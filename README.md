@@ -4,9 +4,11 @@
 
 A wrist wearable that counts reps, measures rep speed and quality, buzzes when a set has slowed too much or rest is over, and tells me when to add weight. The same signal pipeline is also built in Verilog as an RTL project, verified against a Python golden model on my own gym data.
 
-**Status:** D0 done (parts ordered, test pod printing). D1 logger firmware written, builds, and storage logic tested on the laptop; waiting for the board to arrive.
+**Status:** D1 logger running on the XIAO in the printed pod (battery, auto-recording, USB dumps). Now: Bluetooth control from a phone app, so each set is started, stopped and labelled from the phone. Custom PCB v1.1 ready to order.
 
-<img src="hardware/pod/renders/pod_on_band.png" width="420" alt="Pod on its band">
+<img src="docs/photos/pod_v4_strap_usb.jpg" width="520" alt="The printed pod on its strap, charging over USB-C (blue LED)">
+
+*Pod v4: XIAO nRF52840 Sense + LiPo in a black PETG print, on a hook-and-loop strap, charging over USB-C through the side hole.*
 
 ## Layout
 
