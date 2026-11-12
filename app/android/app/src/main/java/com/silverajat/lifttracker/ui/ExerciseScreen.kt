@@ -129,6 +129,14 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         SectionLabel("Personal records")
+                        vm.calibration(ex.id)?.let { (deg, at) ->
+                            Row {
+                                Text("Full ROM (calibrated)", style = MaterialTheme.typography.bodyLarge, color = C.Muted,
+                                    modifier = Modifier.weight(1f))
+                                Text("${deg.toInt()}° · ${shortDate.format(Date(at))}",
+                                    style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Pod)
+                            }
+                        }
                         Stats.records(ex, sessions).forEach { r ->
                             Row {
                                 Text(r.label, style = MaterialTheme.typography.bodyLarge, color = C.Muted,

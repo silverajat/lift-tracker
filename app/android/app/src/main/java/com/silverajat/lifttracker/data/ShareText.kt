@@ -35,7 +35,11 @@ object ShareText {
                 else -> " + ${l.addons} add-ons"
             }
         }
-        return "$w × ${l.reps}" + if (l.warmup) " (warm-up)" else ""
+        return "$w × ${l.reps}" + when {
+            l.calibration -> " (ROM calibration)"
+            l.warmup -> " (warm-up)"
+            else -> ""
+        }
     }
 
     fun build(s: Session): String = buildString {

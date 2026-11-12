@@ -84,6 +84,8 @@ fun compact(weight: Double, addons: Int, reps: Int?, bodyweight: Boolean): Strin
     return if (reps != null) "$w × $reps" else w
 }
 
+private val calDate = java.text.SimpleDateFormat("d MMM", java.util.Locale.getDefault())
+
 // Table column widths
 private const val W_SET = 0.55f
 private const val W_PREV = 1.5f
@@ -280,6 +282,14 @@ private fun ExerciseCard(
             }
             Icon(Icons.Filled.ChevronRight, "Progress", tint = C.Muted)
         }
+        val cal = vm.calibration(ex.id)
+        Text(
+            if (cal != null) "◎ Full ROM ${cal.first.toInt()}° · calibrated ${calDate.format(java.util.Date(cal.second))}"
+            else "◎ ROM not calibrated: tap a set number until it shows C",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (cal != null) C.Pod else C.Muted,
+            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp),
+        )
         if (ex.note.isNotEmpty()) {
             Text(
                 "📝 ${ex.note}", style = MaterialTheme.typography.bodyMedium, color = C.Warm,
@@ -299,16 +309,25 @@ private fun ExerciseCard(
             val p = plan.getOrNull(i)
             val d = done.firstOrNull { it.setNo == i + 1 }
             val isActive = active != null && active.exerciseId == ex.id && active.setNo == i + 1
-            val warm = remember(ex.id, i, d) { mutableStateOf(d?.warmup ?: p?.warmup ?: false) }
-            if (!warm.value) working++
-            val label = if (warm.value) "W" else "$working"
+            // Set type: 0 working, 1 warm-up (W), 2 ROM calibration (C). Tap the label to cycle.
+            val kind = remember(ex.id, i, d) {
+                mutableIntStateOf(
+                    when {
+                        d?.calibration == true -> 2
+                        d?.warmup ?: p?.warmup ?: false -> 1
+                        else -> 0
+                    }
+                )
+            }
+            if (kind.intValue == 0) working++
+            val label = when (kind.intValue) { 1 -> "W"; 2 -> "C"; else -> "$working" }
             val fallback = p ?: plan.lastOrNull()
             val weightText = remember(ex.id, i, d) {
                 mutableStateOf(d?.let { kg(it.weight) } ?: fallback?.let { kg(it.weight) } ?: "")
             }
             SetRow(
                 label = label,
-                warm = warm.value,
+                kind = kind.intValue,
                 previous = p?.let { compact(it.weight, it.addons, it.reps, ex.bodyweight) } ?: "–",
                 weight = weightText.value,
                 onWeight = { weightText.value = it },
@@ -318,11 +337,12 @@ private fun ExerciseCard(
                 done = d != null,
                 active = isActive,
                 canStart = canStart && d == null,
-                onToggleWarm = { if (d == null && !isActive) warm.value = !warm.value },
+                onToggleWarm = { if (d == null && !isActive) kind.intValue = (kind.intValue + 1) % 3 },
                 onCopyPrev = { p?.let { weightText.value = kg(it.weight) } },
                 onStart = {
                     val w = weightText.value.replace(',', '.').toDoubleOrNull() ?: 0.0
-                    vm.startSet(ex, i + 1, w, fallback?.addons ?: 0, warm.value)
+                    vm.startSet(ex, i + 1, w, fallback?.addons ?: 0,
+                        warmup = kind.intValue >= 1, calibration = kind.intValue == 2)
                 },
                 onDone = { d?.let(onRemove) },
             )
@@ -349,7 +369,7 @@ private fun RowScope.HeaderCell(text: String, w: Float) {
 @Composable
 private fun SetRow(
     label: String,
-    warm: Boolean,
+    kind: Int,
     previous: String,
     weight: String,
     onWeight: (String) -> Unit,
@@ -377,13 +397,14 @@ private fun SetRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(W_SET), contentAlignment = Alignment.Center) {
+            val kc = when (kind) { 1 -> C.Warm; 2 -> C.Pod; else -> C.Text }
             Text(
                 label,
                 style = MaterialTheme.typography.titleMedium.merge(Tnum),
-                color = if (warm) C.Warm else C.Text,
+                color = kc,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                    .background(if (warm) C.Warm.copy(alpha = 0.15f) else Color.Transparent)
+                    .background(if (kind != 0) kc.copy(alpha = 0.15f) else Color.Transparent)
                     .clickable(onClick = onToggleWarm).padding(horizontal = 10.dp, vertical = 5.dp),
             )
         }
@@ -463,7 +484,8 @@ private fun BottomPanel(
                             style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             (active?.let { compact(it.weight, it.addons, null, ex?.bodyweight == true) + " kg" } ?: "") +
-                                (if (active?.warmup == true) " · warm-up" else "") +
+                                (if (active?.calibration == true) " · calibration: slow, full stretch"
+                                else if (active?.warmup == true) " · warm-up" else "") +
                                 "  ·  " + elapsed(now - (active?.startMs ?: now)),
                             style = MaterialTheme.typography.bodyLarge.merge(Tnum), color = C.Muted,
                         )
@@ -492,7 +514,7 @@ private fun BottomPanel(
                     style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (analysis != null) {
                     Spacer(Modifier.height(10.dp))
-                    QualityView(analysis, warmup = active?.warmup == true)
+                    QualityView(analysis, warmup = active?.warmup == true, calibration = active?.calibration == true)
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -557,7 +579,7 @@ private fun BottomPanel(
 
 /** Rep quality after a set: overall score, ROM per rep, speed drop, tempo. */
 @Composable
-private fun QualityView(a: SetAnalysis, warmup: Boolean) {
+private fun QualityView(a: SetAnalysis, warmup: Boolean, calibration: Boolean) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Raised).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -573,9 +595,11 @@ private fun QualityView(a: SetAnalysis, warmup: Boolean) {
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text("Rep quality", style = MaterialTheme.typography.titleMedium)
+                Text(if (calibration) "ROM calibration" else "Rep quality", style = MaterialTheme.typography.titleMedium)
                 val romLine = when {
-                    warmup && a.setRomDeg != null -> "Warm-up sets your full ROM: ${a.setRomDeg.toInt()}°"
+                    calibration && a.setRomDeg != null -> "Calibrated: your full ROM is ${a.setRomDeg.toInt()}°"
+                    calibration -> "Calibration saved (this lift is scored relative for now)"
+                    warmup && a.setRomDeg != null -> "Warm-up ROM: ${a.setRomDeg.toInt()}°"
                     a.rotation && a.fullRomDeg != null ->
                         "ROM ${a.avgRomPct}% of your full ${a.fullRomDeg.toInt()}°"
                     else -> "ROM ${a.avgRomPct}% of your best rep"

@@ -48,6 +48,7 @@ data class ActiveSet(
     val endMs: Long? = null,
     val podStarted: Boolean = false,
     val podRec: Int? = null,
+    val calibration: Boolean = false,
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -167,10 +168,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      *  3. otherwise null, and the set is scored against its own best reps.
      */
     fun fullRomDeg(exerciseId: Int): Float? {
+        calibration(exerciseId)?.let { return it.first }
         val warm = _session.value?.sets
             ?.filter { it.exerciseId == exerciseId && it.warmup && it.romDeg.size >= 2 }
             ?.maxOfOrNull { top3(it.romDeg) }
         return warm ?: bestRomDeg(exerciseId)
+    }
+
+    /** Every logged set of an exercise, this workout included. */
+    private fun allSets(exerciseId: Int): List<SetLog> {
+        val cur = _session.value
+        val past = _history.value.filter { it.id != cur?.id }.flatMap { it.sets }
+        return (past + (cur?.sets ?: emptyList())).filter { it.exerciseId == exerciseId }
+    }
+
+    /**
+     * The calibrated full ROM (degrees) and when it was set: the latest C set,
+     * raised by any later set that went further (your range improved).
+     * Null if the exercise was never calibrated with the pod.
+     */
+    fun calibration(exerciseId: Int): Pair<Float, Long>? {
+        val sets = allSets(exerciseId).filter { it.romDeg.size >= 2 }
+        val cal = sets.filter { it.calibration }.maxByOrNull { it.startMs } ?: return null
+        val later = sets.filter { it.startMs > cal.startMs }.map { top3(it.romDeg) }
+        return Pair((later + top3(cal.romDeg)).max(), cal.startMs)
     }
 
     private fun top3(x: List<Float>): Float = x.sortedDescending().take(3).let { t -> t.sorted()[t.size / 2] }
@@ -187,7 +208,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- the set flow ------------------------------------------------------------
 
-    fun startSet(ex: Exercise, setNo: Int, weight: Double, addons: Int, warmup: Boolean) {
+    fun startSet(ex: Exercise, setNo: Int, weight: Double, addons: Int, warmup: Boolean, calibration: Boolean = false) {
         if (_phase.value != Phase.READY) return
         val now = System.currentTimeMillis()
         val session = _session.value?.takeIf { it.day == ex.day }
@@ -196,7 +217,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val set = ActiveSet(
             exerciseId = ex.id,
             setNo = setNo,
-            weight = weight, addons = addons, warmup = warmup, startMs = now,
+            weight = weight, addons = addons, warmup = warmup || calibration, startMs = now,
+            calibration = calibration,
         )
         _active.value = set
         counter.reset()
@@ -207,7 +229,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val ok = pod.send(
                 PodProtocol.start(
-                    exercise = ex.id, day = ex.day.id, setNo = set.setNo, warmup = warmup,
+                    exercise = ex.id, day = ex.day.id, setNo = set.setNo, warmup = set.warmup,
+                    calibration = calibration,
                     weightKg = weight, unixTime = now / 1000, sessionId = session.id,
                 )
             )
@@ -219,7 +242,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val set = _active.value ?: return
         if (_phase.value != Phase.LIFTING) return
         _active.value = set.copy(endMs = System.currentTimeMillis())
-        // A warm-up set is the baseline itself, so it's scored on its own reps.
+        // Warm-up and calibration sets are the baseline, so they're scored on their own reps.
         _analysis.value = counter.analyze(if (set.warmup) null else fullRomDeg(set.exerciseId))
         _phase.value = Phase.CONFIRM
         val live = _liveReps.value
@@ -252,6 +275,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             speedDrop = _analysis.value?.speedDropPct,
             romDeg = _analysis.value?.perRep?.mapNotNull { it.romDeg } ?: emptyList(),
             romPct = _analysis.value?.perRep?.map { it.romPct } ?: emptyList(),
+            calibration = set.calibration,
         )
         val updated = session.copy(sets = session.sets.filterNot {
             it.exerciseId == log.exerciseId && it.setNo == log.setNo

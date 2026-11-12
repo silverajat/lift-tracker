@@ -61,7 +61,7 @@ static ssize_t ctrl_write(struct bt_conn *c, const struct bt_gatt_attr *attr,
 			.exercise = s.exercise,
 			.day = s.day,
 			.set_no = s.set_no,
-			.flags = (s.flags & LABEL_WARMUP) | LABEL_FROM_APP,
+			.flags = (s.flags & (LABEL_WARMUP | LABEL_CALIB)) | LABEL_FROM_APP,
 			.rsvd = 0xffff,
 		};
 		break;

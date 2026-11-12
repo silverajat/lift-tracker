@@ -22,6 +22,7 @@ data class SetLog(
     val speedDrop: Int? = null, // % slower at the end of the set
     val romDeg: List<Float> = emptyList(),  // per-rep ROM in degrees (rotation lifts)
     val romPct: List<Int> = emptyList(),    // per-rep ROM as % of full ROM
+    val calibration: Boolean = false,       // light full-ROM set that sets the baseline
 )
 
 data class Session(
@@ -82,6 +83,7 @@ class SessionStore(context: Context) {
                     put("repScores", JSONArray(l.repScores))
                     put("romDeg", JSONArray(l.romDeg.map { it.toDouble() }))
                     put("romPct", JSONArray(l.romPct))
+                    put("calibration", l.calibration)
                 })
             }
         })
@@ -110,6 +112,7 @@ class SessionStore(context: Context) {
                     ?: emptyList(),
                 romPct = l.optJSONArray("romPct")?.let { a -> (0 until a.length()).map { a.getInt(it) } }
                     ?: emptyList(),
+                calibration = l.optBoolean("calibration", false),
             )
         }
         return Session(

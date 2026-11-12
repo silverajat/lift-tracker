@@ -510,12 +510,12 @@ static int cmd_list(const struct shell *sh, size_t argc, char **argv)
 
 	/* Label columns are blank for unlabelled recordings. */
 	shell_print(sh, "id,start_s,seconds,samples,pretrigger,exercise,day,set,warmup,"
-		    "weight_kg,unix_time,session,reps_live,reps_confirmed");
+		    "weight_kg,unix_time,session,reps_live,reps_confirmed,calibration");
 	for (uint32_t i = 0; i < n; i++) {
 		struct rec_info r;
 		struct set_label l;
 		struct set_result res;
-		char lab[96] = ",,,,,,,,";
+		char lab[96] = ",,,,,,,,,";
 
 		if (storage_get(i, &r) != 0) {
 			continue;
@@ -531,10 +531,10 @@ static int cmd_list(const struct shell *sh, size_t argc, char **argv)
 			if (res.reps_confirmed != 0xff) {
 				snprintk(conf, sizeof(conf), "%u", res.reps_confirmed);
 			}
-			snprintk(lab, sizeof(lab), "%u,%u,%u,%u,%u.%02u,%u,%u,%s,%s",
+			snprintk(lab, sizeof(lab), "%u,%u,%u,%u,%u.%02u,%u,%u,%s,%s,%u",
 				 l.exercise, l.day, l.set_no, (l.flags & LABEL_WARMUP) ? 1 : 0,
 				 l.weight_cg / 100, l.weight_cg % 100, l.unix_time,
-				 l.session_id, live, conf);
+				 l.session_id, live, conf, (l.flags & LABEL_CALIB) ? 1 : 0);
 		}
 		shell_print(sh, "%u,%u,%u.%02u,%u,%u,%s", r.rec_id, r.start_uptime_s,
 			    r.n_samples / hz, (r.n_samples % hz) * 100 / hz,

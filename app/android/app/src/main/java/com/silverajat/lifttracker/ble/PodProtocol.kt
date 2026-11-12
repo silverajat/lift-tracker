@@ -28,14 +28,14 @@ object PodProtocol {
     private fun le(n: Int) = ByteBuffer.allocate(n).order(ByteOrder.LITTLE_ENDIAN)
 
     fun start(
-        exercise: Int, day: Int, setNo: Int, warmup: Boolean,
+        exercise: Int, day: Int, setNo: Int, warmup: Boolean, calibration: Boolean,
         weightKg: Double, unixTime: Long, sessionId: Long,
     ): ByteArray = le(15).apply {
         put(OP_START)
         put(exercise.toByte())
         put(day.toByte())
         put(setNo.coerceIn(0, 255).toByte())
-        put((if (warmup) 1 else 0).toByte())
+        put(((if (warmup) 1 else 0) or (if (calibration) 4 else 0)).toByte())
         putShort((weightKg * 100).roundToInt().coerceIn(0, 65535).toShort())
         putInt(unixTime.toInt())
         putInt(sessionId.toInt())

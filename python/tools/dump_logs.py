@@ -149,7 +149,8 @@ def main():
                 d = labels.get(rid)
                 if d:
                     name = EXERCISES.get(int(d["exercise"]), f"exercise {d['exercise']}")
-                    kind = "warm-up" if d.get("warmup") == "1" else "working"
+                    kind = ("calibration" if d.get("calibration") == "1"
+                            else "warm-up" if d.get("warmup") == "1" else "working")
                     reps = d.get("reps_confirmed") or d.get("reps_live") or ""
                     w.writerow([rid, name, d.get("weight_kg", ""), kind, reps,
                                 f"set {d.get('set', '')}, from app"])

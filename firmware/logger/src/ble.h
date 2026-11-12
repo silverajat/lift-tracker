@@ -36,7 +36,7 @@ struct __packed op_start {
 	uint8_t exercise;
 	uint8_t day;
 	uint8_t set_no;
-	uint8_t flags;         /* LABEL_WARMUP */
+	uint8_t flags;         /* LABEL_WARMUP | LABEL_CALIB */
 	uint16_t weight_cg;    /* 0.01 kg */
 	uint32_t unix_time;
 	uint32_t session_id;

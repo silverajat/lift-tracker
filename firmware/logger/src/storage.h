@@ -40,6 +40,7 @@ struct __packed sample {
 #define LABEL_NONE      0xffu
 #define LABEL_WARMUP    BIT(0)  /* flags: warm-up set */
 #define LABEL_FROM_APP  BIT(1)  /* flags: started from the phone app */
+#define LABEL_CALIB     BIT(2)  /* flags: ROM calibration set (light, full range) */
 
 struct __packed set_label {
 	uint32_t unix_time;    /* phone clock at Start (UTC seconds) */
@@ -48,7 +49,7 @@ struct __packed set_label {
 	uint8_t exercise;      /* app exercise id (see app/README.md) */
 	uint8_t day;           /* 0 = upper, 1 = lower */
 	uint8_t set_no;        /* 1, 2, 3 ... within the exercise */
-	uint8_t flags;         /* LABEL_WARMUP | LABEL_FROM_APP */
+	uint8_t flags;         /* LABEL_WARMUP | LABEL_FROM_APP | LABEL_CALIB */
 	uint16_t rsvd;
 };
 
