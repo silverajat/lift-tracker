@@ -47,12 +47,13 @@ lug_h   = 4.2;
 
 // ---------- Shape ----------
 clr = 0.1;        // board in the rim: snug, glued
-wall = 1.0;       // side wall
-ledge = 0.3;      // the board pushes up against this lip
-top_t = 0.9;
+wall = 1.2;       // side wall (JLC3DP: walls > 1.2 mm)
+stop_w = 0.8;     // corner stops the board pushes up against (JLC3DP: >= 0.8 mm)
+stop_l = 2.6;     // ...only at the corners, where the board has no parts
+top_t = 1.0;
 top_r = 2.2;      // rounded top edge
 chamfer = 0.3;    // small chamfer on the bottom outer edge
-logo_h = 6.0;  logo_depth = 0.3;
+logo_h = 6.0;  logo_depth = 0.2;   // leaves 0.8 mm under the logo
 $fn = 48;
 
 // ---------- Derived ----------
@@ -106,13 +107,24 @@ module lugs() {
             cube([slot_w, strap_w + 0.6, lug_h + 2], center = true);
     }
 }
+// L-shaped stops in the 4 corners, 0.8 mm in from the board edge, so the
+// board can't be pushed into the shell (parts stay >= 0.9 mm from the corners)
+module corner_stops() {
+    for (sx = [-1, 1], sy = [-1, 1])
+        translate([sx*(cav_l/2), sy*(cav_w/2), pcb_t]) mirror([sx < 0 ? 1 : 0, 0, 0]) mirror([0, sy < 0 ? 1 : 0, 0])
+            translate([-stop_l, -stop_l, 0]) difference() {
+                cube([stop_l, stop_l, in_h]);
+                translate([-0.01, -0.01, -1]) cube([stop_l - stop_w + 0.01, stop_l - stop_w + 0.01, in_h + 2]);
+            }
+}
 module shell() {
+    corner_stops();
     difference() {
         union() { pebble(); lugs(); }
         // rebate the board sits in (flush with the bottom)
         translate([0, 0, -1]) linear_extrude(pcb_t + 1) rr(cav_l, cav_w, pcb_r + clr);
-        // parts space above the board, leaving the ledge
-        translate([0, 0, pcb_t - 0.01]) linear_extrude(in_h + 0.01) rr(cav_l - 2*ledge, cav_w - 2*ledge, pcb_r + clr - ledge);
+        // parts space above the board (full board size; corner stops added below)
+        translate([0, 0, pcb_t - 0.01]) linear_extrude(in_h + 0.01) rr(cav_l, cav_w, pcb_r + clr);
         // LED windows (fill with clear UV resin for a sealed light pipe)
         for (p = leds) { q = pod(p); translate([q[0], q[1], H - top_t - 1]) cylinder(d = 1.2, h = top_t + 2); }
         translate([-4, 0, H - logo_depth]) linear_extrude(1) r_logo(logo_h);

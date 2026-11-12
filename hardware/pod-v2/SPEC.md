@@ -2,7 +2,7 @@
 
 **Status (Nov 12, late):** board designed and fully routed (34 × 18 mm, 4 layers, 0.8 mm), DRC 0 errors / 0 unconnected / matches the schematic, ERC 0 errors. Case modelled (36.2 × 20.2 × 7.0 mm). Release files built in `release/liftpod_v2_revA/`. **One blocker:** the nRF52840 module (MDBT50Q-1MV2, C5118826) is out of stock at LCSC/JLC.
 
-**Goal:** about the size of a Google Fitbit Air pebble (34.9 × 17 × 8.3 mm), with no USB port, no button, charging on the Fitbit Air charger, and everything over Bluetooth. Result: 36.2 × 20.2 × **7.0 mm**, 1.3 mm thinner than the Fitbit Air.
+**Goal:** about the size of a Google Fitbit Air pebble (34.9 × 17 × 8.3 mm), with no USB port, no button, charging on the Fitbit Air charger, and everything over Bluetooth. Result: 36.6 × 20.6 × **7.1 mm**, 1.2 mm thinner than the Fitbit Air.
 
 ## How it's built
 
@@ -34,7 +34,7 @@ Top view of the board (x 0–34, y 0–18 mm):
 
 | | Choice | Why |
 |---|---|---|
-| Size | **36.2 × 20.2 × 7.0 mm** body, 45.8 mm with band lugs | No floor (the board is the floor) and the tall parts are paired up: motor on the module, cell on the flash |
+| Size | **36.6 × 20.6 × 7.1 mm** body, 46.2 mm with band lugs | No floor (the board is the floor) and the tall parts are paired up: motor on the module, cell on the flash |
 | Data | **Bluetooth only** | Recordings download over BLE, firmware updates over BLE (MCUboot + mcumgr) |
 | Charging | **Google Fitbit Air charger** (5 V, 2 spring pins 18 mm apart, centre magnet) | Contacts on the underside 18 mm apart; a 5 mm steel disc on top of the board between them, for the charger's magnet. Full Schottky bridge, so the pod charges either way round |
 | Battery | **301120 LiPo, 40 mAh, with protection board** | Datasheet max 3.0 × 11.0 × 20.5 mm. Has its own DW01 + 8205 protection, so none on our board |
