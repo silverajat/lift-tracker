@@ -44,6 +44,7 @@ strap_w = 20.0;  band_t = 1.8;
 slot_w  = band_t + 0.6;
 bar_t   = 1.8;
 lug_h   = 4.2;
+lug_side = 1.6;   // lug wall beside the strap slot
 
 // ---------- Shape ----------
 clr = 0.1;        // board in the rim: snug, glued
@@ -52,6 +53,7 @@ stop_w = 0.8;     // corner stops the board pushes up against (JLC3DP: >= 0.8 mm
 stop_l = 2.6;     // ...only at the corners, where the board has no parts
 top_t = 1.0;
 top_r = 2.2;      // rounded top edge
+in_r = 1.0;       // matching round on the inside, keeps the shell >= 1 mm there
 chamfer = 0.3;    // small chamfer on the bottom outer edge
 logo_h = 6.0;  logo_depth = 0.2;   // leaves 0.8 mm under the logo
 $fn = 48;
@@ -99,9 +101,9 @@ module lugs() {
         hull() {
             translate([s*(body_l/2 - 2), 0, 0]) linear_extrude(lug_h) rr(4, W - 1.0, 1.5);
             translate([s*(L/2 - bar_t/2), 0, bar_t/2 + 0.3]) rotate([90, 0, 0])
-                cylinder(d = bar_t + 0.6, h = strap_w + 2.4, center = true);
+                cylinder(d = bar_t + 0.6, h = strap_w + 0.6 + 2*lug_side, center = true);
             translate([s*(L/2 - bar_t/2), 0, lug_h - bar_t/2 - 0.3]) rotate([90, 0, 0])
-                cylinder(d = bar_t + 0.6, h = strap_w + 2.4, center = true);
+                cylinder(d = bar_t + 0.6, h = strap_w + 0.6 + 2*lug_side, center = true);
         }
         translate([s*(body_l/2 + slot_w/2 + 0.3), 0, lug_h/2])
             cube([slot_w, strap_w + 0.6, lug_h + 2], center = true);
@@ -117,14 +119,23 @@ module corner_stops() {
                 translate([-0.01, -0.01, -1]) cube([stop_l - stop_w + 0.01, stop_l - stop_w + 0.01, in_h + 2]);
             }
 }
+module cavity() {
+    z0 = pcb_t - 0.01;  z1 = pcb_t + in_h;  ri = in_r;
+    zs = concat([z0], [for (i = [0:8]) z1 - ri + i*ri/8]);
+    hull() for (z = zs) translate([0, 0, z]) linear_extrude(0.001) {
+        d = z <= z1 - ri ? 0 : ri - sqrt(max(ri*ri - (z - (z1 - ri))*(z - (z1 - ri)), 0));
+        rr(cav_l - 2*d, cav_w - 2*d, max(pcb_r + clr - d, 0.3));
+    }
+}
 module shell() {
     corner_stops();
     difference() {
         union() { pebble(); lugs(); }
         // rebate the board sits in (flush with the bottom)
         translate([0, 0, -1]) linear_extrude(pcb_t + 1) rr(cav_l, cav_w, pcb_r + clr);
-        // parts space above the board (full board size; corner stops added below)
-        translate([0, 0, pcb_t - 0.01]) linear_extrude(in_h + 0.01) rr(cav_l, cav_w, pcb_r + clr);
+        // parts space above the board (full board size; corner stops added below),
+        // its top edge rounded so the shell stays >= 1 mm under the rounded outside
+        cavity();
         // LED windows (fill with clear UV resin for a sealed light pipe)
         for (p = leds) { q = pod(p); translate([q[0], q[1], H - top_t - 1]) cylinder(d = 1.2, h = top_t + 2); }
         translate([-4, 0, H - logo_depth]) linear_extrude(1) r_logo(logo_h);
