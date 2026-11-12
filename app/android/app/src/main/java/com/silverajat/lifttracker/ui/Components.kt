@@ -188,7 +188,7 @@ private fun BatteryGlyph(pct: Int) {
     val color = when {
         pct < 15 -> C.Stop
         pct < 35 -> C.Warm
-        else -> C.Accent
+        else -> C.Done
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(

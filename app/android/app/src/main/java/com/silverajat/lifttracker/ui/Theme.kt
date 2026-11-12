@@ -16,8 +16,10 @@ object C {
     val Line = Color(0xFF2A2F37)
     val Text = Color(0xFFF2F4F7)
     val Muted = Color(0xFF8B93A1)
-    val Accent = Color(0xFFC6FF3D)      // lime: go / done
-    val OnAccent = Color(0xFF0B0D10)
+    val Accent = Color(0xFF3D8BFF)      // blue: actions, links (Hevy-style)
+    val OnAccent = Color(0xFFFFFFFF)
+    val Done = Color(0xFF2FD27A)        // green: completed sets
+    val DoneRow = Color(0xFF12301F)     // completed row background
     val Pod = Color(0xFF3DDCFF)         // cyan: the pod / Bluetooth
     val Stop = Color(0xFFFF5A4E)        // red: stop
     val Warm = Color(0xFFFFB547)        // amber: warm-up sets

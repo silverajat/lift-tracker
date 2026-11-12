@@ -17,10 +17,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.silverajat.lifttracker.ui.C
-import com.silverajat.lifttracker.ui.DayScreen
+import com.silverajat.lifttracker.ui.ExerciseScreen
 import com.silverajat.lifttracker.ui.HomeScreen
-import com.silverajat.lifttracker.ui.LiftScreen
 import com.silverajat.lifttracker.ui.LiftTheme
+import com.silverajat.lifttracker.ui.WorkoutScreen
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -59,8 +59,8 @@ class MainActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize().background(C.Bg)) {
                     when (val s = screen) {
                         Screen.Home -> HomeScreen(vm, onConnect = ::connectPod)
-                        is Screen.DayList -> DayScreen(vm, s.day)
-                        is Screen.Lift -> LiftScreen(vm, s.exerciseId)
+                        is Screen.Workout -> WorkoutScreen(vm, s.day)
+                        is Screen.ExerciseInfo -> ExerciseScreen(vm, s.exerciseId)
                     }
                 }
             }

@@ -2,7 +2,7 @@
 
 # lift-tracker
 
-A wrist wearable that counts reps, measures rep speed and quality, buzzes when a set has slowed too much or rest is over, and tells me when to add weight. The same signal pipeline is also built in Verilog as an RTL project, verified against a Python golden model on my own gym data.
+A wrist wearable that counts reps, measures rep speed and quality, buzzes when a set has slowed too much or rest is over, and tells me when to add weight. The moment a set ends, the phone app shows the rep count and a quality score for each rep (speed, range, consistency). The same signal pipeline is also built in Verilog as an RTL project, verified against a Python golden model on my own gym data.
 
 **Status:** D1 logger running on the XIAO in the printed pod (battery, auto-recording, USB dumps). Now: Bluetooth control from a phone app, so each set is started, stopped and labelled from the phone. Custom PCB v1.1 ready to order.
 

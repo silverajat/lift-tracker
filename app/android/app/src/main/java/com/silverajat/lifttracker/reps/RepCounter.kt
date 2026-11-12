@@ -13,11 +13,16 @@ import kotlin.math.sqrt
  * Method, re-run on the whole set every few samples so the count never
  * jumps around because of a late decision:
  *  1. Smooth each of the 6 channels (0.2 s moving average) and remove the
- *     slow baseline (2 s), leaving the back-and-forth of the reps.
+ *     slow baseline (4 s), leaving the back-and-forth of the reps.
  *  2. Pick the channel that moves the most relative to its noise level:
  *     gyro for curls/raises (the wrist rotates), accel for presses/rows.
  *  3. Count swings with hysteresis: each pass from below -h to above +h,
- *     or back, is half a rep. Swings closer than 0.35 s are ignored.
+ *     or back, is half a rep (h = half the signal's spread). Swings closer
+ *     than 0.5 s are ignored.
+ *
+ * Parameters were picked on the desk-test curls only (Nov 11), so expect
+ * it to be off by a rep or two on real lifts. Tomorrow's confirmed counts
+ * are the data to tune it properly.
  */
 class RepCounter(private val hz: Int = 25) {
     private val buf = ArrayList<FloatArray>(4096)
@@ -44,7 +49,7 @@ class RepCounter(private val hz: Int = 25) {
             val n = data.size
             if (n < hz) return 0
             val smoothW = max(1, hz / 5)
-            val baseW = 2 * hz
+            val baseW = 4 * hz
 
             var best: FloatArray? = null
             var bestScore = 0f
@@ -60,8 +65,8 @@ class RepCounter(private val hz: Int = 25) {
             if (best == null || bestScore < 1.5f) return 0
 
             val sig = best
-            val h = 0.35f * std(sig)
-            val minGap = (0.35f * hz).toInt()
+            val h = 0.5f * std(sig)
+            val minGap = (0.5f * hz).toInt()
             var state = 0          // -1 low, +1 high, 0 unknown
             var swings = 0
             var lastSwing = -minGap

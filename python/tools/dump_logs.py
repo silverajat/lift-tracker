@@ -7,8 +7,9 @@ Usage (XIAO plugged in over USB, blue LED on):
     python dump_logs.py --erase         # erase the board after a successful dump
 
 Files land in data/raw/<date-time>/rec_<id>.csv, one per recording, plus
-recordings.csv listing them all. Fill in notes.csv afterwards: which
-exercise, weight, warm-up or working, anything odd.
+recordings.csv listing them all. Sets started from the phone app (firmware
+v2+) carry their label: exercise, weight, set number, warm-up, rep counts.
+notes.csv is prefilled from those labels; fill in the rest by hand.
 
 Units: accel in milli-g, gyro in 0.1 deg/s (divide by 10 for deg/s).
 """
@@ -23,6 +24,17 @@ import serial                      # pip install pyserial
 from serial.tools import list_ports
 
 ZEPHYR_VID = 0x2FE3                # USB vendor ID the firmware uses
+
+# Exercise ids, same as app/android/.../data/Routines.kt (never renumber).
+EXERCISES = {
+    1: "Incline bench (3D Smith)", 2: "Upper back row", 3: "Overhead press (3D Smith)",
+    4: "Lat pulldown", 5: "Lateral raises", 6: "Reverse pec dec", 7: "Pec dec",
+    8: "Rows machine", 9: "Tricep extension (single-arm cable)", 10: "Hammer curl (cable)",
+    11: "Overhead tricep extension", 12: "Preacher curl (single-arm)",
+    21: "Leg press", 22: "Romanian deadlift", 23: "Ab crunch machine",
+    24: "Reverse ab crunches", 25: "Cable woodchoppers", 26: "Leg extension",
+    27: "Leg curl", 28: "Single-leg calf raise", 29: "Back extension",
+}
 
 
 def find_port():
@@ -90,7 +102,10 @@ def main():
 
     sh = Shell(args.port or find_port())
 
-    listing = [l for l in sh.run("rec list") if l and l[0].isdigit()]
+    out_lines = sh.run("rec list")
+    header = next((l for l in out_lines if l.startswith("id,")),
+                  "id,start_s,seconds,samples,pretrigger")
+    listing = [l for l in out_lines if l and l[0].isdigit()]
     if not listing:
         print("No recordings on the board.")
         return
@@ -98,8 +113,13 @@ def main():
 
     out = pathlib.Path(args.out) / dt.datetime.now().strftime("%Y-%m-%d_%H%M")
     out.mkdir(parents=True, exist_ok=True)
-    (out / "recordings.csv").write_text(
-        "id,start_s,seconds,samples,pretrigger\n" + "\n".join(listing) + "\n")
+    (out / "recordings.csv").write_text(header + "\n" + "\n".join(listing) + "\n")
+    cols = header.split(",")
+    labels = {}
+    for row in listing:
+        d = dict(zip(cols, row.split(",")))
+        if d.get("exercise"):
+            labels[d["id"]] = d
 
     saved = 0
     for row in listing:
@@ -125,10 +145,21 @@ def main():
             w = csv.writer(f)
             w.writerow(["id", "exercise", "weight_kg", "set_type", "reps", "notes"])
             for row in listing:
-                w.writerow([row.split(",")[0], "", "", "working/warm-up/junk", "", ""])
+                rid = row.split(",")[0]
+                d = labels.get(rid)
+                if d:
+                    name = EXERCISES.get(int(d["exercise"]), f"exercise {d['exercise']}")
+                    kind = "warm-up" if d.get("warmup") == "1" else "working"
+                    reps = d.get("reps_confirmed") or d.get("reps_live") or ""
+                    w.writerow([rid, name, d.get("weight_kg", ""), kind, reps,
+                                f"set {d.get('set', '')}, from app"])
+                else:
+                    w.writerow([rid, "", "", "working/warm-up/junk", "", ""])
 
     print(f"Saved {saved} recordings to {out}")
-    print("Now fill in notes.csv: which exercise each recording was.")
+    print(f"{len(labels)} of {len(listing)} were labelled by the app.")
+    if len(labels) < len(listing):
+        print("Fill in notes.csv for the rest: which exercise each recording was.")
 
     if args.erase and saved == len(listing):
         print("Erasing the board...")

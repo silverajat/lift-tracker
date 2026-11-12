@@ -30,8 +30,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 sealed interface Screen {
     data object Home : Screen
-    data class DayList(val day: Day) : Screen
-    data class Lift(val exerciseId: Int) : Screen
+    data class Workout(val day: Day) : Screen
+    data class ExerciseInfo(val exerciseId: Int) : Screen
 }
 
 enum class Phase { READY, LIFTING, CONFIRM }
@@ -111,11 +111,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun back(): Boolean {
         when (val s = _screen.value) {
-            is Screen.Lift -> {
-                if (_phase.value != Phase.READY) return true   // finish the set first
-                _screen.value = Screen.DayList(Routines.byId(s.exerciseId).day)
-            }
-            is Screen.DayList -> _screen.value = Screen.Home
+            is Screen.ExerciseInfo -> _screen.value = Screen.Workout(Routines.byId(s.exerciseId).day)
+            is Screen.Workout -> _screen.value = Screen.Home
             Screen.Home -> return false
         }
         return true
@@ -133,6 +130,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             s.id != current && s.sets.any { it.exerciseId == ex.id }
         }
         return past?.sets?.filter { it.exerciseId == ex.id }
+            ?.sortedBy { it.setNo }
             ?.map { PlanSet(it.weight, it.reps, it.warmup, it.addons) }
             ?: ex.last
     }
@@ -144,16 +142,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }?.startMs
     }
 
-    /** Prefill for the next set: the same set number from last time. */
-    fun suggestion(ex: Exercise): PlanSet {
-        val plan = lastTime(ex)
-        val k = setsToday(ex.id).size
-        return plan.getOrElse(k) { plan.last().copy(warmup = false) }
+    /** Extra set rows added with "+ Add set", per exercise. */
+    private val _extraRows = MutableStateFlow<Map<Int, Int>>(emptyMap())
+    val extraRows: StateFlow<Map<Int, Int>> = _extraRows
+
+    fun addRow(exerciseId: Int) {
+        _extraRows.value = _extraRows.value + (exerciseId to ((_extraRows.value[exerciseId] ?: 0) + 1))
     }
+
+    /** Every finished session, oldest first (for charts and the history tab). */
+    fun sessionsWith(exerciseId: Int): List<Session> =
+        _history.value.filter { s -> s.sets.any { it.exerciseId == exerciseId } }.sortedBy { it.startMs }
 
     // ---- the set flow ------------------------------------------------------------
 
-    fun startSet(ex: Exercise, weight: Double, addons: Int, warmup: Boolean) {
+    fun startSet(ex: Exercise, setNo: Int, weight: Double, addons: Int, warmup: Boolean) {
         if (_phase.value != Phase.READY) return
         val now = System.currentTimeMillis()
         val session = _session.value?.takeIf { it.day == ex.day }
@@ -161,7 +164,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 .also { _session.value = it; saveSession(it) }
         val set = ActiveSet(
             exerciseId = ex.id,
-            setNo = setsToday(ex.id).size + 1,
+            setNo = setNo,
             weight = weight, addons = addons, warmup = warmup, startMs = now,
         )
         _active.value = set
@@ -212,7 +215,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             startMs = set.startMs, endMs = set.endMs ?: System.currentTimeMillis(),
             liveReps = if (set.podStarted) _liveReps.value else null, podRec = set.podRec,
         )
-        val updated = session.copy(sets = session.sets + log)
+        val updated = session.copy(sets = session.sets.filterNot {
+            it.exerciseId == log.exerciseId && it.setNo == log.setNo
+        } + log)
         _session.value = updated
         saveSession(updated)
         set.podRec?.let { rec -> viewModelScope.launch { pod.send(PodProtocol.confirm(rec, reps)) } }
@@ -239,6 +244,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (done.sets.isEmpty()) store.delete(done.id) else store.save(done)
         _history.value = store.all()
         _session.value = null
+        _extraRows.value = emptyMap()
         restJob?.cancel()
         _restEndsAt.value = null
         _screen.value = Screen.Home

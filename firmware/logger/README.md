@@ -1,6 +1,17 @@
-# D1 logger firmware
+# Logger firmware (v2: Bluetooth + labelled sets)
 
-Records the XIAO nRF52840 Sense's IMU to its 2 MB flash during sets, then hands the recordings to the laptop as CSV files.
+Records the XIAO nRF52840 Sense's IMU to its 2 MB flash during sets, then hands the recordings to the laptop as CSV files. Since v2 the phone app starts and stops each set over Bluetooth and labels it, so the recordings come off the pod already tagged with exercise, weight and reps.
+
+## With the phone app (v2)
+
+- The pod advertises as **LiftPod**. The app finds it by its service UUID and connects by itself.
+- **Start** in the app opens a recording with a label: exercise id, day, set number, weight (0.01 kg), warm-up flag, phone time and session id. **Stop** closes it and stores the app's live rep count. **Save** in the app writes the rep count you confirmed.
+- While the app listens, the pod streams the IMU at 25 Hz (every 4th sample) for the live rep counter. The flash still gets the full 100 Hz.
+- Once the app has connected, **motion-triggered recording is off** until the pod reboots, so walking between sets is never recorded. If the phone drops out mid-set, the set closes after 12 s of stillness.
+- LED: a **blue** blip every 3 s means on battery with the app connected.
+- Protocol (UUIDs, byte layouts): `src/ble.h`. The app's copy is `app/android/.../ble/PodProtocol.kt`; keep the two in sync.
+- Recording header v2 is 64 bytes (`src/storage.h`). The rep counts are written into the header later, which is possible because NOR flash bits can go from 1 to 0 without an erase. `rec list` shows the label columns, and `dump_logs.py` copies them into `recordings.csv` and prefills `notes.csv`.
+- **Moving to the gym-pod PCB:** only the board overlay and `read_imu()` change (BMI270 instead of the LSM6DS3TR-C). Storage, Bluetooth and the app stay the same.
 
 ## How it behaves
 
@@ -59,14 +70,16 @@ The `.uf2` in `prebuilt/` was built with nRF Connect SDK v3.4.1, the same versio
 
 | File | What's in it |
 | --- | --- |
-| `src/main.c` | Sampling thread, motion detection (start/stop), shell commands, LED |
+| `src/main.c` | Sampling thread, motion detection (start/stop), app commands, shell commands, LED |
+| `src/ble.c/.h` | Bluetooth service for the phone app: control, status, live stream |
 | `src/storage.c/.h` | Append-only recording log on the QSPI flash, with power-loss recovery |
 | `tests/host/` | Tests `storage.c` on the laptop against a simulated flash chip (`make && ./test_storage`) |
-| `prj.conf` | IMU rate and ranges, flash, shell |
+| `prj.conf` | IMU rate and ranges, flash, shell, Bluetooth |
 
 ## Known limits (to revisit)
 
 - First run on the real board (Nov 11, 2026): 100 Hz with no dropped samples; at rest the accel noise is about 2 mg and the gyro bias is under 3 °/s.
 - Fixed on that first run: the XIAO powers its IMU through a switch, and Zephyr probed the chip before it had booted, so the IMU stayed disabled (the board showed "battery" on USB and recorded nothing). `app.overlay` now defers the IMU's start, and `main.c` starts it after 100 ms with retries.
 - Always sampling on battery, so it draws a few mA continuously. Fine for the prototype; low-power work comes in D5.
-- No battery voltage reading yet.
+- Battery voltage: `rec batt` (and the app shows it), from the XIAO's divider on P0.31.
+- Bluetooth has no pairing yet: any phone running the app could connect. Fine for a prototype; bonding comes with the PCB firmware.
