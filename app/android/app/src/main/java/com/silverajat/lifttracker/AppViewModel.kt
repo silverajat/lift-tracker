@@ -35,7 +35,7 @@ sealed interface Screen {
     data class ExerciseInfo(val exerciseId: Int) : Screen
 }
 
-enum class Phase { READY, LIFTING, CONFIRM }
+enum class Phase { READY, COUNTDOWN, LIFTING, CONFIRM }
 
 /** The set between Start and Save. */
 data class ActiveSet(
@@ -208,6 +208,58 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- the set flow ------------------------------------------------------------
 
+    // ---- 3-2-1 countdown before a set (time to get into position) ----------
+    private val _countdownEndsAt = MutableStateFlow<Long?>(null)
+    val countdownEndsAt: StateFlow<Long?> = _countdownEndsAt
+    private var countdownJob: Job? = null
+    private var pendingStart: (() -> Unit)? = null
+
+    /** ▶ pressed: count down 3 s, then start the set (and the pod recording). */
+    fun requestSet(ex: Exercise, setNo: Int, weight: Double, addons: Int, warmup: Boolean, calibration: Boolean = false) {
+        if (_phase.value != Phase.READY) return
+        restJob?.cancel()
+        _restEndsAt.value = null
+        pendingStart = { startSet(ex, setNo, weight, addons, warmup, calibration) }
+        _active.value = ActiveSet(ex.id, setNo, weight, addons, warmup || calibration,
+            startMs = System.currentTimeMillis(), calibration = calibration)
+        _phase.value = Phase.COUNTDOWN
+        val end = System.currentTimeMillis() + COUNTDOWN_MS
+        _countdownEndsAt.value = end
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
+            for (left in (COUNTDOWN_MS / 1000).toInt() downTo 1) {
+                tick(40)
+                delay((end - System.currentTimeMillis()) - (left - 1) * 1000L)
+            }
+            goNow()
+        }
+    }
+
+    /** Skip the rest of the countdown. */
+    fun goNow() {
+        if (_phase.value != Phase.COUNTDOWN) return
+        countdownJob?.cancel()
+        _countdownEndsAt.value = null
+        _phase.value = Phase.READY
+        tick(250)
+        pendingStart?.invoke()
+        pendingStart = null
+    }
+
+    fun cancelCountdown() {
+        if (_phase.value != Phase.COUNTDOWN) return
+        countdownJob?.cancel()
+        _countdownEndsAt.value = null
+        pendingStart = null
+        _active.value = null
+        _phase.value = Phase.READY
+    }
+
+    private fun tick(ms: Long) {
+        val vm = getApplication<Application>().getSystemService(VibratorManager::class.java) ?: return
+        vm.defaultVibrator.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+    }
+
     fun startSet(ex: Exercise, setNo: Int, weight: Double, addons: Int, warmup: Boolean, calibration: Boolean = false) {
         if (_phase.value != Phase.READY) return
         val now = System.currentTimeMillis()
@@ -360,6 +412,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _restSeconds.value = s
         prefs.edit().putInt("rest_s", s).apply()
     }
+
+    companion object { const val COUNTDOWN_MS = 3_000L }
 
     private fun buzz() {
         val vm = getApplication<Application>().getSystemService(VibratorManager::class.java) ?: return

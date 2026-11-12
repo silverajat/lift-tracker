@@ -350,7 +350,7 @@ private fun ExerciseCard(
                 onCopyPrev = { p?.let { weightText.value = kg(it.weight) } },
                 onStart = {
                     val w = weightText.value.replace(',', '.').toDoubleOrNull() ?: 0.0
-                    vm.startSet(ex, i + 1, w, fallback?.addons ?: 0,
+                    vm.requestSet(ex, i + 1, w, fallback?.addons ?: 0,
                         warmup = kind.intValue >= 1, calibration = kind.intValue == 2)
                 },
                 onDone = { d?.let(onRemove) },
@@ -486,6 +486,27 @@ private fun BottomPanel(
             .border(1.dp, C.Line, shape).navigationBarsPadding().padding(18.dp),
     ) {
         when (phase) {
+            Phase.COUNTDOWN -> {
+                val endsAt by vm.countdownEndsAt.collectAsStateWithLifecycle()
+                val left = (((endsAt ?: now) - now + 999) / 1000).coerceIn(1, 3)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("${ex?.name ?: ""} · set ${active?.setNo ?: ""}",
+                            style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Get into position…", style = MaterialTheme.typography.bodyLarge, color = C.Muted)
+                        Row {
+                            TextButton(onClick = { vm.cancelCountdown() }) { Text("Cancel", color = C.Muted) }
+                            TextButton(onClick = { vm.goNow() }) { Text("Go now", color = C.Accent, fontWeight = FontWeight.Bold) }
+                        }
+                    }
+                    Box(
+                        Modifier.size(108.dp).clip(CircleShape).background(C.Accent).clickable { vm.goNow() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("$left", style = MaterialTheme.typography.displayMedium.merge(Tnum), color = Color.White)
+                    }
+                }
+            }
             Phase.LIFTING -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
