@@ -133,4 +133,16 @@ if (part == "assembled") {
     color("#c9a227") translate([c[0], c[1], pcb_t + flash_h + gap + cell[2]/2]) cube(cell, center = true);
     s = pod(steel_at); color("#777") translate([s[0], s[1], pcb_t]) cylinder(d = 5, h = 0.5);
 }
+
+if (part == "exploded") {   // assembly order, bottom to top
+    e = 6;
+    board();
+    color("#9a9a9a") translate([pod([6.3, 9])[0], pod([6.3, 9])[1], pcb_t + module_h/2]) cube([10, 15.5, module_h], center = true);
+    color("#555") translate([pod([16.6, 3.0])[0], pod([16.6, 3.0])[1], pcb_t + flash_h/2]) cube([4.9, 3.9, flash_h], center = true);
+    s = pod(steel_at); color("#c8c8c8") translate([s[0], s[1], pcb_t + e*0.6]) difference() { cylinder(d = 5, h = 0.5); translate([0,0,-1]) cylinder(d = 2.2, h = 3); }
+    m = pod(motor_at); color("#d0d0d0") translate([m[0], m[1], pcb_t + module_h + e]) cylinder(d = motor_d, h = motor_t);
+    c = pod([(cell_box[0] + cell_box[2])/2, (cell_box[1] + cell_box[3])/2]);
+    color("#c9a227") translate([c[0], c[1], pcb_t + flash_h + e + cell[2]/2]) cube(cell, center = true);
+    color("#111111", 0.55) translate([0, 0, 3*e]) shell();
+}
 echo(str("pod v2 size (mm): body ", body_l, " x ", W, " x ", H, " thick; with lugs ", L, " long; inside height above the board ", in_h));
