@@ -295,6 +295,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _phase.value = Phase.READY
     }
 
+    /** Delete a saved workout for good (its pod recordings stay on the pod). */
+    fun deleteWorkout(id: Long) {
+        if (_session.value?.id == id) {
+            if (_phase.value != Phase.READY) return
+            _session.value = null
+            _extraRows.value = emptyMap()
+            restJob?.cancel()
+            _restEndsAt.value = null
+        }
+        store.delete(id)
+        _history.value = store.all()
+    }
+
     fun deleteSet(log: SetLog) {
         val session = _session.value ?: return
         val updated = session.copy(sets = session.sets - log)

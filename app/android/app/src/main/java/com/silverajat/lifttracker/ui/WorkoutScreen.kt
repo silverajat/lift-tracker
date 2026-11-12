@@ -193,7 +193,16 @@ fun WorkoutScreen(vm: AppViewModel, day: Day, onShare: (Session) -> Unit) {
                     if (done == null || done.sets.isEmpty()) vm.open(Screen.Home) else finished = done
                 }) { Text("Finish", color = C.Accent, fontWeight = FontWeight.Bold) }
             },
-            dismissButton = { TextButton(onClick = { confirmFinish = false }) { Text("Keep going", color = C.Muted) } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        confirmFinish = false
+                        current?.let { vm.deleteWorkout(it.id) }
+                        vm.open(Screen.Home)
+                    }) { Text("Delete workout", color = C.Stop) }
+                    TextButton(onClick = { confirmFinish = false }) { Text("Keep going", color = C.Muted) }
+                }
+            },
         )
     }
     finished?.let { s ->

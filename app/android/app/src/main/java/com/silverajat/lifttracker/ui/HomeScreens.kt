@@ -22,7 +22,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +70,25 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
     val status by vm.pod.status.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
+
+    var toDelete by remember { mutableStateOf<Session?>(null) }
+    toDelete?.let { s ->
+        AlertDialog(
+            onDismissRequest = { toDelete = null },
+            containerColor = C.Surface,
+            title = { Text("Delete this workout?") },
+            text = {
+                Text("${s.day.title} day, ${dayFmt.format(Date(s.startMs))}: ${s.sets.size} sets. " +
+                    "This can't be undone.")
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.deleteWorkout(s.id); toDelete = null }) {
+                    Text("Delete", color = C.Stop, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("Keep", color = C.Muted) } },
+        )
+    }
 
     val weekAgo = System.currentTimeMillis() - 7 * 24 * 3600_000L
     val week = history.filter { it.startMs >= weekAgo && it.sets.isNotEmpty() }
@@ -108,10 +133,12 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                 onClick = { vm.open(Screen.Workout(day)) },
             )
         }
-        val recent = history.filter { it.endMs != null && it.sets.isNotEmpty() }.take(5)
+        val recent = history.filter { it.endMs != null && it.sets.isNotEmpty() }.take(10)
         if (recent.isNotEmpty()) {
             item { SectionLabel("Recent", Modifier.padding(top = 6.dp)) }
-            items(recent, key = { it.id }) { s -> RecentRow(s, onExport = { onExport(s) }) }
+            items(recent, key = { it.id }) { s ->
+                RecentRow(s, onExport = { onExport(s) }, onDelete = { toDelete = s })
+            }
         }
     }
 }
@@ -182,7 +209,7 @@ private fun Pill(text: String) {
 }
 
 @Composable
-private fun RecentRow(s: Session, onExport: () -> Unit) {
+private fun RecentRow(s: Session, onExport: () -> Unit, onDelete: () -> Unit) {
     val color = if (s.day == Day.UPPER) C.UpperA else C.LowerA
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Surface).padding(14.dp),
@@ -201,7 +228,8 @@ private fun RecentRow(s: Session, onExport: () -> Unit) {
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
-        IconButton(onClick = onExport) { Icon(Icons.Filled.Share, "Export", tint = C.Muted) }
+        IconButton(onClick = onExport) { Icon(Icons.Filled.Share, "Share", tint = C.Muted) }
+        IconButton(onClick = onDelete) { Icon(Icons.Filled.DeleteOutline, "Delete", tint = C.Muted) }
     }
 }
 
