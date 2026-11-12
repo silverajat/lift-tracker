@@ -2,13 +2,20 @@
 
 Native Android app (Kotlin + Jetpack Compose) that runs the workout and controls the pod over Bluetooth.
 
-**Now (v0.1):**
-- Pick **Upper** or **Lower** day. Each exercise shows what you lifted last time.
-- Pick an exercise. Weight, add-on plates and warm-up are prefilled from the same set last time.
-- **Start** → lift → **Stop**. The pod records the set with its label, and the live rep count comes from the pod's motion stream.
-- Confirm or fix the reps, then the **rest timer** starts. The phone buzzes when rest is over.
-- Sessions are saved on the phone after every set and become "last time" for the next workout. The screen stays on during a workout.
-- It works without the pod as well: timing and logging only.
+**Now (v0.2):**
+- Pick **Upper** or **Lower** day. The workout is a Hevy-style table per exercise: SET · PREVIOUS · KG · REPS. The numbers you lifted last time are prefilled. Tap a set number to mark it as a warm-up.
+- **▶** starts a set and the pod records it with its label. The live rep count comes from the pod's motion stream. **STOP** ends the set.
+- **Rep quality** after every set, with ROM first:
+  - **Rotation lifts** (curls, raises, flyes, extensions): ROM per rep in degrees, from the gyro.
+  - Each rep is compared with your **full ROM**: today's warm-up set, or your best logged set when there's no warm-up.
+  - Reps under 90% are flagged as partials. Speed drop and tempo are shown alongside.
+  - **Push/pull lifts:** ROM is relative to the set's biggest reps for now.
+- Confirm the reps → the rest timer starts: **2:00** for main lifts, **1:30** for isolation. The phone buzzes when it's over.
+- **Share** a workout as text, written like a hand-typed log, to ChatGPT or anywhere else. It's offered when you finish, and there's a share icon on recent workouts.
+- Exercise page: progress charts (heaviest weight, est. 1RM, best set, volume, reps, full ROM), personal records and history.
+- Sessions are saved on the phone after every set. The screen stays on during a workout, and the app works without the pod (timing and logging only).
+
+**How rep quality will be checked:** the pod's rep counts are compared with the counts you confirm, and its ROM degrees are compared frame by frame with filmed sets (elbow and arm angle). See `docs/` once the first gym data is in.
 
 **Vision:** the moment a set ends, the app shows the rep count and a quality score for each rep (speed, range, consistency). It flags when a set slowed too much and when it's time to add weight.
 
