@@ -22,6 +22,11 @@ data class PlanSet(
     val addons: Int = 0,
 )
 
+/** Muscle group: sets the colour of the exercise's badge. */
+enum class Group(val label: String) {
+    CHEST("Chest"), BACK("Back"), SHOULDERS("Shoulders"), ARMS("Arms"), LEGS("Legs"), CORE("Core")
+}
+
 data class Exercise(
     val id: Int,
     val day: Day,
@@ -86,6 +91,21 @@ object Routines {
         Exercise(29, Day.LOWER, "Back extension", "",
             listOf(s(30.0, 11), s(30.0, 11))),
     )
+
+    // Main compound lifts rest 2 min, isolation work 90 s.
+    private val compound = setOf(1, 2, 3, 4, 8, 21, 22)
+
+    private val groups = mapOf(
+        1 to Group.CHEST, 2 to Group.BACK, 3 to Group.SHOULDERS, 4 to Group.BACK,
+        5 to Group.SHOULDERS, 6 to Group.SHOULDERS, 7 to Group.CHEST, 8 to Group.BACK,
+        9 to Group.ARMS, 10 to Group.ARMS, 11 to Group.ARMS, 12 to Group.ARMS,
+        21 to Group.LEGS, 22 to Group.LEGS, 23 to Group.CORE, 24 to Group.CORE,
+        25 to Group.CORE, 26 to Group.LEGS, 27 to Group.LEGS, 28 to Group.LEGS, 29 to Group.BACK,
+    )
+
+    fun restSeconds(ex: Exercise) = if (ex.id in compound) 120 else 90
+    fun isCompound(ex: Exercise) = ex.id in compound
+    fun group(ex: Exercise) = groups[ex.id] ?: Group.CORE
 
     fun forDay(day: Day) = if (day == Day.UPPER) upper else lower
     fun byId(id: Int) = (upper + lower).first { it.id == id }

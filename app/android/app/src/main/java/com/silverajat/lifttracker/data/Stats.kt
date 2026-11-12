@@ -10,6 +10,7 @@ enum class Metric(val label: String, val unit: String) {
     BEST_SET("Best set volume", "kg"),
     VOLUME("Session volume", "kg"),
     REPS("Total reps", "reps"),
+    ROM("Full ROM", "°"),
 }
 
 data class Point(val label: String, val timeMs: Long?, val value: Double)
@@ -26,6 +27,7 @@ object Stats {
             Metric.BEST_SET -> work.maxOfOrNull { it.weight * it.reps } ?: 0.0
             Metric.VOLUME -> sets.sumOf { it.weight * it.reps }
             Metric.REPS -> sets.sumOf { it.reps }.toDouble()
+            Metric.ROM -> 0.0   // from the pod's per-rep data: see romSeries
         }
     }
 
@@ -41,6 +43,13 @@ object Stats {
             if (sets.isNotEmpty()) pts += Point("", s.startMs, value(m, sets))
         }
         return pts
+    }
+
+    /** Full ROM (degrees) per session: best set's median of its 3 biggest reps. */
+    fun romSeries(ex: Exercise, sessions: List<Session>): List<Point> = sessions.mapNotNull { s ->
+        s.sets.filter { it.exerciseId == ex.id && it.romDeg.size >= 2 }
+            .map { l -> l.romDeg.sortedDescending().take(3).let { t -> t.sorted()[t.size / 2].toDouble() } }
+            .maxOrNull()?.let { Point("", s.startMs, it) }
     }
 
     data class Record(val label: String, val value: String)

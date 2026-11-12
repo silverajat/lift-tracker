@@ -1,6 +1,7 @@
 package com.silverajat.lifttracker.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -21,24 +21,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,67 +42,166 @@ import com.silverajat.lifttracker.AppViewModel
 import com.silverajat.lifttracker.Screen
 import com.silverajat.lifttracker.data.Day
 import com.silverajat.lifttracker.data.Routines
+import com.silverajat.lifttracker.data.Session
+import com.silverajat.lifttracker.data.Stats
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 private val dayFmt = SimpleDateFormat("EEE d MMM", Locale.getDefault())
 private val timeFmt = SimpleDateFormat("H:mm", Locale.getDefault())
 
+private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+    in 5..11 -> "Good morning"
+    in 12..17 -> "Good afternoon"
+    else -> "Good evening"
+}
+
 @Composable
-fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit) {
+fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> Unit) {
     val conn by vm.pod.conn.collectAsStateWithLifecycle()
     val status by vm.pod.status.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
 
+    val weekAgo = System.currentTimeMillis() - 7 * 24 * 3600_000L
+    val week = history.filter { it.startMs >= weekAgo && it.sets.isNotEmpty() }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 40.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Column(Modifier.padding(top = 8.dp, bottom = 6.dp)) {
-                SectionLabel(dayFmt.format(Date()))
-                Text("Lift Tracker", style = MaterialTheme.typography.headlineLarge)
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(dayFmt.format(Date()).uppercase(), style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    Text(greeting(), style = MaterialTheme.typography.headlineLarge)
+                }
+                Box(
+                    Modifier.size(44.dp).clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(C.UpperA, C.UpperB))),
+                    contentAlignment = Alignment.Center,
+                ) { Text("R", style = MaterialTheme.typography.titleLarge, color = Color.White) }
             }
         }
         item { PodBar(conn, status, onConnect) }
-        item { SectionLabel("Pick today's day", Modifier.padding(top = 10.dp)) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatTile("Workouts", "${week.size}", "this week", Modifier.weight(1f))
+                StatTile("Sets", "${week.sumOf { it.sets.size }}", "this week", Modifier.weight(1f))
+                StatTile(
+                    "Volume",
+                    Stats.fmt(week.sumOf { s -> s.sets.sumOf { it.weight * it.reps } } / 1000.0),
+                    "tonnes", Modifier.weight(1f),
+                )
+            }
+        }
+        item { SectionLabel("Start a workout", Modifier.padding(top = 6.dp)) }
         items(Day.entries.toList()) { day ->
-            val last = history.firstOrNull { it.day == day && it.id != session?.id }
-            val live = session?.takeIf { it.day == day }
+            val last = history.firstOrNull { it.day == day && it.id != session?.id && it.sets.isNotEmpty() }
             DayCard(
                 day = day,
-                count = Routines.forDay(day).size,
-                lastText = last?.let { s ->
-                    val end = s.endMs?.let { " – " + timeFmt.format(Date(it)) } ?: ""
-                    "Last: ${dayFmt.format(Date(s.startMs))}, ${timeFmt.format(Date(s.startMs))}$end"
-                } ?: "Usually ${day.usual}",
-                liveText = live?.let { "In progress · ${it.sets.size} sets" },
+                live = session?.takeIf { it.day == day },
+                last = last,
                 onClick = { vm.open(Screen.Workout(day)) },
             )
+        }
+        val recent = history.filter { it.endMs != null && it.sets.isNotEmpty() }.take(5)
+        if (recent.isNotEmpty()) {
+            item { SectionLabel("Recent", Modifier.padding(top = 6.dp)) }
+            items(recent, key = { it.id }) { s -> RecentRow(s, onExport = { onExport(s) }) }
         }
     }
 }
 
 @Composable
-private fun DayCard(day: Day, count: Int, lastText: String, liveText: String?, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        border = if (liveText != null) C.Done else C.Line,
-        onClick = onClick,
+private fun StatTile(label: String, value: String, sub: String, modifier: Modifier) {
+    Column(
+        modifier.clip(RoundedCornerShape(18.dp)).background(C.Surface).padding(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(day.title.uppercase(), style = MaterialTheme.typography.displayMedium)
-                Text("$count exercises", style = MaterialTheme.typography.titleMedium, color = C.Text)
-                Spacer(Modifier.height(6.dp))
-                if (liveText != null) Tag(liveText, color = C.Bg, fill = C.Done)
-                else Text(lastText, style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = C.Muted)
+        Text(value, style = MaterialTheme.typography.headlineMedium.merge(Tnum))
+        Text(sub, style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+    }
+}
+
+@Composable
+private fun DayCard(day: Day, live: Session?, last: Session?, onClick: () -> Unit) {
+    val exercises = Routines.forDay(day)
+    val groups = exercises.map { Routines.group(it).label }.distinct().joinToString(" · ")
+    val brush = if (day == Day.UPPER) Brush.linearGradient(listOf(C.UpperA, C.UpperB))
+    else Brush.linearGradient(listOf(C.LowerA, C.LowerB))
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(brush)
+            .clickable(onClick = onClick).padding(22.dp),
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(day.title.uppercase(), style = MaterialTheme.typography.displayMedium, color = Color.White,
+                    modifier = Modifier.weight(1f))
+                Box(
+                    Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = Color.White) }
             }
-            Icon(Icons.Filled.ChevronRight, null, tint = C.Muted, modifier = Modifier.size(32.dp))
+            Text(groups, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Pill("${exercises.size} exercises")
+                Spacer(Modifier.width(8.dp))
+                Pill(day.usual)
+            }
+            Spacer(Modifier.height(10.dp))
+            if (live != null) {
+                Text(
+                    "● In progress · ${live.sets.size} sets done",
+                    style = MaterialTheme.typography.labelLarge, color = Color.White,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.28f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            } else {
+                Text(
+                    last?.let { "Last: ${dayFmt.format(Date(it.startMs))} · ${it.sets.size} sets" }
+                        ?: "Last numbers loaded from your log",
+                    style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f),
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun Pill(text: String) {
+    Text(
+        text, style = MaterialTheme.typography.labelLarge, color = Color.White,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.18f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
+
+@Composable
+private fun RecentRow(s: Session, onExport: () -> Unit) {
+    val color = if (s.day == Day.UPPER) C.UpperA else C.LowerA
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Surface).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("${s.day.title} day", style = MaterialTheme.typography.titleMedium)
+            val dur = s.endMs?.let { elapsed(it - s.startMs) } ?: ""
+            val q = s.sets.mapNotNull { it.quality }.takeIf { it.isNotEmpty() }?.average()?.toInt()
+            Text(
+                "${dayFmt.format(Date(s.startMs))}, ${timeFmt.format(Date(s.startMs))} · $dur · ${s.sets.size} sets" +
+                    (q?.let { " · quality $it" } ?: ""),
+                style = MaterialTheme.typography.bodyMedium, color = C.Muted,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onExport) { Icon(Icons.Filled.Share, "Export", tint = C.Muted) }
     }
 }
 
@@ -119,7 +213,8 @@ fun TopBar(title: String, subtitle: String?, onBack: () -> Unit, trailing: @Comp
     ) {
         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = C.Text) }
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!subtitle.isNullOrEmpty()) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = C.Muted, maxLines = 1)
             }

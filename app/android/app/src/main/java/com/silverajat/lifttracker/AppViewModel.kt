@@ -17,6 +17,7 @@ import com.silverajat.lifttracker.data.Session
 import com.silverajat.lifttracker.data.SessionStore
 import com.silverajat.lifttracker.data.SetLog
 import com.silverajat.lifttracker.reps.RepCounter
+import com.silverajat.lifttracker.reps.SetAnalysis
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,8 +76,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _restEndsAt = MutableStateFlow<Long?>(null)
     val restEndsAt: StateFlow<Long?> = _restEndsAt
 
-    private val _restSeconds = MutableStateFlow(prefs.getInt("rest_s", 120))
+    /** Length of the rest that's running (120 s main lifts, 90 s isolation). */
+    private val _restSeconds = MutableStateFlow(120)
     val restSeconds: StateFlow<Int> = _restSeconds
+
+    /** Rep quality of the set just stopped (null without the pod). */
+    private val _analysis = MutableStateFlow<SetAnalysis?>(null)
+    val analysis: StateFlow<SetAnalysis?> = _analysis
 
     /** Clock for timers on screen. */
     val now: StateFlow<Long> = flow {
@@ -104,6 +110,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             pod.conn.collect { if (it == PodConn.READY) pod.send(PodProtocol.auto(false)) }
         }
     }
+
+    fun exportJson(s: Session): String = store.exportJson(s)
+    fun shareText(s: Session): String = com.silverajat.lifttracker.data.ShareText.build(s)
 
     // ---- navigation -----------------------------------------------------------
 
@@ -150,6 +159,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _extraRows.value = _extraRows.value + (exerciseId to ((_extraRows.value[exerciseId] ?: 0) + 1))
     }
 
+    /**
+     * Your full ROM for an exercise, in degrees (rotation lifts only):
+     *  1. today's warm-up set, if you did one with the pod: light weight is
+     *     where your range is best, so working sets are scored against it;
+     *  2. otherwise your best logged set (median of its 3 biggest reps);
+     *  3. otherwise null, and the set is scored against its own best reps.
+     */
+    fun fullRomDeg(exerciseId: Int): Float? {
+        val warm = _session.value?.sets
+            ?.filter { it.exerciseId == exerciseId && it.warmup && it.romDeg.size >= 2 }
+            ?.maxOfOrNull { top3(it.romDeg) }
+        return warm ?: bestRomDeg(exerciseId)
+    }
+
+    private fun top3(x: List<Float>): Float = x.sortedDescending().take(3).let { t -> t.sorted()[t.size / 2] }
+
+    private fun bestRomDeg(exerciseId: Int): Float? =
+        _history.value.flatMap { it.sets }
+            .filter { it.exerciseId == exerciseId && it.romDeg.size >= 2 }
+            .map { s -> s.romDeg.sortedDescending().take(3).let { t -> t.sorted()[t.size / 2] } }
+            .maxOrNull()
+
     /** Every finished session, oldest first (for charts and the history tab). */
     fun sessionsWith(exerciseId: Int): List<Session> =
         _history.value.filter { s -> s.sets.any { it.exerciseId == exerciseId } }.sortedBy { it.startMs }
@@ -188,6 +219,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val set = _active.value ?: return
         if (_phase.value != Phase.LIFTING) return
         _active.value = set.copy(endMs = System.currentTimeMillis())
+        // A warm-up set is the baseline itself, so it's scored on its own reps.
+        _analysis.value = counter.analyze(if (set.warmup) null else fullRomDeg(set.exerciseId))
         _phase.value = Phase.CONFIRM
         val live = _liveReps.value
         // Send Stop whenever the pod is there (even if Start's reply was slow):
@@ -214,6 +247,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             addons = set.addons, reps = reps, warmup = set.warmup,
             startMs = set.startMs, endMs = set.endMs ?: System.currentTimeMillis(),
             liveReps = if (set.podStarted) _liveReps.value else null, podRec = set.podRec,
+            quality = _analysis.value?.overall,
+            repScores = _analysis.value?.perRep?.map { it.score } ?: emptyList(),
+            speedDrop = _analysis.value?.speedDropPct,
+            romDeg = _analysis.value?.perRep?.mapNotNull { it.romDeg } ?: emptyList(),
+            romPct = _analysis.value?.perRep?.map { it.romPct } ?: emptyList(),
         )
         val updated = session.copy(sets = session.sets.filterNot {
             it.exerciseId == log.exerciseId && it.setNo == log.setNo
@@ -222,12 +260,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         saveSession(updated)
         set.podRec?.let { rec -> viewModelScope.launch { pod.send(PodProtocol.confirm(rec, reps)) } }
         _active.value = null
+        _analysis.value = null
         _phase.value = Phase.READY
-        startRest()
+        startRest(Routines.restSeconds(Routines.byId(set.exerciseId)))
     }
 
     fun discardSet() {
         _active.value = null
+        _analysis.value = null
         _phase.value = Phase.READY
     }
 
@@ -247,13 +287,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _extraRows.value = emptyMap()
         restJob?.cancel()
         _restEndsAt.value = null
-        _screen.value = Screen.Home
+        // The workout screen shows the "saved, share it?" dialog, then goes home.
     }
 
     // ---- rest timer ---------------------------------------------------------------
 
-    private fun startRest() {
-        val end = System.currentTimeMillis() + _restSeconds.value * 1000L
+    private fun startRest(seconds: Int) {
+        _restSeconds.value = seconds
+        val end = System.currentTimeMillis() + seconds * 1000L
         _restEndsAt.value = end
         restJob?.cancel()
         restJob = viewModelScope.launch {

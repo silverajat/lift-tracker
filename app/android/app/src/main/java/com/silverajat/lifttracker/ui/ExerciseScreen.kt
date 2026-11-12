@@ -91,23 +91,24 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                             modifier = Modifier.padding(top = 6.dp))
                     }
                 }
-                val pts = Stats.series(metric, ex, sessions)
-                val lastPt = pts.last()
+                val pts = if (metric == Metric.ROM) Stats.romSeries(ex, sessions) else Stats.series(metric, ex, sessions)
+                val lastPt = pts.lastOrNull() ?: com.silverajat.lifttracker.data.Point("", null, 0.0)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        "${Stats.fmt(lastPt.value)} ${metric.unit}",
+                        if (pts.isEmpty()) "No pod data yet" else "${Stats.fmt(lastPt.value)} ${metric.unit}",
                         style = MaterialTheme.typography.titleLarge.merge(Tnum),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        lastPt.timeMs?.let { shortDate.format(Date(it)) } ?: "before the app",
+                        lastPt.timeMs?.let { shortDate.format(Date(it)) } ?: if (pts.isEmpty()) "" else "before the app",
                         style = MaterialTheme.typography.bodyMedium, color = C.Accent,
                     )
                 }
                 LineChart(pts, Modifier.fillMaxWidth().height(200.dp))
                 if (pts.size < 3) {
                     Text(
-                        "The line fills in as you log sessions. The first point is what you did before the app.",
+                        if (metric == Metric.ROM) "Full ROM in degrees per session, measured by the pod (rotation lifts). Fills in once you log sets with it."
+                        else "The line fills in as you log sessions. The first point is what you did before the app.",
                         style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                     )
                 }
@@ -143,7 +144,13 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(longDate.format(Date(s.startMs)), style = MaterialTheme.typography.titleMedium)
                             SetLines(s.sets.filter { it.exerciseId == ex.id }.sortedBy { it.setNo }
-                                .map { Triple(it.warmup, compact(it.weight, it.addons, it.reps, ex.bodyweight), it.liveReps) })
+                                .map { l ->
+                                    val extra = listOfNotNull(
+                                        l.romPct.takeIf { it.isNotEmpty() }?.let { "ROM ${it.average().toInt()}%" },
+                                        l.quality?.let { "Q $it" },
+                                    ).joinToString(" · ").ifEmpty { null }
+                                    Triple(l.warmup, compact(l.weight, l.addons, l.reps, ex.bodyweight), extra)
+                                })
                         }
                     }
                 }
@@ -159,7 +166,7 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
 }
 
 @Composable
-private fun SetLines(lines: List<Triple<Boolean, String, Int?>>) {
+private fun SetLines(lines: List<Triple<Boolean, String, String?>>) {
     var n = 0
     lines.forEach { (warm, text, pod) ->
         if (!warm) n++
@@ -172,7 +179,7 @@ private fun SetLines(lines: List<Triple<Boolean, String, Int?>>) {
             )
             Text(text,
                 style = MaterialTheme.typography.bodyLarge.merge(Tnum), modifier = Modifier.weight(1f))
-            pod?.let { Tag("pod $it", color = C.Pod) }
+            pod?.let { Tag(it, color = C.Pod) }
         }
     }
 }

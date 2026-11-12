@@ -17,6 +17,11 @@ data class SetLog(
     val endMs: Long,
     val liveReps: Int?,        // the pod's live count when you hit Stop
     val podRec: Int?,          // recording id on the pod, if it was connected
+    val quality: Int? = null,  // overall rep quality 0..100 (pod sets only)
+    val repScores: List<Int> = emptyList(),
+    val speedDrop: Int? = null, // % slower at the end of the set
+    val romDeg: List<Float> = emptyList(),  // per-rep ROM in degrees (rotation lifts)
+    val romPct: List<Int> = emptyList(),    // per-rep ROM as % of full ROM
 )
 
 data class Session(
@@ -51,6 +56,9 @@ class SessionStore(context: Context) {
         File(dir, "$id.json").delete()
     }
 
+    /** The session as pretty JSON, for the Export button. */
+    fun exportJson(s: Session): String = toJson(s).toString(2)
+
     private fun toJson(s: Session) = JSONObject().apply {
         put("id", s.id)
         put("day", s.day.name)
@@ -69,6 +77,11 @@ class SessionStore(context: Context) {
                     put("endMs", l.endMs)
                     put("liveReps", l.liveReps ?: JSONObject.NULL)
                     put("podRec", l.podRec ?: JSONObject.NULL)
+                    put("quality", l.quality ?: JSONObject.NULL)
+                    put("speedDrop", l.speedDrop ?: JSONObject.NULL)
+                    put("repScores", JSONArray(l.repScores))
+                    put("romDeg", JSONArray(l.romDeg.map { it.toDouble() }))
+                    put("romPct", JSONArray(l.romPct))
                 })
             }
         })
@@ -89,6 +102,14 @@ class SessionStore(context: Context) {
                 endMs = l.getLong("endMs"),
                 liveReps = if (l.isNull("liveReps")) null else l.getInt("liveReps"),
                 podRec = if (l.isNull("podRec")) null else l.getInt("podRec"),
+                quality = if (!l.has("quality") || l.isNull("quality")) null else l.getInt("quality"),
+                repScores = l.optJSONArray("repScores")?.let { a -> (0 until a.length()).map { a.getInt(it) } }
+                    ?: emptyList(),
+                speedDrop = if (!l.has("speedDrop") || l.isNull("speedDrop")) null else l.getInt("speedDrop"),
+                romDeg = l.optJSONArray("romDeg")?.let { a -> (0 until a.length()).map { a.getDouble(it).toFloat() } }
+                    ?: emptyList(),
+                romPct = l.optJSONArray("romPct")?.let { a -> (0 until a.length()).map { a.getInt(it) } }
+                    ?: emptyList(),
             )
         }
         return Session(

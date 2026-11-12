@@ -1,6 +1,7 @@
 package com.silverajat.lifttracker
 
 import android.Manifest
+import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -12,6 +13,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -38,6 +40,16 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    /** Android share sheet with the workout as text (ChatGPT, WhatsApp, notes…). */
+    private fun share(s: com.silverajat.lifttracker.data.Session) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "${s.day.title} day workout")
+            putExtra(Intent.EXTRA_TEXT, vm.shareText(s))
+        }
+        startActivity(Intent.createChooser(send, "Share workout"))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -56,10 +68,10 @@ class MainActivity : ComponentActivity() {
                 }
                 BackHandler(enabled = screen != Screen.Home) { vm.back() }
 
-                Box(Modifier.fillMaxSize().background(C.Bg)) {
+                Box(Modifier.fillMaxSize().background(C.Bg).imePadding()) {
                     when (val s = screen) {
-                        Screen.Home -> HomeScreen(vm, onConnect = ::connectPod)
-                        is Screen.Workout -> WorkoutScreen(vm, s.day)
+                        Screen.Home -> HomeScreen(vm, onConnect = ::connectPod, onExport = ::share)
+                        is Screen.Workout -> WorkoutScreen(vm, s.day, onShare = ::share)
                         is Screen.ExerciseInfo -> ExerciseScreen(vm, s.exerciseId)
                     }
                 }

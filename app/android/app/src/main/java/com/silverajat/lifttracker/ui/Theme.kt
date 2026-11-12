@@ -1,9 +1,11 @@
 package com.silverajat.lifttracker.ui
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -23,6 +25,29 @@ object C {
     val Pod = Color(0xFF3DDCFF)         // cyan: the pod / Bluetooth
     val Stop = Color(0xFFFF5A4E)        // red: stop
     val Warm = Color(0xFFFFB547)        // amber: warm-up sets
+    val Violet = Color(0xFF7A4DFF)
+
+    // Day card gradients
+    val UpperA = Color(0xFF2F6BFF)
+    val UpperB = Color(0xFF7A3DFF)
+    val LowerA = Color(0xFF10B981)
+    val LowerB = Color(0xFF0E8FA8)
+
+    fun group(g: com.silverajat.lifttracker.data.Group): Color = when (g) {
+        com.silverajat.lifttracker.data.Group.CHEST -> Color(0xFFFF6B6B)
+        com.silverajat.lifttracker.data.Group.BACK -> Color(0xFF4DA3FF)
+        com.silverajat.lifttracker.data.Group.SHOULDERS -> Color(0xFFFFB547)
+        com.silverajat.lifttracker.data.Group.ARMS -> Color(0xFFB57BFF)
+        com.silverajat.lifttracker.data.Group.LEGS -> Color(0xFF2FD27A)
+        com.silverajat.lifttracker.data.Group.CORE -> Color(0xFF3DDCFF)
+    }
+
+    /** Green / amber / red for a 0..100 quality score. */
+    fun score(v: Int): Color = when {
+        v >= 80 -> Done
+        v >= 60 -> Warm
+        else -> Stop
+    }
 }
 
 /** Tabular figures so timers and counts don't jitter. */
@@ -58,6 +83,9 @@ fun LiftTheme(content: @Composable () -> Unit) {
             error = C.Stop,
         ),
         typography = type,
-        content = content,
-    )
+    ) {
+        // Text without its own colour is light on the dark background
+        // (outside a Surface, Material's default content colour is black).
+        CompositionLocalProvider(LocalContentColor provides C.Text, content = content)
+    }
 }
