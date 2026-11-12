@@ -9,6 +9,11 @@
  *     So each set becomes its own recording, with no button to press.
  *     The last PRETRIGGER_S seconds before the motion are kept too, so the
  *     first rep is never cut off.
+ *   - With the phone app (Bluetooth): the app starts and stops each set
+ *     and labels it (exercise, weight, set number), and gets a live IMU
+ *     stream for its rep counter. Once the app has connected, motion-
+ *     triggered recording is off until the pod reboots, so walking
+ *     between sets is never recorded. See ble.h.
  *   - On USB: never records by itself. A shell on the USB serial port lets
  *     the laptop list, dump (as CSV) and erase recordings, or start and
  *     stop a recording by hand for desk tests.
@@ -16,11 +21,15 @@
  * LED
  *   green blink (fast)      recording
  *   green blip every 3 s    on battery, waiting for motion
+ *   blue blip every 3 s     on battery, phone app connected
  *   blue                    on USB, idle
  *   red                     flash full, IMU missing or error (rec status / rec imu)
  *
  * Shell commands (open the serial port at any baud rate, press Enter)
  *   rec status | rec list | rec dump <id> | rec start | rec stop | rec erase | rec imu | rec batt | rec dfu
+ *
+ * Moving to the gym-pod PCB (BMI270 IMU, own flash and pins) only changes the
+ * board overlay and read_imu(): storage, Bluetooth and the app stay as they are.
  */
 #include <stdlib.h>
 #include <zephyr/device.h>
@@ -35,6 +44,7 @@
 #include <zephyr/sys/util.h>
 #include <hal/nrf_power.h>
 
+#include "ble.h"
 #include "storage.h"
 
 LOG_MODULE_REGISTER(logger, LOG_LEVEL_INF);
@@ -49,6 +59,7 @@ LOG_MODULE_REGISTER(logger, LOG_LEVEL_INF);
 #define START_MOVE_MS    300   /* this much movement starts a recording */
 #define STOP_STILL_S     12    /* this much stillness ends it */
 #define MAX_REC_S        300   /* safety cap: 5 minutes per recording */
+#define FW_VERSION       2     /* shown in the app; 2 = Bluetooth + labels */
 
 /* A sample counts as "moving" if either is true:
  *   gyro speed above MOVE_GYRO_DPS, or
@@ -75,7 +86,7 @@ static const struct gpio_dt_spec led_blue = GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpi
 /* ---- Shared state (sampling thread <-> shell <-> LED loop) ------------- */
 K_MUTEX_DEFINE(store_lock);          /* guards every storage_* call */
 
-enum rec_mode { REC_AUTO, REC_MANUAL };
+enum rec_mode { REC_AUTO, REC_MANUAL, REC_APP };
 
 static volatile bool usb_power;       /* USB cable plugged in (VBUS present) */
 static volatile bool fault;           /* flash full or write error */
@@ -89,6 +100,8 @@ static volatile bool manual_start_req;
 static volatile bool manual_stop_req;
 static enum rec_mode mode;
 static uint32_t rec_len;              /* samples in the open recording */
+static volatile bool auto_enabled = true; /* motion-triggered recording */
+static volatile int batt_cache_mv;    /* refreshed every 10 s by main() */
 
 /* Pre-trigger ring buffer: always holds the last PRE_SAMPLES samples. */
 static struct sample ring[PRE_SAMPLES];
@@ -150,13 +163,13 @@ static void ring_push(const struct sample *s)
 }
 
 /* Open a recording and copy the pre-trigger buffer into it, oldest first. */
-static int start_recording(enum rec_mode m)
+static int start_recording(enum rec_mode m, const struct set_label *label)
 {
 	uint32_t pre = (m == REC_AUTO) ? ring_count : 0;
 	int err;
 
 	k_mutex_lock(&store_lock, K_FOREVER);
-	err = storage_begin(SAMPLE_HZ, pre);
+	err = storage_begin(SAMPLE_HZ, pre, label);
 	if (!err) {
 		uint32_t first = (ring_head + PRE_SAMPLES - ring_count) % PRE_SAMPLES;
 
@@ -173,7 +186,9 @@ static int start_recording(enum rec_mode m)
 	}
 	mode = m;
 	rec_len = pre;
-	LOG_INF("recording started (%s)", m == REC_AUTO ? "auto" : "manual");
+	LOG_INF("recording started (%s)", m == REC_AUTO ? "auto" :
+		m == REC_APP ? "app" : "manual");
+	ble_status_changed();
 	return 0;
 }
 
@@ -186,6 +201,61 @@ static void stop_recording(void)
 	if (err) {
 		fault = true;
 	}
+	ble_status_changed();
+}
+
+/* Write rep counts into recording `id` (0xFF = leave that one alone). */
+static void set_reps(uint32_t id, uint8_t live, uint8_t confirmed)
+{
+	k_mutex_lock(&store_lock, K_FOREVER);
+	int err = storage_set_reps(id, live, confirmed);
+	k_mutex_unlock(&store_lock);
+
+	if (err) {
+		LOG_WRN("rec %u: could not store reps (%d)", id, err);
+	}
+}
+
+/* Commands from the phone app. Runs in the sampling thread, so it never
+ * races the recording logic. Returns the new "recording" state. */
+static bool handle_app_cmds(bool recording)
+{
+	struct app_cmd c;
+
+	while (ble_get_cmd(&c)) {
+		switch (c.op) {
+		case OP_START:
+			if (recording) {         /* Start while recording: close it */
+				stop_recording();
+				recording = false;
+			}
+			if (!fault && start_recording(REC_APP, &c.label) == 0) {
+				recording = true;
+			}
+			break;
+		case OP_STOP:
+			if (recording) {
+				stop_recording();
+				recording = false;
+				k_mutex_lock(&store_lock, K_FOREVER);
+				uint32_t n = storage_count();
+				k_mutex_unlock(&store_lock);
+				if (c.reps != 0xff && n > 0) {
+					set_reps(n - 1, c.reps, 0xff);
+				}
+			}
+			break;
+		case OP_CONFIRM:
+			set_reps(c.rec_id, 0xff, c.reps);
+			break;
+		case OP_AUTO:
+			auto_enabled = c.on;
+			LOG_INF("auto recording %s", c.on ? "on" : "off");
+			break;
+		}
+		ble_status_changed();
+	}
+	return recording;
 }
 
 /* ---- IMU start-up -------------------------------------------------------
@@ -258,7 +328,7 @@ static void sampling_thread(void)
 
 		if (manual_start_req) {
 			manual_start_req = false;
-			if (!recording && start_recording(REC_MANUAL) == 0) {
+			if (!recording && start_recording(REC_MANUAL, NULL) == 0) {
 				recording = true;
 			}
 		}
@@ -270,6 +340,9 @@ static void sampling_thread(void)
 			}
 		}
 
+		recording = handle_app_cmds(recording);
+		ble_stream_sample(&s);
+
 		if (recording) {
 			k_mutex_lock(&store_lock, K_FOREVER);
 			int err = storage_append(&s);
@@ -278,8 +351,11 @@ static void sampling_thread(void)
 
 			bool auto_done = mode == REC_AUTO &&
 					 (still_run >= STOP_SAMPLES || usb_power);
+			/* Phone lost mid-set: end it like an auto recording would. */
+			bool app_lost = mode == REC_APP && !ble_connected() &&
+					still_run >= STOP_SAMPLES;
 
-			if (err || auto_done || rec_len >= MAX_SAMPLES) {
+			if (err || auto_done || app_lost || rec_len >= MAX_SAMPLES) {
 				if (err == -ENOSPC) {
 					LOG_WRN("flash full");
 				}
@@ -287,8 +363,9 @@ static void sampling_thread(void)
 				stop_recording();
 				move_score = 0;
 			}
-		} else if (!usb_power && !fault && move_score >= START_SAMPLES) {
-			if (start_recording(REC_AUTO) == 0) {
+		} else if (auto_enabled && !usb_power && !fault &&
+			   move_score >= START_SAMPLES) {
+			if (start_recording(REC_AUTO, NULL) == 0) {
 				/* The sample that triggered it goes in right after
 				 * the pre-trigger buffer. */
 				k_mutex_lock(&store_lock, K_FOREVER);
@@ -344,6 +421,32 @@ static bool charging(void)
 	return gpio_pin_get(gpio0, CHG_PIN) == 0;
 }
 
+/* ---- Status for the phone app (ble.h) ----------------------------------- */
+void pod_fill_status(struct pod_status *st)
+{
+	k_mutex_lock(&store_lock, K_FOREVER);
+	bool rec = storage_recording();
+	uint32_t n = storage_count();
+	uint32_t used = storage_bytes_used(), total = storage_bytes_total();
+	k_mutex_unlock(&store_lock);
+
+	*st = (struct pod_status){
+		.proto = POD_PROTO_VERSION,
+		.flags = (rec ? ST_RECORDING : 0) | (usb_power ? ST_USB : 0) |
+			 (usb_power && charging() ? ST_CHARGING : 0) |
+			 (fault ? ST_FAULT : 0) | (imu_ok ? ST_IMU_OK : 0) |
+			 (auto_enabled ? ST_AUTO : 0) |
+			 (rec && mode == REC_APP ? ST_APP_REC : 0),
+		.batt_mv = (uint16_t)MAX(batt_cache_mv, 0),
+		.n_recs = (uint16_t)n,
+		.last_rec = n ? (uint16_t)(n - 1) : 0xffff,
+		.rec_samples = rec ? rec_len : 0,
+		.flash_pct = (uint8_t)(used * 100ull / total),
+		.fw = FW_VERSION,
+		.rsvd = 0,
+	};
+}
+
 /* ---- Shell commands ---------------------------------------------------- */
 static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 {
@@ -362,6 +465,9 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 		    used / 1024, total / 1024, free_s / 60);
 	shell_print(sh, "fault:      %s", fault ? "YES (run 'rec erase' if full)" : "no");
 	shell_print(sh, "imu:        %s", imu_ok ? "ok" : "NOT STARTED (run 'rec imu')");
+	shell_print(sh, "app:        %s, auto recording %s", ble_connected() ? "connected" : "not connected",
+		    auto_enabled ? "on" : "off");
+	shell_print(sh, "firmware:   v%d", FW_VERSION);
 	int mv = batt_mv();
 	shell_print(sh, "battery:    %d.%02d V%s", mv / 1000, (mv % 1000) / 10,
 		    usb_power ? (charging() ? " (charging)" : " (not charging: full or no battery)") : "");
@@ -402,17 +508,37 @@ static int cmd_list(const struct shell *sh, size_t argc, char **argv)
 	k_mutex_lock(&store_lock, K_FOREVER);
 	uint32_t n = storage_count();
 
-	shell_print(sh, "id,start_s,seconds,samples,pretrigger");
+	/* Label columns are blank for unlabelled recordings. */
+	shell_print(sh, "id,start_s,seconds,samples,pretrigger,exercise,day,set,warmup,"
+		    "weight_kg,unix_time,session,reps_live,reps_confirmed");
 	for (uint32_t i = 0; i < n; i++) {
 		struct rec_info r;
+		struct set_label l;
+		struct set_result res;
+		char lab[96] = ",,,,,,,,";
 
-		if (storage_get(i, &r) == 0) {
-			uint32_t hz = r.sample_hz ? r.sample_hz : SAMPLE_HZ;
-
-			shell_print(sh, "%u,%u,%u.%02u,%u,%u", r.rec_id, r.start_uptime_s,
-				    r.n_samples / hz, (r.n_samples % hz) * 100 / hz,
-				    r.n_samples, r.pretrigger);
+		if (storage_get(i, &r) != 0) {
+			continue;
 		}
+		uint32_t hz = r.sample_hz ? r.sample_hz : SAMPLE_HZ;
+
+		if (storage_get_label(i, &l, &res) == 0 && l.exercise != LABEL_NONE) {
+			char live[4] = "", conf[4] = "";
+
+			if (res.reps_live != 0xff) {
+				snprintk(live, sizeof(live), "%u", res.reps_live);
+			}
+			if (res.reps_confirmed != 0xff) {
+				snprintk(conf, sizeof(conf), "%u", res.reps_confirmed);
+			}
+			snprintk(lab, sizeof(lab), "%u,%u,%u,%u,%u.%02u,%u,%u,%s,%s",
+				 l.exercise, l.day, l.set_no, (l.flags & LABEL_WARMUP) ? 1 : 0,
+				 l.weight_cg / 100, l.weight_cg % 100, l.unix_time,
+				 l.session_id, live, conf);
+		}
+		shell_print(sh, "%u,%u,%u.%02u,%u,%u,%s", r.rec_id, r.start_uptime_s,
+			    r.n_samples / hz, (r.n_samples % hz) * 100 / hz,
+			    r.n_samples, r.pretrigger, lab);
 	}
 	k_mutex_unlock(&store_lock);
 	return 0;
@@ -535,6 +661,8 @@ int main(void)
 		fault = true;
 	}
 	k_mutex_unlock(&store_lock);
+	batt_cache_mv = batt_mv();
+	ble_init();
 
 	for (uint32_t t = 0;; t++) {   /* one step every 100 ms */
 		bool rec;
@@ -545,6 +673,9 @@ int main(void)
 		if (t % 10 == 0) {    /* USB cable check, once a second */
 			usb_power = nrf_power_usbregstatus_vbusdet_get(NRF_POWER);
 		}
+		if (t % 100 == 0) {   /* battery, every 10 s */
+			batt_cache_mv = batt_mv();
+		}
 
 		if (fault || (!imu_ok && imu_tries > 10)) {
 			leds(true, false, false);
@@ -552,6 +683,8 @@ int main(void)
 			leds(false, t % 5 == 0, false);       /* fast green blink */
 		} else if (usb_power) {
 			leds(false, false, true);             /* blue: on USB */
+		} else if (ble_connected()) {
+			leds(false, false, t % 30 == 0);      /* blue blip: app */
 		} else {
 			leds(false, t % 30 == 0, false);      /* blip every 3 s */
 		}

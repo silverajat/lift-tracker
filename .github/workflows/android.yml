@@ -1,0 +1,43 @@
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # to publish the APK as a release
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Rename
+        run: cp app/build/outputs/apk/debug/app-debug.apk lift-tracker.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lift-tracker-apk
+          path: app/android/lift-tracker.apk
+      - name: Publish as the "app-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete app-latest --yes --cleanup-tag || true
+          gh release create app-latest lift-tracker.apk \
+            --title "Lift Tracker app (latest build)" \
+            --notes "Built from ${GITHUB_SHA::7}. On your phone: download lift-tracker.apk, open it, allow installing from this source." \
+            --prerelease

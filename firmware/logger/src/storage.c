@@ -18,7 +18,9 @@ LOG_MODULE_REGISTER(storage, LOG_LEVEL_INF);
 #define PAGE_SIZE   256u
 #define MAX_RECS    512u
 
-BUILD_ASSERT(sizeof(struct rec_header) == 32, "header must be 32 bytes");
+BUILD_ASSERT(sizeof(struct rec_header) == 64, "header must be 64 bytes");
+BUILD_ASSERT(offsetof(struct rec_header, result) % 4 == 0,
+	     "QSPI writes must be 4-byte aligned");
 BUILD_ASSERT(sizeof(struct sample) == 14, "sample must be 14 bytes");
 BUILD_ASSERT(offsetof(struct rec_header, n_samples) % 4 == 0,
 	     "QSPI writes must be 4-byte aligned");
@@ -56,7 +58,7 @@ static bool all_ff(const uint8_t *p, size_t n)
  * Samples reach flash only as whole 256-byte pages, so the data ends at the
  * first completely blank page. Count only the samples that fit entirely
  * before it: the last one may have been cut in half by the page boundary. */
-static uint32_t recover_count(uint32_t hdr_addr)
+static uint32_t recover_count(uint32_t hdr_addr, uint32_t hdr_size)
 {
 	static uint8_t __aligned(4) page[PAGE_SIZE];
 	uint32_t end = hdr_addr;
@@ -76,7 +78,7 @@ static uint32_t recover_count(uint32_t hdr_addr)
 		end += PAGE_SIZE;
 	}
 
-	uint32_t data_start = hdr_addr + sizeof(struct rec_header);
+	uint32_t data_start = hdr_addr + hdr_size;
 
 	return end > data_start ? (end - data_start) / sizeof(struct sample) : 0;
 }
@@ -104,9 +106,13 @@ int storage_init(void)
 		}
 
 		uint32_t n = h.n_samples;
+		uint32_t hs = h.version >= 2 ? h.header_size : REC_HEADER_V1_SIZE;
 
+		if (hs < REC_HEADER_V1_SIZE || hs > PAGE_SIZE) {
+			hs = REC_HEADER_V1_SIZE;
+		}
 		if (n == REC_UNFINISHED) {
-			n = recover_count(next_free);
+			n = recover_count(next_free, hs);
 			LOG_WRN("rec %u was not closed, recovered %u samples",
 				h.rec_id, n);
 			/* Write the count now so this repair only happens once. */
@@ -122,10 +128,11 @@ int storage_init(void)
 			.n_samples = n,
 			.start_uptime_s = h.start_uptime_s,
 			.sample_hz = h.sample_hz,
+			.header_size = hs,
 			.pretrigger = h.pretrigger,
 		};
 		n_recs++;
-		next_free = align_up(next_free + sizeof(h) + n * sizeof(struct sample),
+		next_free = align_up(next_free + hs + n * sizeof(struct sample),
 				     PAGE_SIZE);
 	}
 
@@ -149,7 +156,8 @@ static int flush_page(void)
 	return err;
 }
 
-int storage_begin(uint16_t sample_hz, uint32_t pretrigger)
+int storage_begin(uint16_t sample_hz, uint32_t pretrigger,
+		  const struct set_label *label)
 {
 	if (open) {
 		return -EALREADY;
@@ -171,7 +179,10 @@ int storage_begin(uint16_t sample_hz, uint32_t pretrigger)
 		return -EIO;
 	}
 
-	struct rec_header h = {
+	struct rec_header h;
+
+	memset(&h, 0xff, sizeof(h));
+	h = (struct rec_header){
 		.magic = REC_MAGIC,
 		.version = REC_VERSION,
 		.header_size = sizeof(struct rec_header),
@@ -182,7 +193,14 @@ int storage_begin(uint16_t sample_hz, uint32_t pretrigger)
 		.pretrigger = pretrigger,
 		.n_samples = REC_UNFINISHED,
 		.reserved = 0xffffffff,
+		.result = { 0xff, 0xff, 0xffff },
+		.rsvd2 = { 0xffffffff, 0xffffffff, 0xffffffff },
 	};
+	if (label) {
+		h.label = *label;
+	} else {
+		memset(&h.label, 0xff, sizeof(h.label));
+	}
 
 	/* The header goes into the first page buffer with the first samples. */
 	memset(page_buf, 0xff, sizeof(page_buf));
@@ -255,6 +273,7 @@ int storage_end(void)
 		.n_samples = open_samples,
 		.start_uptime_s = 0,
 		.sample_hz = 0,
+		.header_size = sizeof(struct rec_header),
 		.pretrigger = 0,
 	};
 	/* Re-read the header so the RAM table matches what's on flash. */
@@ -300,8 +319,56 @@ int storage_read_sample(const struct rec_info *rec, uint32_t i,
 	if (i >= rec->n_samples) {
 		return -EINVAL;
 	}
-	return flash_read(flash, rec->addr + sizeof(struct rec_header) +
+	return flash_read(flash, rec->addr + rec->header_size +
 			  i * sizeof(struct sample), out, sizeof(*out));
+}
+
+int storage_get_label(uint32_t index, struct set_label *label,
+		      struct set_result *result)
+{
+	memset(label, 0xff, sizeof(*label));
+	memset(result, 0xff, sizeof(*result));
+	if (index >= n_recs) {
+		return -ENOENT;
+	}
+	if (recs[index].header_size < sizeof(struct rec_header)) {
+		return 0;    /* version 1: no label */
+	}
+	struct rec_header h;
+	int err = flash_read(flash, recs[index].addr, &h, sizeof(h));
+
+	if (!err) {
+		*label = h.label;
+		*result = h.result;
+	}
+	return err;
+}
+
+int storage_set_reps(uint32_t index, uint8_t reps_live, uint8_t reps_confirmed)
+{
+	struct set_label l;
+	struct set_result r;
+	int err;
+
+	if (index >= n_recs) {
+		return -ENOENT;
+	}
+	if (recs[index].header_size < sizeof(struct rec_header)) {
+		return -ENOTSUP;
+	}
+	err = storage_get_label(index, &l, &r);
+	if (err) {
+		return err;
+	}
+	if ((reps_live != 0xff && r.reps_live != 0xff && r.reps_live != reps_live) ||
+	    (reps_confirmed != 0xff && r.reps_confirmed != 0xff &&
+	     r.reps_confirmed != reps_confirmed)) {
+		return -EALREADY;   /* NOR flash: a written byte can't be rewritten */
+	}
+	struct set_result __aligned(4) w = { reps_live, reps_confirmed, 0xffff };
+
+	return flash_write(flash, recs[index].addr + offsetof(struct rec_header, result),
+			   &w, sizeof(w));
 }
 
 uint32_t storage_bytes_used(void)

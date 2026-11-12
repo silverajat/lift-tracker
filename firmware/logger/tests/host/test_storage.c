@@ -35,22 +35,22 @@ static void check(uint32_t idx, uint32_t n, uint32_t base) {
 int main(void) {
   memset(mem, 0x5a, SZ);                 /* factory junk, not erased */
   assert(storage_init()==0);
-  assert(storage_begin(100,0) == -EIO);  /* refuses un-erased flash */
+  assert(storage_begin(100,0,NULL) == -EIO);  /* refuses un-erased flash */
   assert(storage_erase_all()==0);
   assert(storage_init()==0 && storage_count()==0);
 
   /* rec 0: 37 samples, so the header + samples straddle page boundaries */
-  assert(storage_begin(100,5)==0);
+  assert(storage_begin(100,5,NULL)==0);
   for (uint32_t i=0;i<37;i++) { struct sample s=mk(i); assert(storage_append(&s)==0); }
   assert(storage_end()==0);
   /* rec 1: 1000 samples, many pages */
-  assert(storage_begin(100,0)==0);
+  assert(storage_begin(100,0,NULL)==0);
   for (uint32_t i=0;i<1000;i++){ struct sample s=mk(1000+i); assert(storage_append(&s)==0); }
   assert(storage_end()==0);
   check(0,37,0); check(1,1000,1000);
 
   /* power loss mid-recording: rec 2 never closed */
-  assert(storage_begin(100,0)==0);
+  assert(storage_begin(100,0,NULL)==0);
   for (uint32_t i=0;i<500;i++){ struct sample s=mk(5000+i); storage_append(&s); }
   /* simulate reboot without storage_end: only full pages reached flash */
   assert(storage_init()==0);
@@ -60,14 +60,14 @@ int main(void) {
   assert(r2.n_samples <= 500 && r2.n_samples >= 500 - 256/14 - 3);
   check(2, r2.n_samples, 5000);
   /* and a new recording after recovery works and lands after it */
-  assert(storage_begin(100,0)==0);
+  assert(storage_begin(100,0,NULL)==0);
   for (uint32_t i=0;i<10;i++){ struct sample s=mk(9000+i); assert(storage_append(&s)==0); }
   assert(storage_end()==0);
   assert(storage_init()==0 && storage_count()==4);
   check(0,37,0); check(1,1000,1000); check(3,10,9000);
 
   /* fill the chip: must stop cleanly with -ENOSPC, no overrun */
-  assert(storage_begin(100,0)==0);
+  assert(storage_begin(100,0,NULL)==0);
   uint32_t n=0; int err=0;
   while ((err = storage_append(&(struct sample){ .t_ms=1 })) == 0) n++;
   assert(err==-ENOSPC);
@@ -75,6 +75,28 @@ int main(void) {
   printf("filled with %u samples (~%u min at 100 Hz)\n", n, n/100/60);
   assert(storage_init()==0); assert(storage_count()==5);
   struct rec_info r4; storage_get(4,&r4); assert(r4.n_samples==n);
-  assert(storage_begin(100,0)==-ENOSPC);
+  assert(storage_begin(100,0,NULL)==-ENOSPC);
+  /* labels + rep counts on a fresh chip */
+  assert(storage_erase_all()==0); assert(storage_init()==0);
+  struct set_label L = { .unix_time=1794500000u, .session_id=1794499000u, .weight_cg=5500,
+                         .exercise=1, .day=0, .set_no=2, .flags=LABEL_FROM_APP, .rsvd=0xffff };
+  assert(storage_begin(100,0,&L)==0);
+  for (uint32_t i=0;i<300;i++){ struct sample s=mk(i); assert(storage_append(&s)==0); }
+  assert(storage_end()==0);
+  assert(storage_set_reps(0, 9, 0xff)==0);          /* live count at Stop */
+  assert(storage_set_reps(0, 0xff, 10)==0);         /* confirmed later */
+  assert(storage_set_reps(0, 0xff, 11)==-EALREADY); /* can't rewrite NOR */
+  assert(storage_begin(100,0,NULL)==0);
+  for (uint32_t i=0;i<5;i++){ struct sample s=mk(700+i); assert(storage_append(&s)==0); }
+  assert(storage_end()==0);
+  assert(storage_init()==0 && storage_count()==2);  /* survives a reboot */
+  struct set_label l; struct set_result r;
+  assert(storage_get_label(0,&l,&r)==0);
+  assert(l.weight_cg==5500 && l.exercise==1 && l.set_no==2 && l.unix_time==1794500000u);
+  assert(r.reps_live==9 && r.reps_confirmed==10);
+  assert(storage_get_label(1,&l,&r)==0 && l.exercise==0xff && r.reps_live==0xff);
+  check(0,300,0); check(1,5,700);
+  printf("labels OK\n");
+
   printf("ALL STORAGE TESTS PASSED (%ld flash writes)\n", writes);
   return 0; }

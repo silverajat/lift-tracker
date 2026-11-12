@@ -1,0 +1,15 @@
+name: Firmware storage tests
+
+on:
+  push:
+    paths: ['firmware/**', '.github/workflows/firmware-tests.yml']
+  workflow_dispatch:
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Storage tests (simulated NOR flash)
+        working-directory: firmware/logger/tests/host
+        run: make && ./test_storage
