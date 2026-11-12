@@ -19,12 +19,12 @@ Top view of the board (x 0–41, y 0–18 mm):
 
 ```
  +-------------------------------------------------------------------------+
- |ant.|                    |dec.| flash  |  LEDs, charge programming         |
+ |ant.|                    |dec.| flash  |  red LED, charge programming      |
  |    |   Ebyte E73        |caps|--------|----------------------------------|
  |    |   (coin motor      |    |( steel)| bridge  charger  TVS   cell pads  |  <- LiPo lies on
  |    |    sits on it)     |    |( disc )|                                  |     x 19.9-40.4
  |    |                    |    |--------| bridge  LDO                      |
- |    |                    |    | IMU    | motor pads, driver, flyback      |
+ |    |                    |    | IMU    | motor driver, flyback            |
  +-------------------------------------------------------------------------+
  underside: contact A at x 15.2, contact B at x 33.2 (18 mm apart, y 9),
             SWD pads (IO, CK, G) under the module's top edge
@@ -66,11 +66,11 @@ Only the E73's outer edge pads are used. Ebyte asks for no tracks under the modu
 
 | Use | E73 pad | GPIO |
 |---|---|---|
-| SPI SCK / MOSI / MISO (IMU + flash) | 13 / 15 / 11 | P0.01 / P0.05 / P0.00 |
+| SPI SCK / MOSI / MISO (IMU + flash) | 15 / 13 / 11 | P0.05 / P0.01 / P0.00 |
 | IMU CS / INT1 | 10 / 9 | P0.30 / P0.31 |
 | Flash CS | 33 | P0.13 |
-| Status LED (green) | 35 | P0.24 |
-| Charging status (low = charging; pull-up, wakes the nRF) | 7 | P0.02 |
+| Status LED (green) | 7 | P0.02 |
+| Charging status (low = charging; pull-up, wakes the nRF) | 35 | P0.24 |
 | Battery voltage (1M/1M divider) | 8 | P0.29 = AIN5 |
 | Motor | 17 | P1.09 |
 | SWD | 37 / 39 | SWDIO / SWDCLK |
