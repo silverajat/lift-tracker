@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "gympod")(type "KiCad")(uri "${KIPRJMOD}/gympod.kicad_sym")(options "")(descr "Gym pod local symbols"))
+)

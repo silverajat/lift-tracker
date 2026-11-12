@@ -1,6 +1,14 @@
 # Pod v2: the final, Fitbit-sized lift tracker
 
-**Status:** spec locked (Nov 12, 2026). Schematic and layout come next.
+**Status (Nov 12, night):** schematic done (37 parts, ERC 0 errors), parts placed on a 34 × 18 mm board, routing ~95% (a few connections left), case modelled. Not order-ready yet: routing, the charger-contact position and the nRF module stock are open.
+
+### Changes since the spec was locked
+- **Charger: the Google Fitbit Air charger** instead of our own dock (dock design parked in `unused/`). Measured from photos: face ~38 × 22 mm, 2 spring pins on the centre line ~18 mm apart, 5 V, bidirectional, so the pod gets a polarity bridge. Still to find: where the charger's magnets are, and how far the pins stick out.
+- **No on-board battery protection:** the 301120 cell has its own (DW01 + 8205 per its datasheet). Buy only cells "with protection board".
+- **No 32 kHz crystal:** the nRF's internal RC clock, with the phone re-syncing time on every connection.
+- **Board 34 × 18 mm** (was 33 × 17) so it routes; signals 0.127 mm, power 0.2 mm (JLC standard 4-layer). In1 = GND plane, In2 = 3V3 plane.
+- **GPIO moves:** VBAT_SENSE P0.04 (AIN2), CHG_STAT P0.06, LED P0.08, MOTOR_EN P1.09, all on the module's right-hand column, next to the parts they drive.
+- **Case:** 36.3 × 20.3 × 8.65 mm body, 45.9 mm with the band lugs (`lift_pod_v2.scad`). The band loops through a slot at each end, so the underside stays free for the charger.
 **Goal:** about the size of a Google Fitbit Air pebble (34.9 × 17 × 8.3 mm), with no USB port, no button, magnetic charging, and everything over Bluetooth.
 
 ## Decisions
