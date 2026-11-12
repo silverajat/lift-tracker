@@ -3,7 +3,7 @@
 Everything here is generated from `hardware/pod-v2/pcb/` (`make_release.sh`).
 Checks: DRC 0 errors, 0 unconnected, PCB matches the schematic (`checks/drc.json`; the one warning is two silkscreen outlines touching under the cell). ERC 0 errors (`checks/erc.json`).
 
-**Blocker:** the nRF52840 module (MDBT50Q-1MV2, LCSC C5118826) is out of stock. Assembly can't be ordered until it's in JLC's library: either an LCSC restock, or bought from Digi-Key/Mouser through JLC Global Sourcing.
+**nRF module:** MDBT50Q-1MV2 (C5118826) was out of stock, so it's pre-ordered into your JLC parts library (2 pcs, Nov 12). JLC confirms the price within 48 h of payment; order the board + assembly once the parts show in My Inventory.
 
 ## 1. PCB (JLCPCB)
 
@@ -29,6 +29,7 @@ Upload `fabrication/liftpod_v2_revA_JLCPCB_Gerbers.zip`.
 
 Upload `assembly/liftpod_v2_BOM_JLCPCB.csv` and `assembly/liftpod_v2_CPL_JLCPCB.csv`.
 
+- **PCBA type: Standard** (the nRF module is "Standard only, X-ray inspection required" at JLC, so Economic won't take it).
 - Top side only. 32 parts, 20 BOM lines. Not assembled: charger contacts, cell/motor/SWD pads, the steel-disc marking.
 - Quantity: 2 (or all 5).
 - In the placement preview, check each part's rotation, mainly the SOT-23s, SOD-323 diodes, the LEDs and the module. Watch the marked pin 1 on the BMI270 and the flash.
