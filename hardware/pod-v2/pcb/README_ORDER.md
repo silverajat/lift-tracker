@@ -37,11 +37,12 @@ Upload `assembly/liftpod_v2_BOM_JLCPCB.csv` and `assembly/liftpod_v2_CPL_JLCPCB.
 
 ## 3. Case (JLC3DP)
 
-Upload `../lift_pod_v2_shell.stl` (one piece, 46.2 × 20.6 × 7.1 mm with the band lugs).
+Upload `../lift_pod_v2_shell.stl` (one piece, 46.2 × 23.8 × 7.3 mm with the band lugs).
 
 - Material: SLA black resin, with the sanded / "mineral oil" finish for a smooth, dry, Fitbit-like feel. Alternative: MJF PA12 nylon dyed black (tougher, slightly grainy).
 - Quantity: 2 (one spare).
-- Meets JLC3DP's limits: 1.2 mm walls, 1.0 mm top, 0.8 mm corner stops the board presses against.
+- Meets JLC3DP's limits (no thin-wall warning): 1.2 mm walls and top, rounded inside edge, 1.6 mm lug sides, 0.8 mm corner stops.
+- Material: **JLC Black Resin** (toughest of the black resins, 65 °C heat deflection), general sanding. For a silkier feel, wipe with a drop of mineral oil.
 
 ## 4. Buy separately
 
