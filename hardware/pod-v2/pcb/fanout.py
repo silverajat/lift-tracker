@@ -1,4 +1,5 @@
 """Fan out GND and +3V3 SMD pads: a short trace + via straight down to the
+import sys; sys.path.insert(0, "/home/claude/podv2")
 inner planes (In1 = GND, In2 = +3V3). Tries several directions/distances per
 pad and keeps the first spot that clears every other pad, via and keepout."""
 import math
@@ -21,9 +22,9 @@ for fp in b.GetFootprints():
         pads.append((p, bb.GetX() / 1e6, bb.GetY() / 1e6, bb.GetRight() / 1e6, bb.GetBottom() / 1e6))
 
 edge = b.GetBoardEdgesBoundingBox()
-EX0, EY0, EX1, EY1 = edge.GetX() / 1e6, edge.GetY() / 1e6, edge.GetRight() / 1e6, edge.GetBottom() / 1e6
+EX0, EY0, EX1, EY1 = edge.GetX() / 1e6 + 0.05, edge.GetY() / 1e6 + 0.05, edge.GetRight() / 1e6 - 0.05, edge.GetBottom() / 1e6 - 0.05  # bbox includes the 0.1 mm outline width
 OX, OY = EX0, EY0
-R_CORNER = 3.0
+from placement import CORNER_R as R_CORNER
 
 keepouts = []
 for fp in b.GetFootprints():
@@ -32,7 +33,16 @@ for fp in b.GetFootprints():
             bb = z.GetBoundingBox()
             keepouts.append((bb.GetX() / 1e6, bb.GetY() / 1e6, bb.GetRight() / 1e6, bb.GetBottom() / 1e6))
 
+for z in b.Zones():
+    if z.GetIsRuleArea() and z.GetDoNotAllowVias():
+        bb = z.GetBoundingBox()
+        keepouts.append((bb.GetX() / 1e6, bb.GetY() / 1e6, bb.GetRight() / 1e6, bb.GetBottom() / 1e6))
+
 vias = []
+
+
+def same(a, b):
+    return a.GetParentFootprint().GetReference() == b.GetParentFootprint().GetReference() and a.GetNumber() == b.GetNumber()
 
 
 def inside_board(x, y, margin):
@@ -59,7 +69,7 @@ def seg_clear(x0, y0, x1, y1, own_pad, netname):
         t = i / 9
         x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
         for p, *r in pads:
-            if p is own_pad or p.GetNetname() == netname:
+            if same(p, own_pad) or p.GetNetname() == netname:
                 continue
             if rect_dist(x, y, r) < TRACK_W / 2 + CLR:
                 return False
@@ -67,13 +77,13 @@ def seg_clear(x0, y0, x1, y1, own_pad, netname):
 
 
 def spot_ok(x, y, own_pad, netname):
-    if not inside_board(x, y, VIA_D / 2 + 0.3):
+    if not inside_board(x, y, VIA_D / 2 + 0.32):
         return False
     for k in keepouts:
         if rect_dist(x, y, k) < VIA_D / 2 + 0.1:
             return False
     for p, *r in pads:
-        if p is own_pad:
+        if same(p, own_pad):
             continue
         need = VIA_D / 2 + (0.15 if p.GetNetname() == netname else CLR)
         if rect_dist(x, y, r) < need:

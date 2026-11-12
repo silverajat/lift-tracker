@@ -1,65 +1,67 @@
-// Lift pod v2 case: the Fitbit-sized one, around the v2 board (33 x 17 mm,
-// 0.8 mm thick). Made to be printed at JLC3DP:
-//   - SLA black resin, sanded + "mineral oil" finish (smooth, dry touch), or
-//   - MJF PA12-HP nylon, dyed black (tougher, slightly grainy).
+// Lift pod v2 case, Fitbit Air charger version.
 //
-//   lid   : thin cap over the parts, two LED holes, engraved logo
-//   board : rests on a ledge all round
-//   bay   : 301120 cell (datasheet max 3.0 x 11.0 x 20.5 mm) + 8 mm coin motor
-//   floor : 2 holes for the dock's spring pins, 2 magnet pockets
-//   lugs  : a band slot at each end (band loops through, like a watch),
-//           so the floor stays free for the dock and the pod stays thin
+// The board IS the pod's underside: it sits in a rebate in the bottom rim
+// of a one-piece shell, so its black solder mask and the two gold charger
+// contacts are the face that goes on the Fitbit Air charger (and on your
+// wrist). Everything else stacks on top of the board, inside the shell:
 //
-// Every size below comes from a datasheet maximum + clearance, not from a
-// measured sample: the cell can't rattle (pocket = max + 0.3 mm, plus a
-// 0.3 mm foam pad), and parts from any batch fit.
+//   shell top 0.9 mm  (engraved logo, 2 LED holes)
+//   coin motor 2.5 on the nRF module 2.2  |  LiPo 3.0 + foam on the flash 1.75
+//   board 0.8 mm, flush with the rim
 //
-// Axes: band along X; antenna at -X (plastic only around it).
-// Board coordinates (KiCad, mm from the board's top-left) map to the pod
-// with pod(). Positions come from podv2/placement.py.
+// Print at JLC3DP: SLA black resin (8228 / "black resin"), sanded + mineral
+// oil finish for a smooth, dry, Fitbit-like feel; or MJF PA12 nylon dyed
+// black (tougher, slightly grainy).
+//
+// Assembly: solder the cell and motor wires, stick the cell and motor down
+// with thin double-sided foam tape (the shell presses them down), glue the
+// steel disc (kapton under it) at the marked circle, then press the board
+// into the rim and run a thin bead of flexible glue (B-7000 / E6000) along
+// the seam. Flexible glue can be cut to open the pod again.
+//
+// Sizes come from datasheet maximums + clearance, not a measured sample.
+// Axes: band along X; antenna at -X (top-left corner of the board, plastic
+// only around it). Board coordinates (KiCad mm from the board's top-left,
+// y down) map to the pod with pod(); positions match podv2/placement.py.
 
-part = "all";   // "base", "lid", "all", "assembled"
+part = "shell";   // "shell", "assembled", "bottom"
 
 // ---------- Board ----------
-pcb_l = 33.0;  pcb_w = 17.0;  pcb_r = 3.0;  pcb_t = 0.8;
-parts_h = 2.45;         // tallest part: MDBT50Q module 2.2 mm (+ margin)
+pcb_l = 34.0;  pcb_w = 18.0;  pcb_r = 2.0;  pcb_t = 0.8;
+contacts = [[9.5, 9.0], [27.5, 9.0]];     // charger contacts (underside)
+steel_at = [18.5, 9.0];                    // steel disc for the charger magnet
+leds     = [[24.2, 1.2], [27.6, 1.2]];     // D2 green (status), D3 red (charging)
 
-// ---------- Under the board (datasheet maximums) ----------
-cell = [20.5, 11.0, 3.0];       // 301120 LiPo, L x W x T max (SparkFun/DTP datasheet)
-cell_at = [12.5 + cell[0]/2, 0.6 + cell[1]/2];   // board coords of the cell centre
-motor_d = 8.0;  motor_t = 2.5;  motor_at = [8.5, 5.0];   // coin ERM
-foam = 0.3;                     // foam pad under the cell
-bay_h = max(cell[2], motor_t) + foam + 0.2;
+// ---------- On top of the board (datasheet maximums) ----------
+cell = [20.5, 11.0, 3.0];       // 301120 LiPo, L x W x T max
+cell_box = [12.8, 3.5, 33.3, 14.5];        // board coords of the cell outline
+motor_d = 8.0;  motor_t = 2.5;  motor_at = [6.3, 12.5];
+module_h = 2.2;  flash_h = 1.75;  foam = 0.3;  gap = 0.15;
+in_h = max(module_h + gap + motor_t, flash_h + gap + cell[2] + foam) + 0.1;
 
-// ---------- Dock interface (shared with lift_dock_v2.scad) ----------
-dock_pads = [[22.5, 14.2], [28.5, 14.2]];   // J1: VIN, GND (board bottom)
-magnets   = [[18.9, 14.2], [31.6, 14.2]];   // 3 x 1.5 mm N52 discs
-pin_hole  = 2.2;                // dock spring pins reach the pads through these
-mag_d = 3.0;  mag_t = 1.5;  mag_skin = 0.4;
-
-// ---------- Band (measure your band: width and thickness) ----------
+// ---------- Band (measure yours: width and thickness) ----------
 strap_w = 20.0;  band_t = 1.8;
-slot_w  = band_t + 0.6;         // gap the band passes through
-bar_t   = 1.8;                  // the bar the band wraps around
+slot_w  = band_t + 0.6;
+bar_t   = 1.8;
 lug_h   = 4.2;
 
 // ---------- Shape ----------
-clr = 0.25;  fit_clr = 0.1;  wall = 1.4;  floor_t = 1.0;  lid_t = 0.9;  lap_h = 1.0;
-ledge_w = 0.8;  plan_r = 4.0;  top_r = 2.2;  bot_r = 1.2;
-leds = [[28.2, 5.2], [28.2, 6.9]];   // D3 red (charging), D2 green (status)
+clr = 0.1;        // board in the rim: snug, glued
+wall = 1.0;       // side wall
+ledge = 0.3;      // the board pushes up against this lip
+top_t = 0.9;
+top_r = 2.2;      // rounded top edge
+chamfer = 0.3;    // small chamfer on the bottom outer edge
 logo_h = 6.0;  logo_depth = 0.3;
 $fn = 48;
 
 // ---------- Derived ----------
 cav_l = pcb_l + 2*clr;  cav_w = pcb_w + 2*clr;
 body_l = cav_l + 2*wall;  W = cav_w + 2*wall;
+plan_r = pcb_r + clr + wall;
+H = pcb_t + in_h + top_t;
 lug_l = slot_w + bar_t + 0.6;
 L = body_l + 2*lug_l;
-z_bay = floor_t;
-z_pcb = z_bay + bay_h;          // board underside
-z_top = z_pcb + pcb_t;
-z_split = z_top;
-H = z_top + parts_h + lid_t;
 
 function pod(p) = [p[0] - pcb_l/2, pcb_w/2 - p[1]];   // board mm -> pod XY
 
@@ -68,15 +70,12 @@ module rr(l, w, r) {
     offset(r = r2) square([l - 2*r2, w - 2*r2], center = true);
 }
 function inset(z) =
-    z < bot_r     ? bot_r - sqrt(max(bot_r*bot_r - (bot_r - z)*(bot_r - z), 0)) :
+    z < chamfer   ? chamfer - z :
     z > H - top_r ? top_r - sqrt(max(top_r*top_r - (z - (H - top_r))*(z - (H - top_r)), 0)) : 0;
-module pebble(l = body_l) {
-    zs = concat([for (i = [0:6]) i*bot_r/6], [for (i = [0:10]) H - top_r + i*top_r/10]);
+module pebble() {
+    zs = concat([0, chamfer], [for (i = [0:10]) H - top_r + i*top_r/10]);
     hull() for (z = zs) translate([0, 0, z]) linear_extrude(0.001)
-        rr(l - 2*inset(z), W - 2*inset(z), plan_r - inset(z));
-}
-module cav(z0, z1, grow = 0) {
-    translate([0, 0, z0]) linear_extrude(z1 - z0) rr(cav_l + 2*grow, cav_w + 2*grow, pcb_r + clr + grow);
+        rr(body_l - 2*inset(z), W - 2*inset(z), plan_r - inset(z));
 }
 module r_logo(h = 9) {
     k = h / 84;
@@ -92,12 +91,13 @@ module r_logo(h = 9) {
         polygon([[533, 134], [547.7, 134], [555.6, 144], [533, 144]]);
     }
 }
-// band lugs: a rounded bar at each end with a through-slot for the band
+// band lugs: a rounded bar at each end with a through-slot; their underside
+// is flush with the board, so the pod still sits flat on the charger
 module lugs() {
     for (s = [-1, 1]) difference() {
         hull() {
             translate([s*(body_l/2 - 2), 0, 0]) linear_extrude(lug_h) rr(4, W - 1.0, 1.5);
-            translate([s*(L/2 - bar_t/2), 0, bot_r]) rotate([90, 0, 0])
+            translate([s*(L/2 - bar_t/2), 0, bar_t/2 + 0.3]) rotate([90, 0, 0])
                 cylinder(d = bar_t + 0.6, h = strap_w + 2.4, center = true);
             translate([s*(L/2 - bar_t/2), 0, lug_h - bar_t/2 - 0.3]) rotate([90, 0, 0])
                 cylinder(d = bar_t + 0.6, h = strap_w + 2.4, center = true);
@@ -106,53 +106,31 @@ module lugs() {
             cube([slot_w, strap_w + 0.6, lug_h + 2], center = true);
     }
 }
-module base() {
+module shell() {
     difference() {
-        union() {
-            intersection() { pebble(); translate([-L, -W, 0]) cube([2*L, 2*W, z_split]); }
-            lugs();
-            // half-lap tongue: inner half of the wall continues up
-            difference() { cav(z_split - 0.01, z_split + lap_h, wall/2); cav(z_split - 1, z_split + lap_h + 1); }
-        }
-        cav(z_pcb, z_split + lap_h + 1);               // board pocket
-        cav(z_bay, z_pcb + 0.01, -ledge_w);            // bay (leaves the ledge)
-        for (p = dock_pads) { q = pod(p); translate([q[0], q[1], -1]) cylinder(d = pin_hole, h = floor_t + 2); }
-        for (p = magnets) { q = pod(p); translate([q[0], q[1], mag_skin]) cylinder(d = mag_d + 0.15, h = 5); }
-    }
-    // locating ribs for the cell and the motor (0.8 mm high, on the floor)
-    c = pod(cell_at);
-    translate([c[0], c[1], z_bay - 0.01]) linear_extrude(0.8) difference() {
-        rr(cell[0] + 0.6 + 1.2, cell[1] + 0.6 + 1.2, 1.0);
-        rr(cell[0] + 0.6, cell[1] + 0.6, 0.6);
-        translate([-cell[0]/2 - 2, -2]) square([3, 4]);   // gap for the cell's wires (PCM end)
-    }
-    m = pod(motor_at);
-    translate([m[0], m[1], z_bay - 0.01]) linear_extrude(0.8) difference() {
-        circle(d = motor_d + 0.4 + 1.2); circle(d = motor_d + 0.4);
-        translate([0, -motor_d]) square([1.6, motor_d], center = true);   // wire exit
-    }
-    // collars around the magnet pockets (the pockets go above the floor)
-    for (p = magnets) { q = pod(p); translate([q[0], q[1], z_bay - 0.01]) difference() {
-        cylinder(d = mag_d + 1.4, h = mag_skin + mag_t - floor_t + 0.2);
-        translate([0, 0, -1]) cylinder(d = mag_d + 0.15, h = 5);
-    } }
-}
-module lid() {
-    difference() {
-        intersection() { pebble(); translate([-L, -W, z_split]) cube([2*L, 2*W, H]); }
-        cav(z_split - 1, H - lid_t);                           // parts space
-        cav(z_split - 1, z_split + lap_h + fit_clr, wall/2 + fit_clr);
-        for (p = leds) { q = pod(p); translate([q[0], q[1], z_split]) cylinder(d = 1.2, h = H); }
-        translate([-6, 0, H - logo_depth]) linear_extrude(1) r_logo(logo_h);
+        union() { pebble(); lugs(); }
+        // rebate the board sits in (flush with the bottom)
+        translate([0, 0, -1]) linear_extrude(pcb_t + 1) rr(cav_l, cav_w, pcb_r + clr);
+        // parts space above the board, leaving the ledge
+        translate([0, 0, pcb_t - 0.01]) linear_extrude(in_h + 0.01) rr(cav_l - 2*ledge, cav_w - 2*ledge, pcb_r + clr - ledge);
+        // LED windows (fill with clear UV resin for a sealed light pipe)
+        for (p = leds) { q = pod(p); translate([q[0], q[1], H - top_t - 1]) cylinder(d = 1.2, h = top_t + 2); }
+        translate([-4, 0, H - logo_depth]) linear_extrude(1) r_logo(logo_h);
     }
 }
-if (part == "base") base();
-if (part == "lid")  translate([0, 0, -z_split]) lid();
-if (part == "all") { color("#111111") base(); color("#111111") translate([0, W + 8, -z_split]) lid(); }
+module board() {
+    color("#1b1b1b") linear_extrude(pcb_t) rr(pcb_l, pcb_w, pcb_r);
+    for (p = contacts) { q = pod(p); color("gold") translate([q[0], q[1], -0.02]) linear_extrude(0.03) rr(4, 3, 1.5); }
+}
+if (part == "shell") shell();
+if (part == "bottom") { color("#111111") shell(); board(); }   // view from below
 if (part == "assembled") {
-    color("#111111") base();
-    color("#2d6a3e") translate([0, 0, z_pcb]) linear_extrude(pcb_t) rr(pcb_l, pcb_w, pcb_r);
-    c = pod(cell_at); color("#b0b0b0") translate([c[0], c[1], z_bay + foam + cell[2]/2]) cube(cell, center = true);
-    color("#1a1a1a", 0.85) lid();
+    color("#111111", 0.35) shell();
+    board();
+    color("#9a9a9a") translate([pod([6.3, 9])[0], pod([6.3, 9])[1], pcb_t + module_h/2]) cube([10, 15.5, module_h], center = true);
+    m = pod(motor_at); color("#c0c0c0") translate([m[0], m[1], pcb_t + module_h + gap]) cylinder(d = motor_d, h = motor_t);
+    c = pod([(cell_box[0] + cell_box[2])/2, (cell_box[1] + cell_box[3])/2]);
+    color("#c9a227") translate([c[0], c[1], pcb_t + flash_h + gap + cell[2]/2]) cube(cell, center = true);
+    s = pod(steel_at); color("#777") translate([s[0], s[1], pcb_t]) cylinder(d = 5, h = 0.5);
 }
-echo(str("pod v2 size (mm): body ", body_l, " x ", W, " x ", H, " thick; with lugs ", L, " long"));
+echo(str("pod v2 size (mm): body ", body_l, " x ", W, " x ", H, " thick; with lugs ", L, " long; inside height above the board ", in_h));

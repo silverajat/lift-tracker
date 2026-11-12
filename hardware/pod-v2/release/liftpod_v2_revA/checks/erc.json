@@ -1,0 +1,96 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-12T21:04:52+0800",
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "9.0.9",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/1d2c3b4a-5f6e-4a7b-8c9d-0e1f2a3b4c5d",
+            "violations": [
+                {
+                    "description": "Symbol 'MDBT50Q-1MV2' doesn't match copy in library 'RF_Module'",
+                    "items": [
+                        {
+                            "description": "Symbol U101 [MDBT50Q-1MV2]",
+                            "pos": {
+                                "x": 0.7112,
+                                "y": 0.8382
+                            },
+                            "uuid": "4fd00e0d-2f83-5fb8-84da-b2290d8afa11"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Pins of type Bidirectional and Power output are connected",
+                    "items": [
+                        {
+                            "description": "Symbol U107 Pin 3 [~{WP}/IO_{2}, Bidirectional, Line]",
+                            "pos": {
+                                "x": 1.1176,
+                                "y": 1.8288
+                            },
+                            "uuid": "cffc9c41-09b4-4dac-b61a-f53f9048594a"
+                        },
+                        {
+                            "description": "Symbol U104 Pin 2 [VO, Power output, Line]",
+                            "pos": {
+                                "x": 3.7338,
+                                "y": 2.8448
+                            },
+                            "uuid": "9ad9ccdc-d74c-4677-b6e1-1b0c36781aab"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "pin_to_pin"
+                },
+                {
+                    "description": "Pins of type Bidirectional and Power output are connected",
+                    "items": [
+                        {
+                            "description": "Symbol U107 Pin 7 [~{HOLD}/~{RESET}/IO_{3}, Bidirectional, Line]",
+                            "pos": {
+                                "x": 1.1176,
+                                "y": 1.8542
+                            },
+                            "uuid": "a39dfef2-0c4d-402b-a8d5-75ad47cf6b50"
+                        },
+                        {
+                            "description": "Symbol U104 Pin 2 [VO, Power output, Line]",
+                            "pos": {
+                                "x": 3.7338,
+                                "y": 2.8448
+                            },
+                            "uuid": "9ad9ccdc-d74c-4677-b6e1-1b0c36781aab"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "pin_to_pin"
+                },
+                {
+                    "description": "Symbol 'AO3400A' doesn't match copy in library 'Transistor_FET'",
+                    "items": [
+                        {
+                            "description": "Symbol Q101 [AO3400A]",
+                            "pos": {
+                                "x": 1.1684,
+                                "y": 3.3401
+                            },
+                            "uuid": "a1730d8d-d862-5bbf-868a-0a5d5dac53bc"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                }
+            ]
+        }
+    ],
+    "source": "gympod.kicad_sch"
+}

@@ -1,0 +1,39 @@
+{
+    "$schema": "https://schemas.kicad.org/drc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-12T21:10:02+0800",
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "9.0.9",
+    "schematic_parity": [],
+    "source": "gympod.kicad_pcb",
+    "unconnected_items": [],
+    "violations": [
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of R104 on F.Silkscreen",
+                    "pos": {
+                        "x": 127.446359,
+                        "y": 103.08
+                    },
+                    "uuid": "68e8889a-add3-421b-b267-296da8d8896d"
+                },
+                {
+                    "description": "Polygon of U103 on F.Silkscreen",
+                    "pos": {
+                        "x": 127.95,
+                        "y": 103.49
+                    },
+                    "uuid": "d29c05cd-c560-48b2-a240-e9ab554d94ae"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        }
+    ]
+}

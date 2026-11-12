@@ -2,15 +2,16 @@
 
 Board: pod v2, rounded rectangle, 4 layers, 0.8 mm.
   F.Cu  signals + parts      In1.Cu  solid GND
-  In2.Cu  +3V3 plane         B.Cu    signals + GND pour (no parts: battery side)
-Antenna end at x = 0, USB-C at x = 36.
+  In2.Cu  +3V3 plane         B.Cu    signals + GND pour; this face is the pod's
+                                     underside (charger contacts, SWD pads)
+Antenna in the top-left corner. Cell, motor and steel disc drawn on Dwgs.User.
 """
 import sys
 import pcbnew
 import sexpdata
 
 sys.path.insert(0, "/home/claude/podv2")
-from placement import PLACE, BOARD_W, BOARD_H, CORNER_R  # noqa: E402
+from placement import PLACE, BOARD_W, BOARD_H, CORNER_R, MECH, CELL, MOTOR  # noqa: E402
 from design import PARTS  # noqa: E402
 DNP = {p["ref"] for p in PARTS if p.get("dnp")}
 
@@ -169,6 +170,81 @@ for ref, c in comps.items():
         fp.SetDNP(True)
         fp.SetExcludedFromBOM(True)
         fp.SetExcludedFromPosFiles(True)
+
+
+# ---- board-only mechanical footprints (steel disc spot) -------------------
+for ref, (lib, name, x, y, rot) in MECH.items():
+    libdir = "/home/claude/podv2/lib" if lib == "lift" else FPLIB
+    fp = pcbnew.FootprintLoad(f"{libdir}/{lib}.pretty", name)
+    fp.SetReference(ref)
+    fp.SetFPID(pcbnew.LIB_ID(lib, name))
+    fp.SetBoardOnly(True)
+    fp.SetExcludedFromBOM(True)
+    fp.SetExcludedFromPosFiles(True)
+    board.Add(fp)
+    fp.SetPosition(P(x, y))
+    fp.SetOrientationDegrees(rot)
+
+
+# ---- keep-outs under the nRF module: its underside has pads, so only the
+# short escape tracks from each pad go there. No vias under the body (any
+# layer), no tracks on F.Cu inside the pad ring.
+def rule_area(layers, x0, y0, x1, y1, tracks, vias):
+    z = pcbnew.ZONE(board)
+    z.SetIsRuleArea(True)
+    ls = pcbnew.LSET()
+    for l in layers:
+        ls.AddLayer(l)
+    z.SetLayerSet(ls)
+    z.SetDoNotAllowTracks(not tracks)
+    z.SetDoNotAllowVias(not vias)
+    z.SetDoNotAllowPads(False)
+    z.SetDoNotAllowFootprints(False)
+    z.SetDoNotAllowCopperPour(False)
+    ol = z.Outline()
+    ol.NewOutline()
+    for (x, y) in [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]:
+        ol.Append(mm(OX + x), mm(OY + y))
+    board.Add(z)
+
+
+ux, uy = PLACE["U1"][:2]
+rule_area([pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu],
+          ux - 5.0, uy - 7.75, ux + 5.0, uy + 7.75, tracks=True, vias=False)
+rule_area([pcbnew.F_Cu], ux - 3.3, uy - 3.9, ux + 3.3, uy + 5.85, tracks=False, vias=False)
+
+
+# ---- drawings: where the cell and motor sit (documentation only) ---------
+def user_rect(x0, y0, x1, y1):
+    s = pcbnew.PCB_SHAPE(board)
+    s.SetShape(pcbnew.SHAPE_T_RECT)
+    s.SetStart(P(x0, y0))
+    s.SetEnd(P(x1, y1))
+    s.SetLayer(pcbnew.Dwgs_User)
+    s.SetWidth(mm(0.1))
+    board.Add(s)
+
+
+def user_text(x, y, txt):
+    t = pcbnew.PCB_TEXT(board)
+    t.SetText(txt)
+    t.SetPosition(P(x, y))
+    t.SetLayer(pcbnew.Dwgs_User)
+    t.SetTextSize(pcbnew.VECTOR2I(mm(0.8), mm(0.8)))
+    t.SetTextThickness(mm(0.12))
+    board.Add(t)
+
+
+user_rect(*CELL)
+user_text((CELL[0] + CELL[2]) / 2, (CELL[1] + CELL[3]) / 2 + 1.5, "LiPo 301120 (on top of parts)")
+c = pcbnew.PCB_SHAPE(board)
+c.SetShape(pcbnew.SHAPE_T_CIRCLE)
+c.SetCenter(P(MOTOR[0], MOTOR[1]))
+c.SetEnd(P(MOTOR[0] + MOTOR[2], MOTOR[1]))
+c.SetLayer(pcbnew.Dwgs_User)
+c.SetWidth(mm(0.1))
+board.Add(c)
+user_text(MOTOR[0], MOTOR[1], "coin motor (on module)")
 
 
 # ---- copper planes ------------------------------------------------------

@@ -2,7 +2,7 @@
 import sys, itertools, pcbnew, os
 b = pcbnew.LoadBoard(sys.argv[1])
 OX, OY = 100, 100
-from placement import BOARD_W, BOARD_H
+from placement import BOARD_W, BOARD_H, ANTENNA, STEEL
 boxes = {}
 for fp in b.GetFootprints():
     side = pcbnew.B_CrtYd if fp.IsFlipped() else pcbnew.F_CrtYd
@@ -21,7 +21,8 @@ for (a, A), (c, Cc) in itertools.combinations(boxes.items(), 2):
 for r, (fl, x0, y0, x1, y1) in boxes.items():
     if x0 < -0.01 or y0 < -0.01 or x1 > BOARD_W + 0.01 or y1 > BOARD_H + 0.01:
         print(f"outside {r} {x0:.2f},{y0:.2f}-{x1:.2f},{y1:.2f}"); bad += 1
-    if r != "U101" and x0 < 4.5:
-        print(f"near antenna {r} x0={x0:.2f}"); bad += 1
+    ax0, ay0, ax1, ay1 = ANTENNA
+    if r not in ("U101",) and x0 < ax1 and y0 < ay1:
+        print(f"in antenna keep-out {r} {x0:.2f},{y0:.2f}"); bad += 1
 print("problems:", bad)
 os._exit(0)
