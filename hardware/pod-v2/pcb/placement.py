@@ -1,85 +1,93 @@
-"""Part placement for lift pod v2, Fitbit Air charger version (mm from the
-board's top-left corner, y down).
+"""Part placement for lift pod v2, Ebyte E73 version (mm from the board's
+top-left corner, y down).
 
-Board 34 x 18 mm, 0.8 mm, 4 layers. The board is the pod's underside:
-everything is assembled on top, and the bottom face only has the charger
-contacts and the SWD test pads, under solder mask everywhere else.
+Board 41 x 18 mm, 0.8 mm, 4 layers. The board is the pod's underside:
+everything is assembled on top; the bottom face only has the charger
+contacts and the SWD pads, under solder mask everywhere else.
 
-STACK (bottom -> top): board 0.8 | parts (module 2.2, others <= 1.75) |
-coin motor on the module, LiPo cell on the right-hand parts | lid.
+STACK (bottom -> top): board 0.8 | E73 module 3.0 + coin motor 2.5 on it  |
+right-hand parts (<= 1.1 mm) + LiPo 3.0 on them | shell top.
 
 TOP
-  x 0-12.1   nRF52840 module, antenna in the top-left corner (y 0-5)
-             coin motor (8 mm) sits on the module, centred at (6.3, 12.5)
-  x 12.1-15.8  IMU right next to the SPI pins, decoupling below it
-  (18.5, 9)  5 mm steel disc for the charger magnet (no parts, no vias)
-  above it   2 MB flash        below it   IMU caps, motor wire pads
-  x 21-34    charging, LDO, motor driver; the 20.5 x 11 mm cell lies on
-             top of these (x 12.8-33.3, y 3.5-14.5); LEDs along the top
-             edge, outside the cell, so their light can get out
+  x 0.3-19.3   Ebyte E73 (rotated 270: antenna at the left edge x 0.3-3.7,
+               pad rows along the top and bottom edges, power + SPI pads
+               facing right). Coin motor sits on it at (11.3, 9).
+  x 19.5-21.5  module decoupling
+  (24.2, 9)    5 mm steel disc for the charger magnet (no parts, no vias)
+  above it     2 MB flash (USON 2x3)    below it   IMU, caps, motor pads
+  x 28.5-41    charging, LDO, motor driver, LEDs, cell pads
+  The 20.5 x 11 mm cell lies on x 19.9-40.4, y 3.5-14.5; LEDs sit in the
+  strip above it so their light can get out.
 BOTTOM
-  charger contacts at (9.5, 9) and (27.5, 9), 18 mm apart, either way round
-  SWD pads under the module, between the antenna corner and contact A
-  (cover with kapton after flashing)
+  charger contacts at (15.2, 9) and (33.2, 9), 18 mm apart
+  SWD pads under the module's top edge (cover with kapton after flashing)
 """
-BOARD_W, BOARD_H, CORNER_R = 34.0, 18.0, 2.0
+BOARD_W, BOARD_H, CORNER_R = 41.0, 18.0, 2.0
 
-STEEL = (18.5, 9.0)          # charger magnet centre
-CELL = (12.8, 3.5, 33.3, 14.5)   # cell outline on top (for drawings + checks)
-MOTOR = (6.3, 12.5, 4.0)     # centre x, y, radius
-ANTENNA = (0.0, 0.0, 12.5, 5.0)  # nothing else in here, any layer
+STEEL = (24.2, 9.0)              # charger magnet centre
+CELL = (19.9, 3.5, 40.4, 14.5)   # cell outline on top
+MOTOR = (11.3, 9.0, 4.0)         # on the module: centre x, y, radius
+ANTENNA = (0.0, 0.0, 4.0, 18.0)  # nothing else here, any layer
+
+UX, UY = 11.3, 9.0               # module centre (footprint origin), rotation 270
+# module body and the area inside its pad ring, board coords
+MODULE_BODY = (UX - 11.0, UY - 6.5, UX + 7.0, UY + 6.5)
+MODULE_INSIDE = (UX - 7.6, UY - 3.8, UX + 4.3, UY + 3.8)   # no F.Cu tracks here
 
 PLACE = {
-    "U1": (6.3, 9.0, 0),          # module: courtyard x 0.5-12.1, y 0.7-17.3
+    "U1": (UX, UY, 270),           # E73: antenna x 0.3-3.7, pads to x 19.3, y 1.5-16.5
 
-    # strip beside the module's SPI pins (x 12.1-15.8)
-    "U2": (14.1, 12.75, 90),      # BMI270, SPI pins facing the module
-    "C4": (16.9, 13.3, 90),       # IMU VDD
-    "C5": (18.1, 13.3, 90),       # IMU VDDIO
+    # column beside the module's right-hand pad row (VDD y 8.4, VDDH y 5.8)
+    "C2": (20.2, 8.0, 90),         # 3V3 100 nF
+    "C1": (20.2, 5.9, 90),         # 3V3 10 uF
 
-    # above the steel disc
-    "U7": (16.6, 3.0, 0),         # SOIC-8 flash: x 12.85-20.35, y 0.25-5.75
-    "C14": (21.2, 1.4, 90),       # flash decoupling (VCC pin 8 at 19.1, 1.1)
+    # above the steel disc: flash
+    "U7": (23.5, 3.2, 90),         # W25Q16 USON 2x3: CLK/DI face the module side, CS/DO the right
+    "C14": (22.6, 5.25, 0),        # flash decoupling (VCC pin bottom-left)
+    "R13": (25.9, 5.5, 0),         # flash CS pull-up
 
-    # bottom strip under the module's power pins (VDD 7.9/8.7, VBUS 10.3, y 16.15)
-    "C2": (13.2, 15.3, 0),        # 3V3 100 nF
-    "C1": (13.2, 16.6, 0),        # 3V3 10 uF
-    "C3": (15.3, 16.6, 0),        # nRF VBUS (VCHG)
-    "R5": (15.3, 15.3, 0),        # VBAT divider top
-    "R6": (17.6, 14.85, 0),       # VBAT divider bottom
-    "C8": (19.6, 14.85, 0),       # VBAT sense hold
-    "J4": (18.7, 16.5, 0),        # motor wire pads (motor sits on the module)
+    # below the steel disc: IMU, its caps, motor wire pads, battery sense
+    "U2": (23.2, 13.6, 0),         # BMI270: MOSI/SCK/CS along the top, MISO/INT1 on the left
+    "C4": (25.6, 12.8, 90),        # IMU VDD
+    "C5": (26.7, 12.8, 90),        # IMU VDDIO
+    "R14": (26.7, 14.75, 90),      # IMU CS pull-up
+    "J4": (35.0, 8.7, 0),          # motor wire pads, open spot under the cell (wires run under it)
+    "R5": (32.9, 11.0, 90),        # VBAT divider top, beside the other VBAT parts
+    "R6": (32.9, 13.2, 90),        # VBAT divider bottom
+    "C8": (20.3, 15.6, 90),        # VBAT sense hold, at the module's ADC pin
 
-    # top edge, outside the cell: LEDs + charger programming
-    "D2": (24.2, 1.2, 0),         # status LED (green)
-    "R9": (24.2, 2.7, 0),
-    "D3": (27.6, 1.2, 0),         # charge LED (red)
-    "R4": (27.6, 2.7, 0),
-    "R3": (30.6, 1.3, 0),         # PROG 47k
-    "C6": (30.6, 2.7, 0),         # charger in
+    # top strip, outside the cell: LEDs + charger programming
+    "D3": (34.9, 1.2, 0),          # charge LED (red)
+    "R4": (37.4, 1.2, 180),        # charge LED resistor, right beside D3's anode
+    "R3": (37.4, 2.6, 0),          # PROG 47k
+    "C6": (38.9, 1.6, 90),         # charger in
+
+    # green status LED in the bottom strip (outside the cell), near the module's LED pin
+    "D2": (27.0, 16.9, 180),       # status LED (green), anode faces R9
+    "R9": (24.9, 16.7, 90),
 
     # under the cell: bridge, charger, LDO, cell pads
-    "D8": (23.4, 4.55, 0),        # bridge, pad B -> VCHG
-    "D9": (23.4, 6.6, 0),         # bridge, GND -> pad B
-    "D5": (26.4, 5.0, 90),         # TVS on VCHG
-    "U3": (29.4, 5.0, 0),         # MCP73831
-    "C7": (32.6, 4.6, 90),        # charger out (VBAT)
-    "J2": (32.4, 9.5, 90),        # cell wire pads (cell's protection board end)
-    "D6": (23.4, 11.45, 0),       # bridge, pad A -> VCHG
-    "D7": (23.4, 13.45, 0),       # bridge, GND -> pad A
-    "U4": (28.6, 12.8, 0),        # XC6206 3.3 V
-    "C9": (31.6, 13.3, 90),       # LDO in
-    "C10": (32.8, 13.3, 90),      # LDO out
+    "D8": (30.7, 4.55, 0),         # bridge, pad B -> VCHG
+    "D9": (30.7, 6.6, 0),          # bridge, GND -> pad B
+    "D5": (33.7, 5.0, 90),         # TVS on VCHG
+    "U3": (36.7, 5.0, 0),          # MCP73831
+    "C7": (39.9, 4.6, 90),         # charger out (VBAT)
+    "J2": (39.3, 9.5, 90),         # cell wire pads (cell's protection board end)
+    "D6": (30.7, 11.45, 0),        # bridge, pad A -> VCHG
+    "D7": (30.7, 13.45, 0),        # bridge, GND -> pad A
+    "U4": (35.6, 12.8, 0),         # XC6206 3.3 V
+    "C9": (38.9, 13.3, 90),        # LDO in
+    "C10": (40.1, 13.3, 90),       # LDO out
 
     # bottom strip right: motor driver
-    "Q1": (23.2, 16.2, 0),
-    "R7": (26.4, 15.4, 0),        # gate 100R
-    "R8": (26.4, 16.7, 0),        # gate pull-down 100k
-    "D1": (29.5, 16.2, 0),        # motor flyback
+    "Q1": (31.2, 16.2, 180),       # drain faces the motor pads, gate faces R7/R8
+    "R7": (34.3, 15.4, 0),         # gate 100R
+    "R8": (34.3, 16.7, 0),         # gate pull-down 100k
+    "D1": (37.3, 16.2, 0),         # motor flyback
 
     # ---- underside ("B") ----
-    "J1": (STEEL[0], STEEL[1], 0, "B"),   # charger contacts at x 9.5 and 27.5
-    "J3": (7.0, 6.3, 180, "B"),   # SWD pads under the module, above contact A (SWDIO at x 8.5)
+    "J1": (STEEL[0], STEEL[1], 0, "B"),   # charger contacts at x 15.2 and 33.2
+    "J3": (7.5, 4.6, 180, "B"),    # SWD pads under the module's top edge (SWDIO at x 9)
 }
 
 # board-only mechanical footprints (not in the schematic)

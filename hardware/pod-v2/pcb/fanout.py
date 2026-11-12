@@ -1,5 +1,5 @@
 """Fan out GND and +3V3 SMD pads: a short trace + via straight down to the
-import sys; sys.path.insert(0, "/home/claude/podv2")
+import sys; sys.path.insert(0, __import__("os").path.dirname(__import__("os").path.abspath(__file__)))
 inner planes (In1 = GND, In2 = +3V3). Tries several directions/distances per
 pad and keeps the first spot that clears every other pad, via and keepout."""
 import math
@@ -63,13 +63,13 @@ def rect_dist(x, y, r):
     return math.hypot(dx, dy)
 
 
-def seg_clear(x0, y0, x1, y1, own_pad, netname):
-    """Track from pad to via must not pass near other-net pads."""
+def seg_clear(x0, y0, x1, y1, own_pad, netname, layer):
+    """Track from pad to via must not pass near other-net pads on its layer."""
     for i in range(1, 9):
         t = i / 9
         x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
         for p, *r in pads:
-            if same(p, own_pad) or p.GetNetname() == netname:
+            if same(p, own_pad) or p.GetNetname() == netname or not p.IsOnLayer(layer):
                 continue
             if rect_dist(x, y, r) < TRACK_W / 2 + CLR:
                 return False
@@ -108,11 +108,11 @@ for fp in b.GetFootprints():
         if abs(px - fc.x / 1e6) < 1e-6 and abs(py - fc.y / 1e6) < 1e-6:
             ang0 = -math.pi / 2
         best = None
-        for dist in (0.75, 0.95, 1.15, 1.4, 1.7, 2.0, 2.4, 2.8, 3.2):
+        for dist in (0.75, 0.95, 1.15, 1.4, 1.7, 2.0, 2.4, 2.8, 3.2, 3.6, 3.9, 4.2):
             for k in range(0, 24):
                 a = ang0 + (k // 2) * (math.pi / 12) * (1 if k % 2 == 0 else -1)
                 x, y = px + dist * math.cos(a), py + dist * math.sin(a)
-                if spot_ok(x, y, p, net) and seg_clear(px, py, x, y, p, net):
+                if spot_ok(x, y, p, net) and seg_clear(px, py, x, y, p, net, pcbnew.B_Cu if bottom else pcbnew.F_Cu):
                     best = (x, y)
                     break
             if best:

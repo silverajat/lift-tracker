@@ -10,7 +10,8 @@ from kiutils.items.schitems import (LocalLabel, NoConnect, SchematicSymbol,
 from kiutils.schematic import Schematic
 from kiutils.symbol import SymbolLib
 
-sys.path.insert(0, "/home/claude/podv2")
+HERE = __import__("os").path.dirname(__import__("os").path.abspath(__file__))
+sys.path.insert(0, HERE)
 from design import PARTS  # noqa: E402
 
 LIBDIR = "/usr/share/kicad/symbols"
@@ -20,7 +21,7 @@ _libs = {}
 def lib_symbol(lib, name):
     """Return a flattened copy of a library symbol (resolves 'extends')."""
     if lib not in _libs:
-        path = ("/home/claude/podv2/gympod.kicad_sym" if lib == "gympod"
+        path = (HERE + "/gympod.kicad_sym" if lib == "gympod"
                 else f"{LIBDIR}/{lib}.kicad_sym")
         _libs[lib] = SymbolLib.from_file(path)
     syms = {s.entryName: s for s in _libs[lib].symbols}
@@ -160,5 +161,5 @@ sch.texts.append(t)
 
 from kiutils.items.schitems import HierarchicalSheetInstance
 sch.sheetInstances = [HierarchicalSheetInstance(instancePath="/", page="1")]
-sch.to_file("/home/claude/podv2/gympod.kicad_sch")
+sch.to_file(HERE + "/gympod.kicad_sch")
 print("parts:", len(PARTS), "labels:", len(sch.labels), "no-connects:", len(sch.noConnects))

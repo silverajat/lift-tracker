@@ -10,7 +10,8 @@ import sys
 import pcbnew
 import sexpdata
 
-sys.path.insert(0, "/home/claude/podv2")
+HERE = __import__("os").path.dirname(__import__("os").path.abspath(__file__))
+sys.path.insert(0, HERE)
 from placement import PLACE, BOARD_W, BOARD_H, CORNER_R, MECH, CELL, MOTOR  # noqa: E402
 from design import PARTS  # noqa: E402
 DNP = {p["ref"] for p in PARTS if p.get("dnp")}
@@ -26,7 +27,7 @@ def P(x, y):
 
 # ---- read the netlist exported from the schematic ----------------------
 S = sexpdata.Symbol
-net_s = sexpdata.loads(open("/home/claude/podv2/gympod.net").read())
+net_s = sexpdata.loads(open(HERE + "/gympod.net").read())
 
 
 def kids(node, key):
@@ -132,7 +133,7 @@ for ref, c in comps.items():
     if ref.startswith("#"):
         continue
     lib, name = c["fp"].split(":")
-    libdir = "/home/claude/podv2/lib" if lib == "lift" else FPLIB
+    libdir = HERE + "/lib" if lib == "lift" else FPLIB
     fp = pcbnew.FootprintLoad(f"{libdir}/{lib}.pretty", name)
     if fp is None:
         raise SystemExit(f"footprint not found: {c['fp']}")
@@ -174,7 +175,7 @@ for ref, c in comps.items():
 
 # ---- board-only mechanical footprints (steel disc spot) -------------------
 for ref, (lib, name, x, y, rot) in MECH.items():
-    libdir = "/home/claude/podv2/lib" if lib == "lift" else FPLIB
+    libdir = HERE + "/lib" if lib == "lift" else FPLIB
     fp = pcbnew.FootprintLoad(f"{libdir}/{lib}.pretty", name)
     fp.SetReference(ref)
     fp.SetFPID(pcbnew.LIB_ID(lib, name))
@@ -208,10 +209,9 @@ def rule_area(layers, x0, y0, x1, y1, tracks, vias):
     board.Add(z)
 
 
-ux, uy = PLACE["U1"][:2]
-rule_area([pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu],
-          ux - 5.0, uy - 7.75, ux + 5.0, uy + 7.75, tracks=True, vias=False)
-rule_area([pcbnew.F_Cu], ux - 3.3, uy - 3.9, ux + 3.3, uy + 5.85, tracks=False, vias=False)
+from placement import MODULE_BODY, MODULE_INSIDE  # noqa: E402
+rule_area([pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu], *MODULE_BODY, tracks=True, vias=False)
+rule_area([pcbnew.F_Cu], *MODULE_INSIDE, tracks=False, vias=False)
 
 
 # ---- drawings: where the cell and motor sit (documentation only) ---------
@@ -273,5 +273,5 @@ zone(pcbnew.In2_Cu, "/+3V3")
 zone(pcbnew.B_Cu, "/GND")
 zone(pcbnew.F_Cu, "/GND")
 
-board.Save("/home/claude/podv2/gympod.kicad_pcb")
+board.Save(HERE + "/gympod.kicad_pcb")
 print("footprints:", len(board.GetFootprints()), "nets:", len(nets))

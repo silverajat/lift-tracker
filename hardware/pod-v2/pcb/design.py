@@ -11,30 +11,30 @@ What changed from v1.1 (see hardware/pod-v2/SPEC.md)
     underside, 18 mm apart, with a 5 mm steel disc between them for the
     charger's centre magnet. The pod can sit either way round, so the pads
     feed a bridge rectifier (4x B5819WS Schottky) into VCHG, with a TVS on VCHG. The
-    bridge diodes also steer ESD on the exposed pads into that TVS. VCHG
-    goes to the nRF's VBUS pin, so putting the pod on the charger wakes it.
+    bridge diodes also steer ESD on the exposed pads into that TVS. The
+    charger's STAT pin (CHG_STAT) tells the nRF it's on the charger.
   - No button (tap gestures from the IMU), no load-sharing path (the pod
     isn't used while it charges), no JST socket (cell wires solder to pads).
-  - New: 2 MB SPI flash for recordings, sharing the IMU's SPI bus.
+  - New: 2 MB SPI flash (USON 2x3) for recordings, sharing the IMU's SPI bus.
   - No 32 kHz crystal: the internal RC (calibrated, ~250 ppm) is enough,
     because the phone re-syncs the time on every connection.
   - No on-board battery protection: the cell has its own (datasheet PCM).
   - LDO: XC6206 (~1 uA quiescent) instead of ME6211 (~40 uA), since a
     40 mAh cell can't afford ~1 mAh/day of regulator drain.
 
-nRF52840 pins (Raytac MDBT50Q-1MV2 pin number -> GPIO -> use). The module's
-right-hand pad column faces the rest of the board, so the pins are picked in
-the same order as the pads they go to (no crossings):
-  IMU on its own SPI bus (spi1), next to the IMU:
-    43 P0.21 IMU_INT2   41 P0.17 IMU_CS    39 P0.15 IMU_SCK
-    38 P0.16 IMU_MOSI   37 P0.13 IMU_MISO  36 P0.14 IMU_INT1
-  Flash on a second SPI bus (spi2), lines run up under the flash:
-    50 P1.02 FL_MISO    49 P0.25 FLASH_CS  48 P0.24 FL_SCK   47 P1.00 FL_MOSI
-  46 P0.22 LED          45 P0.23 CHG_STAT (MCP73831 STAT, low while charging; pull-up)
-  20 P0.04 VBAT_SENSE (AIN2)   26 P1.09 MOTOR_EN   (bottom row)
-  32 VBUS  <- VCHG (charger detect)
-  51 SWDIO  53 SWDCLK (pads on the underside; no reset pad: the nRF52 programs
-  and recovers over SWD alone, and the flash's CS is driven high at boot)
+nRF52840 module: Ebyte E73-2G4M08S1C (13 x 18 mm, ceramic antenna), placed
+with its antenna at the board's left edge. Only its outer edge pads are used
+(no tracks under the module, as Ebyte asks). Pin -> GPIO -> use:
+  IMU + flash share one SPI bus:
+    15 P0.05 SPI_SCK    13 P0.01 SPI_MOSI  11 P0.00 SPI_MISO   (right-hand row)
+    10 P0.30 IMU_CS     9 P0.31 IMU_INT1                       (bottom edge)
+    33 P0.13 FLASH_CS                                          (top edge)
+  17 P1.09 MOTOR_EN   35 P0.24 CHG_STAT   7 P0.02 LED   8 P0.29 VBAT_SENSE (AIN5)
+  19 VDD + 23 VDDH = +3V3   25 DCCH, 27 VBUS open: charging is seen on CHG_STAT
+  (MCP73831 STAT goes low while charging; GPIO sense wakes the nRF)
+  37 SWDIO  39 SWDCLK (pads on the underside)
+  P0.00/P0.01 are the 32 kHz crystal pins, used as GPIO: firmware uses the
+  internal RC clock (LFRC). Reset pin unconnected (internal pull-up).
 """
 
 NC = None  # pin left unconnected (gets a no-connect flag)
@@ -44,49 +44,46 @@ C0402 = "Capacitor_SMD:C_0402_1005Metric"
 
 PARTS = [
     # ---- nRF52840 module ------------------------------------------------
-    dict(ref="U1", sym=("RF_Module", "MDBT50Q-1MV2"), value="MDBT50Q-1MV2",
-         fp="RF_Module:Raytac_MDBT50Q", lcsc="C5118826", unused_nc=True,
-         pins={"1": "GND", "2": "GND", "15": "GND", "33": "GND", "55": "GND",
-               "28": "+3V3", "30": "+3V3",          # VDD, VDDH tied: normal-voltage mode
-               "31": NC,                            # DCCH unused
-               "32": "VCHG",                        # VBUS pin: dock detect
-               "34": NC, "35": NC,                  # USB data unused
-               "43": "IMU_INT2", "41": "IMU_CS", "39": "IMU_SCK",
-               "38": "IMU_MOSI", "37": "IMU_MISO", "36": "IMU_INT1",
-               "50": "FL_MISO", "49": "FLASH_CS", "48": "FL_SCK", "47": "FL_MOSI",
-               "46": "LED", "45": "CHG_STAT",
-               "17": NC, "18": NC,              # no 32 kHz crystal: internal RC + phone time sync
-               "20": "VBAT_SENSE",                  # P0.04 = AIN2 (bottom row)
-               "26": "MOTOR_EN",                    # P1.09 (bottom row)
-               "51": "SWDIO", "53": "SWDCLK"}),
+    dict(ref="U1", sym=("gympod", "E73-2G4M08S1C"), value="E73-2G4M08S1C",
+         fp="lift:Ebyte_E73-2G4M08S1C", lcsc="C356849", unused_nc=True,
+         pins={"5": "GND", "21": "GND",              # 24 (GND) is an inner pad: left open, 5 + 21 ground the module
+               "19": "+3V3", "23": "+3V3",            # VDD, VDDH tied: normal-voltage mode
+               "15": "SPI_SCK", "13": "SPI_MOSI", "11": "SPI_MISO",   # order matches the IMU's pins
+               "10": "IMU_CS", "9": "IMU_INT1", "33": "FLASH_CS",
+               "17": "MOTOR_EN", "35": "CHG_STAT", "7": "LED",
+               "8": "VBAT_SENSE",                     # P0.29 = AIN5
+               "37": "SWDIO", "39": "SWDCLK"}),
     dict(ref="C1", sym=("Device", "C"), value="10uF", fp=C0402,
          lcsc="C15525", pins={"1": "+3V3", "2": "GND"}),
     dict(ref="C2", sym=("Device", "C"), value="100nF", fp=C0402,
          lcsc="C1525", pins={"1": "+3V3", "2": "GND"}),
-    dict(ref="C3", sym=("Device", "C"), value="4.7uF", fp=C0402,
-         lcsc="C23733", pins={"1": "VCHG", "2": "GND"}),   # nRF VBUS decoupling
 
 
     # ---- IMU: BMI270 on SPI (BMI160 symbol: same LGA-14 pinout) ----------
     dict(ref="U2", sym=("Sensor_Motion", "BMI160"), value="BMI270",
          fp="Package_LGA:Bosch_LGA-14_3x2.5mm_P0.5mm", lcsc="C2836813",
-         pins={"1": "IMU_MISO",    # SDO
+         pins={"1": "SPI_MISO",    # SDO
                "2": NC, "3": NC,   # ASDx/ASCx: aux I2C unused, may float
                "4": "IMU_INT1", "5": "+3V3", "6": "GND", "7": "GND", "8": "+3V3",
-               "9": "IMU_INT2", "10": NC, "11": NC,   # OCSB/OSDO: aux SPI, open
-               "12": "IMU_CS", "13": "IMU_SCK", "14": "IMU_MOSI"}),
+               "9": NC, "10": NC, "11": NC,   # INT2 unused (INT1 does wake + taps); OCSB/OSDO open
+               "12": "IMU_CS", "13": "SPI_SCK", "14": "SPI_MOSI"}),
     dict(ref="C4", sym=("Device", "C"), value="100nF", fp=C0402,
          lcsc="C1525", pins={"1": "+3V3", "2": "GND"}),   # VDD
     dict(ref="C5", sym=("Device", "C"), value="100nF", fp=C0402,
          lcsc="C1525", pins={"1": "+3V3", "2": "GND"}),   # VDDIO
 
-    # ---- 2 MB flash for recordings, on its own SPI bus ----------------------
-    dict(ref="U7", sym=("Memory_Flash", "W25Q32JVSS"), value="W25Q16JVSNIQ",
-         fp="Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", lcsc="C2456211",
-         pins={"1": "FLASH_CS", "2": "FL_MISO", "3": "+3V3", "4": "GND",
-               "5": "FL_MOSI", "6": "FL_SCK", "7": "+3V3", "8": "+3V3"}),
+    # ---- 2 MB flash for recordings, on the IMU's SPI bus ---------------------
+    dict(ref="U7", sym=("Memory_Flash", "W25Q32JVSS"), value="W25Q16JVUXIQ",
+         fp="lift:Winbond_USON-8-1EP_2x3mm_P0.5mm", lcsc="C2843335",
+         pins={"1": "FLASH_CS", "2": "SPI_MISO", "3": "+3V3", "4": "GND",
+               "5": "SPI_MOSI", "6": "SPI_SCK", "7": "+3V3", "8": "+3V3"}),
     dict(ref="C14", sym=("Device", "C"), value="100nF", fp=C0402,
          lcsc="C1525", pins={"1": "+3V3", "2": "GND"}),
+    # both chips share the bus: keep both deselected until the firmware runs
+    dict(ref="R13", sym=("Device", "R"), value="100k", fp=R0402,
+         lcsc="C25741", pins={"1": "+3V3", "2": "FLASH_CS"}),
+    dict(ref="R14", sym=("Device", "R"), value="100k", fp=R0402,
+         lcsc="C25741", pins={"1": "+3V3", "2": "IMU_CS"}),
 
     # ---- Charging input: Fitbit Air charger, either polarity ---------------
     # Pads on the underside (B.Cu). Full bridge of 1N5819-class Schottkys:
@@ -158,10 +155,10 @@ PARTS = [
     dict(ref="R8", sym=("Device", "R"), value="100k", fp=R0402,
          lcsc="C25741", pins={"1": "MOTOR_G", "2": "GND"}),   # motor off at boot
     dict(ref="D1", sym=("Device", "D"), value="1N4148WS", fp="Diode_SMD:D_SOD-323",
-         lcsc="C2128", pins={"1": "VBAT", "2": "MOTOR_N"}),   # flyback
+         lcsc="C2128", pins={"1": "MOTOR_N", "2": "VBAT"}),   # ERM motor: either way round; + side faces the power parts   # flyback
     dict(ref="J4", sym=("Connector_Generic", "Conn_01x02"), value="MOTOR",
          fp="lift:Motor_Pads_2x1.2x1.6mm_P2.5mm", lcsc=None, dnp=True,
-         pins={"1": "VBAT", "2": "MOTOR_N"}),
+         pins={"1": "MOTOR_N", "2": "VBAT"}),   # ERM motor: either way round; + side faces the power parts
 
     # ---- Status LED (shines through a light pipe in the lid) -----------------
     dict(ref="R9", sym=("Device", "R"), value="330", fp=R0402,
