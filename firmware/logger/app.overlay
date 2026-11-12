@@ -1,0 +1,33 @@
+/* The XIAO Sense powers its IMU through a GPIO-controlled switch
+ * (lsm6ds3tr-c-en, 3 ms startup delay in the board file). The IMU can
+ * need longer than that after power-up, and if Zephyr probes it too early
+ * the driver gives up for good (device shows DISABLED). So skip the boot-time
+ * init and start it from the firmware after a proper delay, with retries. */
+&lsm6ds3tr_c {
+	zephyr,deferred-init;
+};
+
+/* Battery voltage: the XIAO divides BAT through 1 M / 510 k onto P0.31
+ * (AIN7). The divider's low side is P0.14, which the firmware drives low
+ * to switch it on (and keeps low: Seeed warns against driving it high while
+ * charging). */
+/ {
+	zephyr,user {
+		io-channels = <&adc 7>;
+	};
+};
+
+&adc {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@7 {
+		reg = <7>;
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)>;
+		zephyr,input-positive = <NRF_SAADC_AIN7>;   /* P0.31 */
+		zephyr,resolution = <12>;
+		zephyr,oversampling = <4>;
+	};
+};

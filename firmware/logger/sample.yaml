@@ -1,0 +1,6 @@
+sample:
+  name: Lift tracker D1 logger
+tests:
+  lift.logger:
+    platform_allow: xiao_ble/nrf52840/sense
+    tags: sensors

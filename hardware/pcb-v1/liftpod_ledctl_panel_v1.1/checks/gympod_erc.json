@@ -1,0 +1,95 @@
+{
+    "$schema": "https://schemas.kicad.org/erc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-12T08:16:39+0800",
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "9.0.9",
+    "sheets": [
+        {
+            "path": "/",
+            "uuid_path": "/1d2c3b4a-5f6e-4a7b-8c9d-0e1f2a3b4c5d",
+            "violations": [
+                {
+                    "description": "Symbol 'MDBT50Q-1MV2' doesn't match copy in library 'RF_Module'",
+                    "items": [
+                        {
+                            "description": "Symbol U101 [MDBT50Q-1MV2]",
+                            "pos": {
+                                "x": 0.7112,
+                                "y": 0.8382
+                            },
+                            "uuid": "4fd00e0d-2f83-5fb8-84da-b2290d8afa11"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'USB_C_Receptacle_USB2.0_16P' doesn't match copy in library 'Connector'",
+                    "items": [
+                        {
+                            "description": "Symbol J101 [USB_C_Receptacle_USB2.0_16P]",
+                            "pos": {
+                                "x": 1.1938,
+                                "y": 1.8288
+                            },
+                            "uuid": "3692fe9a-919e-5c5d-92a3-6a1f4c83b4bb"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'AO3400A' doesn't match copy in library 'Transistor_FET'",
+                    "items": [
+                        {
+                            "description": "Symbol Q101 [AO3400A]",
+                            "pos": {
+                                "x": 1.778,
+                                "y": 3.5179
+                            },
+                            "uuid": "a1730d8d-d862-5bbf-868a-0a5d5dac53bc"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'DW01A' doesn't match copy in library 'Battery_Management'",
+                    "items": [
+                        {
+                            "description": "Symbol U106 [DW01A]",
+                            "pos": {
+                                "x": 3.683,
+                                "y": 2.4638
+                            },
+                            "uuid": "4fa44689-c6f1-5e1e-a63d-c70607bf64c8"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                },
+                {
+                    "description": "Symbol 'ME6211C33M5' doesn't match copy in library 'Regulator_Linear'",
+                    "items": [
+                        {
+                            "description": "Symbol U104 [ME6211C33M5]",
+                            "pos": {
+                                "x": 4.2418,
+                                "y": 3.0226
+                            },
+                            "uuid": "06fd494d-217c-5682-bbe4-bf1b64798de2"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
+                }
+            ]
+        }
+    ],
+    "source": "gympod.kicad_sch"
+}

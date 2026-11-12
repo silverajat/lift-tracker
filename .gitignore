@@ -1,0 +1,30 @@
+# Zephyr / nRF Connect build output
+build/
+**/build/
+# Raw gym recordings stay local (curated sets get copied to data/curated/)
+data/raw/
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+# cocotb / simulators
+sim_build/
+results.xml
+*.vcd
+*.fst
+# Host test binary
+firmware/logger/tests/host/test_storage
+# OS / editor
+.DS_Store
+Thumbs.db
+# Release zips are rebuilt from the folders next to them
+hardware/pcb-v1/*.zip
+# Superseded v1 PCB release (kept on the laptop only)
+hardware/pcb-v1/liftpod_ledctl_panel_v1/
+# Android
+app/android/.gradle/
+app/android/**/build/
+app/android/local.properties
+*.apk
+logs/

@@ -1,0 +1,368 @@
+{
+    "$schema": "https://schemas.kicad.org/drc.v1.json",
+    "coordinate_units": "mm",
+    "date": "2026-11-12T08:31:07+0800",
+    "included_severities": [
+        "error",
+        "warning",
+        "exclusion"
+    ],
+    "kicad_version": "9.0.9",
+    "schematic_parity": [],
+    "source": "gympod.kicad_pcb",
+    "unconnected_items": [],
+    "violations": [
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Reference field of Q101",
+                    "pos": {
+                        "x": 117.027,
+                        "y": 124.0
+                    },
+                    "uuid": "a2e7647f-8f76-43fc-8414-d51231008d0f"
+                },
+                {
+                    "description": "Segment of D101 on F.Silkscreen",
+                    "pos": {
+                        "x": 116.35,
+                        "y": 125.61
+                    },
+                    "uuid": "e9153634-cccc-4708-a8d4-e5f648dce98f"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of D101 on F.Silkscreen",
+                    "pos": {
+                        "x": 118.05,
+                        "y": 125.61
+                    },
+                    "uuid": "7dc23bb3-ddcf-4869-bf6e-2f12391f9ad8"
+                },
+                {
+                    "description": "Reference field of Q101",
+                    "pos": {
+                        "x": 117.027,
+                        "y": 124.0
+                    },
+                    "uuid": "a2e7647f-8f76-43fc-8414-d51231008d0f"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Polygon of U105 on F.Silkscreen",
+                    "pos": {
+                        "x": 122.95,
+                        "y": 107.49
+                    },
+                    "uuid": "67c15815-5b96-4331-8a51-3d348b85c95e"
+                },
+                {
+                    "description": "Reference field of U105",
+                    "pos": {
+                        "x": 124.4,
+                        "y": 106.729999
+                    },
+                    "uuid": "f397b57e-b83e-4a6a-98eb-50737b53a1fd"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Polygon of U105 on F.Silkscreen",
+                    "pos": {
+                        "x": 122.95,
+                        "y": 107.49
+                    },
+                    "uuid": "67c15815-5b96-4331-8a51-3d348b85c95e"
+                },
+                {
+                    "description": "Reference field of C103",
+                    "pos": {
+                        "x": 121.377,
+                        "y": 107.0
+                    },
+                    "uuid": "d114c06c-7e5f-4c30-b757-61c8134495a2"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of D104 on F.Silkscreen",
+                    "pos": {
+                        "x": 131.04,
+                        "y": 120.6
+                    },
+                    "uuid": "164620ce-ab50-4915-b705-9d8801fbbb05"
+                },
+                {
+                    "description": "Reference field of D102",
+                    "pos": {
+                        "x": 132.4,
+                        "y": 122.899999
+                    },
+                    "uuid": "b57fd7f1-abe3-4ae9-87ea-2a86a63a1daa"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of D104 on F.Silkscreen",
+                    "pos": {
+                        "x": 131.04,
+                        "y": 122.6
+                    },
+                    "uuid": "8017d3d7-8040-4f4d-87f2-9bac2d6c238a"
+                },
+                {
+                    "description": "Reference field of D102",
+                    "pos": {
+                        "x": 132.4,
+                        "y": 122.899999
+                    },
+                    "uuid": "b57fd7f1-abe3-4ae9-87ea-2a86a63a1daa"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Polygon of Q103 on F.Silkscreen",
+                    "pos": {
+                        "x": 109.55,
+                        "y": 118.89
+                    },
+                    "uuid": "9b0b7237-440f-46d1-9e51-484434470fd7"
+                },
+                {
+                    "description": "Reference field of Q103",
+                    "pos": {
+                        "x": 111.0,
+                        "y": 118.13
+                    },
+                    "uuid": "e686f1e7-837c-473f-ae97-f4e0099bd011"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of C111 on F.Silkscreen",
+                    "pos": {
+                        "x": 118.11,
+                        "y": 120.54058
+                    },
+                    "uuid": "4e5fcfd6-57b9-4d08-8691-ff238f1bda3d"
+                },
+                {
+                    "description": "Reference field of C111",
+                    "pos": {
+                        "x": 119.627,
+                        "y": 120.4
+                    },
+                    "uuid": "a91c2974-4521-46a2-95cb-83b1d2d245a4"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Reference field of U106",
+                    "pos": {
+                        "x": 115.493,
+                        "y": 122.62
+                    },
+                    "uuid": "66b3db67-e1d0-4d11-8784-670ed6327e4c"
+                },
+                {
+                    "description": "Segment of Q101 on F.Silkscreen",
+                    "pos": {
+                        "x": 113.04,
+                        "y": 122.44
+                    },
+                    "uuid": "eba58470-bf69-4fb5-be8d-6a7c568a5664"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Reference field of U106",
+                    "pos": {
+                        "x": 115.493,
+                        "y": 122.62
+                    },
+                    "uuid": "66b3db67-e1d0-4d11-8784-670ed6327e4c"
+                },
+                {
+                    "description": "Segment of Q101 on F.Silkscreen",
+                    "pos": {
+                        "x": 114.56,
+                        "y": 122.44
+                    },
+                    "uuid": "8b4c497a-2c6d-4247-ac85-d2c7b9860244"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Reference field of C101",
+                    "pos": {
+                        "x": 116.55,
+                        "y": 108.8
+                    },
+                    "uuid": "4b6a8933-f07d-497d-a963-5e691db5224b"
+                },
+                {
+                    "description": "Segment of U101 on F.Silkscreen",
+                    "pos": {
+                        "x": 116.15,
+                        "y": 106.65
+                    },
+                    "uuid": "f9d6350f-7d82-4d53-8c74-8e7878bc8a51"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen overlap",
+            "items": [
+                {
+                    "description": "Segment of J104 on B.Silkscreen",
+                    "pos": {
+                        "x": 107.39,
+                        "y": 122.61
+                    },
+                    "uuid": "b32a1fd9-b559-4f58-b3bf-7bf8f9b7bffb"
+                },
+                {
+                    "description": "PCB text 'MOTOR' on B.Silkscreen",
+                    "pos": {
+                        "x": 108.5,
+                        "y": 123.1
+                    },
+                    "uuid": "c820f881-19f7-44c4-b093-cdd0ec07e849"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_overlap"
+        },
+        {
+            "description": "Silkscreen clipped by solder mask",
+            "items": [
+                {
+                    "description": "Reference field of U106",
+                    "pos": {
+                        "x": 115.493,
+                        "y": 122.62
+                    },
+                    "uuid": "66b3db67-e1d0-4d11-8784-670ed6327e4c"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_over_copper"
+        },
+        {
+            "description": "Footprint 'PinHeader_1x02_P2.00mm_Vertical_SMD_Pin1Left' does not match copy in library 'Connector_PinHeader_2.00mm'.",
+            "items": [
+                {
+                    "description": "Footprint J104",
+                    "pos": {
+                        "x": 108.5,
+                        "y": 120.5
+                    },
+                    "uuid": "61ae5ca4-2bbe-48dc-b858-e6d90d172af6"
+                }
+            ],
+            "severity": "warning",
+            "type": "lib_footprint_mismatch"
+        },
+        {
+            "description": "Silkscreen clipped by board edge",
+            "items": [
+                {
+                    "description": "Segment on Edge.Cuts",
+                    "pos": {
+                        "x": 138.0,
+                        "y": 104.0
+                    },
+                    "uuid": "8e66c049-3b1b-417d-b739-a6c986fbbc1b"
+                },
+                {
+                    "description": "Segment of J101 on F.Silkscreen",
+                    "pos": {
+                        "x": 136.3,
+                        "y": 107.3
+                    },
+                    "uuid": "691f214e-b8ff-46b0-bc5a-dcf0aeb38dde"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_edge_clearance"
+        },
+        {
+            "description": "Silkscreen clipped by board edge",
+            "items": [
+                {
+                    "description": "Segment on Edge.Cuts",
+                    "pos": {
+                        "x": 138.0,
+                        "y": 104.0
+                    },
+                    "uuid": "8e66c049-3b1b-417d-b739-a6c986fbbc1b"
+                },
+                {
+                    "description": "Segment of J101 on F.Silkscreen",
+                    "pos": {
+                        "x": 136.3,
+                        "y": 116.7
+                    },
+                    "uuid": "6fbcfbe1-ee27-432c-8ad3-b48234a7a5f7"
+                }
+            ],
+            "severity": "warning",
+            "type": "silk_edge_clearance"
+        }
+    ]
+}
