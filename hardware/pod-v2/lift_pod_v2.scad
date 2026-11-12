@@ -30,7 +30,7 @@ part = "shell";   // "shell", "assembled", "bottom"
 pcb_l = 41.0;  pcb_w = 18.0;  pcb_r = 2.0;  pcb_t = 0.8;
 contacts = [[15.2, 9.0], [33.2, 9.0]];     // charger contacts (underside)
 steel_at = [24.2, 9.0];                    // steel disc for the charger magnet
-leds     = [[31.5, 1.2], [34.9, 1.2]];     // D2 green (status), D3 red (charging)
+leds     = [[27.0, 16.9], [34.9, 1.2]];    // D2 green (status), D3 red (charging)
 
 // ---------- On top of the board (datasheet maximums) ----------
 cell = [20.5, 11.0, 3.0];       // 301120 LiPo, L x W x T max

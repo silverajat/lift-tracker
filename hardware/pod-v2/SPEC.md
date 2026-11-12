@@ -35,7 +35,7 @@ Top view of the board (x 0–41, y 0–18 mm):
 | | Choice | Why |
 |---|---|---|
 | Module | **Ebyte E73-2G4M08S1C** (nRF52840, ceramic antenna) | In stock at JLC (MDBT50Q-1MV2 wasn't). Same chip, so firmware, BLE and app are unchanged apart from pins. Its pads are castellated, so it can be hand-soldered too |
-| Size | **43.6 × 20.6 × 7.75 mm** body, 53.2 mm with band lugs | Motor on the module, cell beside it: thinner than stacking the cell on the 3 mm module |
+| Size | **43.6 × 20.6 × 7.75 mm** body, 53.8 mm with band lugs | Motor on the module, cell beside it: thinner than stacking the cell on the 3 mm module |
 | Data | **Bluetooth only** | Recordings download over BLE, firmware updates over BLE (MCUboot + mcumgr) |
 | Charging | **Google Fitbit Air charger** (5 V, 2 spring pins 18 mm apart, centre magnet) | Contacts on the underside 18 mm apart; a 5 mm steel disc on top of the board between them, for the charger's magnet. Full Schottky bridge, so the pod charges either way round |
 | Battery | **301120 LiPo, 40 mAh, with protection board** | Datasheet max 3.0 × 11.0 × 20.5 mm. Has its own DW01 + 8205 protection, so none on our board |
