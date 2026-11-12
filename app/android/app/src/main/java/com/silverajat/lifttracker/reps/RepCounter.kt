@@ -173,7 +173,7 @@ class RepCounter(private val hz: Int = 25) {
             fun top3(x: List<Float>) = median(x.sortedDescending().take(3))
             val setDeg = top3(raw.map { it.deg })
             val rotation = setDeg >= 25f        // the forearm really turns: degrees mean something
-            val romOf: (Raw) -> Float = if (rotation) { r -> r.deg } else { r -> r.travel }
+            val romOf: (Raw) -> Float = { r -> if (rotation) r.deg else r.travel }
             val setRef = top3(raw.map(romOf)).coerceAtLeast(1e-6f)
             val ref = if (rotation && fullRomDeg != null) max(fullRomDeg, setRef) else setRef
 
