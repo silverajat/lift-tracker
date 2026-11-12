@@ -167,7 +167,7 @@ PARTS = [
     dict(ref="R9", sym=("Device", "R"), value="330", fp=R0402,
          lcsc="C25104", pins={"1": "LED", "2": "LED_A"}),
     dict(ref="D2", sym=("Device", "LED"), value="GREEN", fp="LED_SMD:LED_0603_1608Metric",
-         lcsc="C72043", pins={"2": "LED_A", "1": "GND"}),
+         lcsc="C12624", pins={"2": "LED_A", "1": "GND"}),
 
     # ---- SWD: 3 test pads on the underside (cover with kapton; reflash anytime) -----
     dict(ref="J3", sym=("Connector_Generic", "Conn_01x03"), value="SWD",

@@ -88,7 +88,7 @@ The two SPI buses are deliberate: the pins are in the same order as the pads the
 | D106–D109 | B5819WS Schottky (bridge) | C22624 | |
 | D105 | ESD5Z5.0T1G TVS | C82044 | |
 | Q101, D101 | AO3400A + 1N4148WS (motor) | C20917, C2128 | |
-| D102, D103 | green / red 0603 LEDs | C72043, C2286 | |
+| D102, D103 | green / red 0603 LEDs (KT-0603G / KT-0603R) | C12624, C2286 | |
 | passives | 0402 | C1525, C23733, C15525, C11702, C25741, C26083, C25076, C25104, C25792 | |
 | J101 | charger contacts, 4 × 3 mm ENIG, underside | n/a | |
 | J102, J104 | cell / motor wire pads, top | n/a | |

@@ -1,11 +1,10 @@
 {
     "$schema": "https://schemas.kicad.org/erc.v1.json",
     "coordinate_units": "mm",
-    "date": "2026-11-12T21:04:52+0800",
+    "date": "2026-11-12T22:03:11+0800",
     "included_severities": [
         "error",
-        "warning",
-        "exclusion"
+        "warning"
     ],
     "kicad_version": "9.0.9",
     "sheets": [
@@ -37,7 +36,7 @@
                                 "x": 1.1176,
                                 "y": 1.8288
                             },
-                            "uuid": "cffc9c41-09b4-4dac-b61a-f53f9048594a"
+                            "uuid": "141c3a16-c089-498a-acfb-86380f211b43"
                         },
                         {
                             "description": "Symbol U104 Pin 2 [VO, Power output, Line]",
@@ -45,7 +44,7 @@
                                 "x": 3.7338,
                                 "y": 2.8448
                             },
-                            "uuid": "9ad9ccdc-d74c-4677-b6e1-1b0c36781aab"
+                            "uuid": "3c568a1c-9612-40b3-985b-dfbc1e3b65c5"
                         }
                     ],
                     "severity": "warning",
@@ -60,7 +59,7 @@
                                 "x": 1.1176,
                                 "y": 1.8542
                             },
-                            "uuid": "a39dfef2-0c4d-402b-a8d5-75ad47cf6b50"
+                            "uuid": "3c3ac0ff-2ceb-4bc7-a260-085c76483b83"
                         },
                         {
                             "description": "Symbol U104 Pin 2 [VO, Power output, Line]",
@@ -68,7 +67,7 @@
                                 "x": 3.7338,
                                 "y": 2.8448
                             },
-                            "uuid": "9ad9ccdc-d74c-4677-b6e1-1b0c36781aab"
+                            "uuid": "3c568a1c-9612-40b3-985b-dfbc1e3b65c5"
                         }
                     ],
                     "severity": "warning",

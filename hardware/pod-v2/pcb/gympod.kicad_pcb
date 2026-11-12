@@ -4825,7 +4825,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C72043"
+		(property "LCSC" "C12624"
 			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
@@ -8252,7 +8252,7 @@
 	(gr_text "JLCJLCJLCJLC"
 		(at 126.2 109 0)
 		(layer "F.SilkS")
-		(uuid "51a40c87-31b8-4606-b3e0-2c70773b3f8b")
+		(uuid "463b3589-f6da-4c41-98cd-59348fce90a4")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -8263,7 +8263,7 @@
 	(gr_text "-"
 		(at 130.4 108 0)
 		(layer "F.SilkS")
-		(uuid "16d05294-ebca-4188-92ed-0f4ccb3e029e")
+		(uuid "5630dfb7-c282-45bf-9acb-91d9e55e557f")
 		(effects
 			(font
 				(size 1 1)
@@ -8274,7 +8274,7 @@
 	(gr_text "+"
 		(at 130.4 111 0)
 		(layer "F.SilkS")
-		(uuid "a9722b67-c5cc-430d-b927-52d195cff1c1")
+		(uuid "2c85701b-249c-438e-80ab-0ee65a91106c")
 		(effects
 			(font
 				(size 1 1)
@@ -8285,7 +8285,7 @@
 	(gr_text "silverajat 2026"
 		(at 118.5 116.9 0)
 		(layer "B.SilkS")
-		(uuid "d8704af7-5cea-4c7c-b4ff-f08b5656ad40")
+		(uuid "01f6fe0c-de79-4d06-9751-5d2cc2a07c99")
 		(effects
 			(font
 				(size 0.8 0.8)
@@ -8297,7 +8297,7 @@
 	(gr_text "LIFT POD v2"
 		(at 118.5 115.6 0)
 		(layer "B.SilkS")
-		(uuid "67cfae2b-428b-4263-abdc-3f73e6a0e165")
+		(uuid "cf9e2f90-45b2-4280-918e-3299d40a40c3")
 		(effects
 			(font
 				(size 1 1)
