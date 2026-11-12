@@ -51,11 +51,11 @@ clr = 0.1;        // board in the rim: snug, glued
 wall = 1.2;       // side wall (JLC3DP: walls > 1.2 mm)
 stop_w = 0.8;     // corner stops the board pushes up against (JLC3DP: >= 0.8 mm)
 stop_l = 2.6;     // ...only at the corners, where the board has no parts
-top_t = 1.0;
+top_t = 1.2;
 top_r = 2.2;      // rounded top edge
 in_r = 1.0;       // matching round on the inside, keeps the shell >= 1 mm there
 chamfer = 0.3;    // small chamfer on the bottom outer edge
-logo_h = 6.0;  logo_depth = 0.2;   // leaves 0.8 mm under the logo
+logo_h = 6.0;  logo_depth = 0.3;   // leaves 0.9 mm under the logo
 $fn = 48;
 
 // ---------- Derived ----------
