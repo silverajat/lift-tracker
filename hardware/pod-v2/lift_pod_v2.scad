@@ -5,8 +5,8 @@
 // contacts are the face that goes on the Fitbit Air charger (and on your
 // wrist). Everything else stacks on top of the board, inside the shell:
 //
-//   shell top 0.9 mm  (engraved logo, 2 LED holes)
-//   coin motor 2.5 on the nRF module 2.2  |  LiPo 3.0 + foam on the flash 1.75
+//   shell top 1.2 mm  (engraved logo, 2 LED holes)
+//   coin motor 2.5 on the Ebyte E73 module 3.0  |  LiPo 3.0 + foam on parts <= 1.1
 //   board 0.8 mm, flush with the rim
 //
 // Print at JLC3DP: SLA black resin (8228 / "black resin"), sanded + mineral
@@ -20,23 +20,23 @@
 // the seam. Flexible glue can be cut to open the pod again.
 //
 // Sizes come from datasheet maximums + clearance, not a measured sample.
-// Axes: band along X; antenna at -X (top-left corner of the board, plastic
+// Axes: band along X; antenna at -X (left end of the board, plastic
 // only around it). Board coordinates (KiCad mm from the board's top-left,
 // y down) map to the pod with pod(); positions match podv2/placement.py.
 
 part = "shell";   // "shell", "assembled", "bottom"
 
 // ---------- Board ----------
-pcb_l = 34.0;  pcb_w = 18.0;  pcb_r = 2.0;  pcb_t = 0.8;
-contacts = [[9.5, 9.0], [27.5, 9.0]];     // charger contacts (underside)
-steel_at = [18.5, 9.0];                    // steel disc for the charger magnet
-leds     = [[24.2, 1.2], [27.6, 1.2]];     // D2 green (status), D3 red (charging)
+pcb_l = 41.0;  pcb_w = 18.0;  pcb_r = 2.0;  pcb_t = 0.8;
+contacts = [[15.2, 9.0], [33.2, 9.0]];     // charger contacts (underside)
+steel_at = [24.2, 9.0];                    // steel disc for the charger magnet
+leds     = [[31.5, 1.2], [34.9, 1.2]];     // D2 green (status), D3 red (charging)
 
 // ---------- On top of the board (datasheet maximums) ----------
 cell = [20.5, 11.0, 3.0];       // 301120 LiPo, L x W x T max
-cell_box = [12.8, 3.5, 33.3, 14.5];        // board coords of the cell outline
-motor_d = 8.0;  motor_t = 2.5;  motor_at = [6.3, 12.5];
-module_h = 2.2;  flash_h = 1.75;  foam = 0.3;  gap = 0.15;
+cell_box = [19.9, 3.5, 40.4, 14.5];        // board coords of the cell outline
+motor_d = 8.0;  motor_t = 2.5;  motor_at = [11.3, 9.0];
+module_h = 3.0;  flash_h = 1.1;  foam = 0.3;  gap = 0.15;   // E73 height (3D model); tallest part under the cell
 in_h = max(module_h + gap + motor_t, flash_h + gap + cell[2] + foam) + 0.1;
 
 // ---------- Band (measure yours: width and thickness) ----------
@@ -50,7 +50,7 @@ lug_side = 1.6;   // lug wall beside the strap slot
 clr = 0.1;        // board in the rim: snug, glued
 wall = 1.2;       // side wall (JLC3DP: walls > 1.2 mm)
 stop_w = 0.8;     // corner stops the board pushes up against (JLC3DP: >= 0.8 mm)
-stop_l = 2.6;     // ...only at the corners, where the board has no parts
+stop_l = 2.4;     // ...only at the corners, where the board has no parts
 top_t = 1.2;
 top_r = 2.2;      // rounded top edge
 in_r = 1.0;       // matching round on the inside, keeps the shell >= 1 mm there
@@ -150,7 +150,7 @@ if (part == "bottom") { color("#111111") shell(); board(); }   // view from belo
 if (part == "assembled") {
     color("#111111", 0.35) shell();
     board();
-    color("#9a9a9a") translate([pod([6.3, 9])[0], pod([6.3, 9])[1], pcb_t + module_h/2]) cube([10, 15.5, module_h], center = true);
+    color("#9a9a9a") translate([pod([9.3, 9])[0], pod([9.3, 9])[1], pcb_t + module_h/2]) cube([18, 13, module_h], center = true);
     m = pod(motor_at); color("#c0c0c0") translate([m[0], m[1], pcb_t + module_h + gap]) cylinder(d = motor_d, h = motor_t);
     c = pod([(cell_box[0] + cell_box[2])/2, (cell_box[1] + cell_box[3])/2]);
     color("#c9a227") translate([c[0], c[1], pcb_t + flash_h + gap + cell[2]/2]) cube(cell, center = true);
@@ -160,8 +160,8 @@ if (part == "assembled") {
 if (part == "exploded") {   // assembly order, bottom to top
     e = 6;
     board();
-    color("#9a9a9a") translate([pod([6.3, 9])[0], pod([6.3, 9])[1], pcb_t + module_h/2]) cube([10, 15.5, module_h], center = true);
-    color("#555") translate([pod([16.6, 3.0])[0], pod([16.6, 3.0])[1], pcb_t + flash_h/2]) cube([4.9, 3.9, flash_h], center = true);
+    color("#9a9a9a") translate([pod([9.3, 9])[0], pod([9.3, 9])[1], pcb_t + module_h/2]) cube([18, 13, module_h], center = true);
+    color("#555") translate([pod([23.5, 3.2])[0], pod([23.5, 3.2])[1], pcb_t + 0.3]) cube([2, 3, 0.6], center = true);
     s = pod(steel_at); color("#c8c8c8") translate([s[0], s[1], pcb_t + e*0.6]) difference() { cylinder(d = 5, h = 0.5); translate([0,0,-1]) cylinder(d = 2.2, h = 3); }
     m = pod(motor_at); color("#d0d0d0") translate([m[0], m[1], pcb_t + module_h + e]) cylinder(d = motor_d, h = motor_t);
     c = pod([(cell_box[0] + cell_box[2])/2, (cell_box[1] + cell_box[3])/2]);
