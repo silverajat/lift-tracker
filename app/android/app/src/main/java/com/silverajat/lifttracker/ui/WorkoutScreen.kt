@@ -300,12 +300,7 @@ private fun ExerciseCard(
             color = if (cal != null) C.Pod else C.Muted,
             modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp),
         )
-        if (ex.note.isNotEmpty()) {
-            Text(
-                "📝 ${ex.note}", style = MaterialTheme.typography.bodyMedium, color = C.Warm,
-                modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp),
-            )
-        }
+        NoteLine(vm, ex.id, Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp))
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             HeaderCell("SET", W_SET)
@@ -758,4 +753,53 @@ private fun RoundBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, onCl
         Modifier.size(56.dp).clip(CircleShape).background(C.Raised).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, null, tint = C.Text, modifier = Modifier.size(28.dp)) }
+}
+
+
+/** Your note on this exercise: shows every session until you change it. Tap to edit. */
+@Composable
+fun NoteLine(vm: AppViewModel, exerciseId: Int, modifier: Modifier = Modifier) {
+    val notes by vm.notes.collectAsStateWithLifecycle()
+    val note = notes[exerciseId]
+    var editing by remember { mutableStateOf(false) }
+    if (editing) NoteDialog(note?.text.orEmpty(), onDismiss = { editing = false }) { vm.setNote(exerciseId, it); editing = false }
+    if (note != null) {
+        Column(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.Warm.copy(alpha = 0.10f))
+            .clickable { editing = true }.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(note.text, style = MaterialTheme.typography.bodyMedium, color = C.Text)
+            Text("Your note, " + java.text.SimpleDateFormat("EEE d MMM", java.util.Locale.getDefault()).format(java.util.Date(note.updatedMs)) + ". Tap to edit.",
+                style = MaterialTheme.typography.labelSmall, color = C.Muted)
+        }
+    } else {
+        Text("+ Add a note for next time", style = MaterialTheme.typography.labelLarge, color = C.Muted,
+            modifier = modifier.clickable { editing = true }.padding(vertical = 2.dp))
+    }
+}
+
+@Composable
+private fun NoteDialog(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = C.Surface,
+        title = { Text("Note for this exercise") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                androidx.compose.material3.OutlinedTextField(
+                    text, { text = it }, minLines = 3,
+                    placeholder = { Text("e.g. seat at 4, felt easy: go 2.5 kg up", color = C.Muted) },
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = C.Accent, unfocusedBorderColor = C.Line, focusedTextColor = C.Text, unfocusedTextColor = C.Text),
+                )
+                Text("It stays on this exercise every session until you change it.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(text) }) { Text("Save", color = C.Accent, fontWeight = FontWeight.Bold) } },
+        dismissButton = {
+            Row {
+                if (initial.isNotEmpty()) TextButton(onClick = { onSave("") }) { Text("Delete", color = C.Stop) }
+                TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) }
+            }
+        },
+    )
 }

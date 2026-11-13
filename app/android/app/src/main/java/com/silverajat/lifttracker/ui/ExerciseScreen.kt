@@ -90,10 +90,7 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                         "${ex.day.title} day" + if (ex.detail.isNotEmpty()) " · ${ex.detail}" else "",
                         style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                     )
-                    if (ex.note.isNotEmpty()) {
-                        Text(ex.note, style = MaterialTheme.typography.bodyMedium, color = C.Warm,
-                            modifier = Modifier.padding(top = 6.dp))
-                    }
+                    NoteLine(vm, ex.id, Modifier.padding(top = 8.dp))
                 }
                 val pts = if (metric == Metric.ROM) Stats.romSeries(ex, sessions, AppViewModel.RepEngineVersion)
                     else Stats.series(metric, ex, sessions)

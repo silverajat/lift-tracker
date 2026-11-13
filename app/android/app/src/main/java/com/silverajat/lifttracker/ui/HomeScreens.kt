@@ -202,17 +202,17 @@ private fun DayCard(day: Day, live: Session?, last: Session?, onClick: () -> Uni
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(day.title.uppercase(), style = MaterialTheme.typography.displayMedium, color = Color.White,
                     modifier = Modifier.weight(1f))
-                Box(
-                    Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = Color.White) }
+                Text(
+                    if (live != null) "Resume" else "Start",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (day == Day.UPPER) C.UpperB else C.LowerB,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).padding(horizontal = 20.dp, vertical = 10.dp),
+                )
             }
             Text(groups, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Pill("${exercises.size} exercises")
-                Spacer(Modifier.width(8.dp))
-                Pill(day.usual)
             }
             Spacer(Modifier.height(10.dp))
             if (live != null) {

@@ -167,6 +167,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun exportJson(s: Session): String = store.exportJson(s)
     fun shareText(s: Session): String = com.silverajat.lifttracker.data.ShareText.build(s)
 
+    // ---- your notes per exercise ------------------------------------------------
+    private val noteStore = com.silverajat.lifttracker.data.ExerciseNotes(app.filesDir)
+    private val _notes = MutableStateFlow(noteStore.all())
+    val notes: StateFlow<Map<Int, com.silverajat.lifttracker.data.ExerciseNote>> = _notes
+    fun setNote(exerciseId: Int, text: String) { noteStore.set(exerciseId, text); _notes.value = noteStore.all() }
+
     // ---- navigation -----------------------------------------------------------
 
     fun open(s: Screen) { _screen.value = s }
