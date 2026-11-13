@@ -272,8 +272,8 @@ object Insights {
         val wakes = a.days.takeLast(7).mapNotNull { it.sleep?.wake?.atZone(zone)?.toLocalTime() }
         val todayStrain = today?.load?.let { Analysis.strainOf(it.trimp) } ?: 0.0
         val lastNights = a.days.takeLast(3).mapNotNull { it.sleep?.asleepMin }
-        val need = 480 + ((todayStrain - 10) * 4).coerceIn(0.0, 45.0).roundToInt() +
-            (lastNights.sumOf { (480 - it).coerceAtLeast(0) } / 2).coerceAtMost(60)
+        val need = Analysis.SLEEP_BASE_MIN + ((todayStrain - 10) * 4).coerceIn(0.0, 45.0).roundToInt() +
+            (lastNights.sumOf { (Analysis.SLEEP_BASE_MIN - it).coerceAtLeast(0) } / 2).coerceAtMost(60)
         if (wakes.size >= 3) {
             val wake = wakes.map { it.toSecondOfDay() }.sorted()[wakes.size / 2].let { LocalTime.ofSecondOfDay(it.toLong()) }
             val bed = wake.minusMinutes(need + 15L)

@@ -425,7 +425,7 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
         }
         block("What you needed", "Need goes up after hard days and when you're short on sleep. It resets as you catch up.") {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Kv("Baseline", "8h 0m")
+                Kv("Baseline", hmin(Analysis.SLEEP_BASE_MIN))
                 Kv("From yesterday's strain", "+${s.needStrainMin}m")
                 Kv("Paying back sleep debt", "+${s.needDebtMin}m", if (s.debtMin > 0) "${s.debtMin} min owed over the last 3 nights" else null)
                 HorizontalDivider(color = C.Line)
@@ -441,10 +441,10 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
             }
         }
         val nights = a?.days?.takeLast(14).orEmpty()
-        block("Last 14 nights", "Bars are time asleep; the dashed line is 8 hours.") {
+        block("Last 14 nights", "Bars are time asleep; the dashed line is your 7-hour baseline.") {
             Column {
                 DayBars(nights.map { n -> n.sleep?.let { (it.asleepMin / 600f) } ?: 0f },
-                    nights.map { n -> n.sleep?.let { if (it.performance >= 85) SleepPurple else if (it.performance >= 70) Yellow else RedZ } ?: C.Raised }, 110, 480f / 600f)
+                    nights.map { n -> n.sleep?.let { if (it.performance >= 85) SleepPurple else if (it.performance >= 70) Yellow else RedZ } ?: C.Raised }, 110, Analysis.SLEEP_BASE_MIN / 600f)
                 Axis(nights.firstOrNull()?.date)
             }
         }
@@ -455,7 +455,7 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
             val wakes = nights.mapNotNull { it.sleep?.wake?.atZone(zone)?.toLocalTime() }
             if (wakes.size >= 3) {
                 val wake = wakes.map { it.toSecondOfDay() }.sorted()[wakes.size / 2].let { java.time.LocalTime.ofSecondOfDay(it.toLong()) }
-                val need = 480 + s.needDebtMin
+                val need = Analysis.SLEEP_BASE_MIN + s.needDebtMin
                 val bed = wake.minusMinutes(need + 15L)
                 Card(Modifier.fillMaxWidth(), border = SleepPurple.copy(alpha = 0.4f)) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

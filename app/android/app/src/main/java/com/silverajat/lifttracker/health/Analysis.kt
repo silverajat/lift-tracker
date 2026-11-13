@@ -42,7 +42,7 @@ import kotlin.math.sqrt
  * MUSCULAR LOAD, from the pod: working-set volume (kg x reps) vs your
  * average gym day of the last 28 days. Heart rate misses most of lifting.
  *
- * SLEEP: need = 8 h + strain (+4 min per point above 10, max 45) + debt
+ * SLEEP: need = 7 h + strain (+4 min per point above 10, max 45) + debt
  *   (half of the last 3 nights' shortfall, max 60 min). Performance =
  *   asleep / need. Consistency = how close bed and wake times are to the
  *   last 4 nights (100% = same minute, -1% per minute of average spread).
@@ -62,7 +62,7 @@ object Analysis {
         val needMin: Int, val asleepMin: Int, val performance: Int, val debtMin: Int,
         val consistency: Int?, val efficiency: Int?, val deepPct: Int?, val remPct: Int?,
         val bed: Instant, val wake: Instant,
-        // what the need is made of: 8 h baseline + yesterday's strain + half the recent debt
+        // what the need is made of: 7 h baseline + yesterday's strain + half the recent debt
         val needStrainMin: Int = 0, val needDebtMin: Int = 0,
         val deepMin: Int = 0, val remMin: Int = 0, val lightMin: Int = 0, val awakeMin: Int = 0,
         val stages: List<SleepStage> = emptyList(),
@@ -148,13 +148,16 @@ object Analysis {
 
     // ---- sleep ------------------------------------------------------------------------------
 
+    /** Your baseline sleep need: 7 hours. */
+    const val SLEEP_BASE_MIN = 420
+
     fun sleep(days: List<HealthDay>, i: Int, strainPrev: Double?, zone: ZoneId): SleepResult? {
         val s = days[i].sleep ?: return null
-        var need = 480.0
+        var need = SLEEP_BASE_MIN.toDouble()
         val forStrain = if (strainPrev != null && strainPrev > 10) ((strainPrev - 10) * 4).coerceAtMost(45.0) else 0.0
         need += forStrain
         val prev = (1..3).mapNotNull { k -> days.getOrNull(i - k)?.sleep }
-        val debt = prev.sumOf { (480 - it.totalMin).coerceAtLeast(0) } * 0.5
+        val debt = prev.sumOf { (SLEEP_BASE_MIN - it.totalMin).coerceAtLeast(0) } * 0.5
         need += debt.coerceAtMost(60.0)
         val recent = (0..3).mapNotNull { k -> days.getOrNull(i - k)?.sleep }
         val consistency = if (recent.size >= 3) {

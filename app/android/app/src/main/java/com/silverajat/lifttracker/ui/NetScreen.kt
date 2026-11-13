@@ -50,7 +50,7 @@ fun netColor(net: Int, goal: Int): Color = when {
 }
 
 /** The Net view (top of the Food tab). */
-fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, goalKg: Double, onGoal: (Double) -> Unit) {
+fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, goalKg: Double, onWeight: () -> Unit = {}, onGoal: (Double) -> Unit) {
     val e = a?.energy
     if (e == null) {
         item { Text("Working it out…", color = C.Muted) }
@@ -139,7 +139,7 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
     // body weight: completed-week averages and what they mean for the goal
     a?.let { an ->
         item {
-            Card(Modifier.fillMaxWidth()) {
+            Card(Modifier.fillMaxWidth(), onClick = onWeight) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     SectionLabel("Body weight")
                     an.weight.lastWeekAvg?.let { w ->
@@ -152,7 +152,7 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
                         }
                     }
                     Text(an.weight.verdict + ".", style = MaterialTheme.typography.bodyMedium, color = if (an.weight.lastWeekAvg == null) C.Muted else C.Text)
-                    Text("Log your weight each morning in Log, at the bottom.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    Text("Tap for the graph, your rate and patterns", style = MaterialTheme.typography.titleSmall, color = C.Accent)
                 }
             }
         }

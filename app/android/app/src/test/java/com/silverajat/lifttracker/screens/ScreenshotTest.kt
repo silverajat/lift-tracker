@@ -213,5 +213,13 @@ class ScreenshotTest {
             splitsS = listOf(331, 327, 334, 329), paceSPerKm = 322, gpsOk = true, accuracyM = 6f)) {}
     }
 
+    @Test fun weightDetail() = shoot("detail_weight") {
+        val ws = (0 until 70).filter { it % 9 != 4 }.map { i ->
+            val d = today.minusDays(i.toLong())
+            WeightEntry(d, 70.2 + (69 - i) * 0.022 + rnd.nextGaussian() * 0.35 + (if (d.dayOfWeek == java.time.DayOfWeek.MONDAY) 0.4 else 0.0), 0)
+        }.sortedBy { it.date }
+        com.silverajat.lifttracker.ui.WeightDetail(ws, 0.25, {}, {})
+    }
+
     @Suppress("unused") private val keepFoods = Foods.all.size
 }

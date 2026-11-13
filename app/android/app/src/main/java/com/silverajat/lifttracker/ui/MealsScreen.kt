@@ -86,10 +86,16 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
     }
     var customSlot by remember { mutableStateOf<Slot?>(null) }
     var weightDialog by remember { mutableStateOf(false) }
+    var weightOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
 
     editing?.let { e -> EntryDialog(e, onDismiss = { editing = null }, hub = hub) }
     customSlot?.let { s -> CustomDialog(s, onDismiss = { customSlot = null }, onSave = { n, m -> hub.logCustom(s, n, m); customSlot = null }) }
-    if (weightDialog) WeightDialog(onDismiss = { weightDialog = false }, onSave = { hub.setWeight(it, date); weightDialog = false })
+    if (weightDialog) WeightDialog(onDismiss = { weightDialog = false }, onSave = { hub.setWeight(it, if (weightOpen) LocalDate.now() else date); weightDialog = false })
+    if (weightOpen) {
+        androidx.activity.compose.BackHandler { weightOpen = false }
+        WeightDetail(weights, goal, onBack = { weightOpen = false }, onLog = { weightDialog = true })
+        return
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
@@ -109,7 +115,7 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
             }
         }
         if (view == 0) {
-            netItems(analysis, todayEntries, goal, hub::setGoal)
+            netItems(analysis, todayEntries, goal, onWeight = { weightOpen = true }, onGoal = hub::setGoal)
             return@LazyColumn
         }
         item {

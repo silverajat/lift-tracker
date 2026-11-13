@@ -76,7 +76,7 @@ class HubTest {
         assertEquals(Analysis.Zone.RED, b.zone)
         assertNull(Analysis.recovery(base.take(3), 2, 90))     // no baseline yet
         val s = Analysis.sleep(bad, 20, 16.0, zone)!!
-        assertTrue("need ${s.needMin}", s.needMin > 480)
+        assertTrue("need ${s.needMin}", s.needMin > 420)
         assertTrue(s.performance < 70)
     }
 
