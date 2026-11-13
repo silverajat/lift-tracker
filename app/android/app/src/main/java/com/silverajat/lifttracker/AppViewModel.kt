@@ -116,6 +116,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val paused: StateFlow<Boolean> = _paused
     /** Pieces of the set between pauses; each is counted on its own, then added up. */
     private val segments = ArrayList<List<FloatArray>>()
+    private val hold = com.silverajat.lifttracker.reps.PeakHold()
     private var segmentReps = 0
     private var pausedTotalMs = 0L
     private var pausedAt: Long? = null
@@ -152,8 +153,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             pod.samples.collect { s ->
                 if (collecting && counter.add(s) && countJob?.isActive != true) {
                     countJob = viewModelScope.launch {
-                        val n = withContext(Dispatchers.Default) { counter.countNow() }
-                        if (collecting) _liveReps.value = segmentReps + n
+                        val snap = counter.snapshot()
+                        val n = withContext(Dispatchers.Default) { RepCounter.count(snap, PodProtocol.STREAM_HZ, counter.params, counter.oneArm) }
+                        if (collecting) _liveReps.value = segmentReps + hold.update(n, snap.size)
                     }
                 }
             }
@@ -385,6 +387,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         counter.reset(_model.value.params(ex.id), Routines.isOneArm(ex))
         segments.clear()
         segmentReps = 0
+        hold.reset()
         pausedTotalMs = 0
         pausedAt = null
         _paused.value = false
@@ -413,13 +416,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         countJob?.cancel()
         _paused.value = true
         pausedAt = System.currentTimeMillis()
-        val seg = counter.snapshot()
-        segments += seg
+        val raw = counter.snapshot()
         val p = counter.params
         val oneArm = counter.oneArm
+        val idx = segments.size
+        segments += raw
         viewModelScope.launch {
-            val n = if (seg.size < PodProtocol.STREAM_HZ) 0
-                else withContext(Dispatchers.Default) { RepCounter.count(seg, PodProtocol.STREAM_HZ, p, oneArm) }
+            val full = if (raw.size < PodProtocol.STREAM_HZ) 0
+                else withContext(Dispatchers.Default) { RepCounter.count(raw, PodProtocol.STREAM_HZ, p, oneArm) }
+            if (hold.collapsed(full) && idx < segments.size) segments[idx] = hold.cut(raw, full)
+            val n = hold.shown(full)
+            hold.reset()
             segmentReps += n
             _liveReps.value = segmentReps
         }
@@ -439,18 +446,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_phase.value != Phase.LIFTING) return
         collecting = false
         countJob?.cancel()
-        if (!_paused.value) segments += counter.snapshot()
+        val last = if (!_paused.value) counter.snapshot() else null
+        val lastHold = com.silverajat.lifttracker.reps.PeakHold().also { if (last != null) { it.update(hold.peak, hold.peakLen) } }
         pausedAt?.let { pausedTotalMs += System.currentTimeMillis() - it }
         pausedAt = null
         _paused.value = false
         _active.value = set.copy(endMs = System.currentTimeMillis())
-        val segs = segments.toList()
-        val data = segs.flatten()
-        // A set with a pause has a jump where the pause was: don't train on it.
-        setData = if (segs.size == 1) segs[0] else emptyList()
         val p = counter.params
         val oneArm = counter.oneArm
         viewModelScope.launch {
+            // the end of the set (re-racking, picking up the phone) can wipe the count: cut it back
+            if (last != null) {
+                val full = if (last.size < PodProtocol.STREAM_HZ) 0
+                    else withContext(Dispatchers.Default) { RepCounter.count(last, PodProtocol.STREAM_HZ, p, oneArm) }
+                segments += lastHold.cut(last, full)
+            }
+            hold.reset()
+            val segs = segments.toList()
+            val data = segs.flatten()
+            // A set with a pause has a jump where the pause was: don't train on it.
+            setData = if (segs.size == 1) segs[0] else emptyList()
             // Final count and quality, each piece on its own. Warm-up and
             // calibration sets are the baseline, so they're scored on their own reps.
             val ref: (String) -> RomRef? = if (set.warmup) { _ -> null } else { u -> romRef(set.exerciseId, u) }
@@ -590,9 +605,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val examples = store.all().flatMap { s ->
                     s.sets.filter { it.liveReps != null }.mapNotNull { l ->
                         val d = raw.load(s.id, l.exerciseId, l.setNo) ?: return@mapNotNull null
-                        val oneArm = Routines.isOneArm(l.exerciseId)
-                        val t = RepCounter.trimTail(d, hz, com.silverajat.lifttracker.reps.CounterParams(), oneArm)
-                        val cut = if (oneArm) t.slice(RepEngine.lastBout(t, hz)) else t
+                        val cut = if (Routines.isOneArm(l.exerciseId)) d.slice(RepEngine.lastBout(d, hz)) else d
                         if (cut.size < hz) null
                         else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps)
                     }
