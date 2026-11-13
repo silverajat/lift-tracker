@@ -33,9 +33,9 @@ steel_at = [24.2, 9.0];                    // steel disc for the charger magnet
 leds     = [[27.0, 16.9], [34.9, 1.2]];    // D2 green (status), D3 red (charging)
 
 // ---------- On top of the board (datasheet maximums) ----------
-cell = [22.0, 11.0, 3.0];       // 301120 LiPo, L x W x T max (some list 22 mm with the protection board)
-cell_box = [19.6, 3.5, 41.6, 14.5];        // board coords of the cell outline (runs 0.6 mm past the board end)
-cell_ext = 2.0;                 // pocket past the board's right end, for a 22 mm cell + its wire bend
+cell = [20.0, 10.0, 3.0];       // 301020 LiPo, L x W x T (the ordered case fits up to ~20.5 mm long incl. its protection board)
+cell_box = [20.4, 4.0, 40.4, 14.0];        // board coords of the cell outline
+cell_ext = 0.0;                 // 0 = the case as ordered (cells up to ~20 mm); 2.0 = longer variant with a pocket for 22 mm cells
 motor_d = 8.0;  motor_t = 2.5;  motor_at = [11.3, 9.0];
 module_h = 3.0;  flash_h = 1.1;  foam = 0.3;  gap = 0.15;   // E73 height (3D model); tallest part under the cell
 in_h = max(module_h + gap + motor_t, flash_h + gap + cell[2] + foam) + 0.1;
@@ -139,7 +139,7 @@ module shell() {
         // its top edge rounded so the shell stays >= 1 mm under the rounded outside
         cavity();
         // cell pocket past the board's right end (middle only, clear of the corner stops)
-        translate([cav_l/2 - 1, -6.5, pcb_t - 0.01]) cube([1 + cell_ext, 13, in_h - in_r]);
+        if (cell_ext > 0) translate([cav_l/2 - 1, -6.5, pcb_t - 0.01]) cube([1 + cell_ext, 13, in_h - in_r]);
         // LED windows (fill with clear UV resin for a sealed light pipe)
         for (p = leds) { q = pod(p); translate([q[0], q[1], H - top_t - 1]) cylinder(d = 1.2, h = top_t + 2); }
         translate([-4, 0, H - logo_depth]) linear_extrude(1) r_logo(logo_h);

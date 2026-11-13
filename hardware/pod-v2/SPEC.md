@@ -1,6 +1,6 @@
 # Pod v2: the final, Fitbit-sized lift tracker
 
-**Status (Nov 13):** IMU is now the ST LSM6DSV16X (same footprint position as the BMI270 it replaced). **Earlier (Nov 12, late):** rev A uses the **Ebyte E73-2G4M08S1C** nRF52840 module, which JLC has in stock. The Raytac MDBT50Q we started with is out of stock. Board: 41 × 18 mm, 4 layers, 0.8 mm. Case: 45.6 × 20.6 × 7.75 mm (2 mm cell pocket past the board end, Nov 13). Release files are in `release/liftpod_v2_revA/`.
+**Status (Nov 13):** IMU is now the ST LSM6DSV16X (same footprint position as the BMI270 it replaced). **Earlier (Nov 12, late):** rev A uses the **Ebyte E73-2G4M08S1C** nRF52840 module, which JLC has in stock. The Raytac MDBT50Q we started with is out of stock. Board: 41 × 18 mm, 4 layers, 0.8 mm. Case: 43.6 × 20.6 × 7.75 mm (as ordered; a 2 mm longer variant for 22 mm cells is in lift_pod_v2_shell_long.stl). Release files are in `release/liftpod_v2_revA/`.
 
 **Goal:** close to a Google Fitbit Air pebble (34.9 × 17 × 8.3 mm), with no USB port, no button, charging on the Fitbit Air charger, and everything over Bluetooth. Result: **0.55 mm thinner** than the Fitbit Air and about 9 mm longer. The E73 is bigger and taller than the Raytac module (13 × 18 × 3 mm vs 10 × 15.5 × 2.2), and we picked thin over short.
 
@@ -35,7 +35,7 @@ Top view of the board (x 0–41, y 0–18 mm):
 | | Choice | Why |
 |---|---|---|
 | Module | **Ebyte E73-2G4M08S1C** (nRF52840, ceramic antenna) | In stock at JLC (MDBT50Q-1MV2 wasn't). Same chip, so firmware, BLE and app are unchanged apart from pins. Its pads are castellated, so it can be hand-soldered too |
-| Size | **45.6 × 20.6 × 7.75 mm** body, 55.2 mm with band lugs (2 mm pocket past the board end for a 22 mm cell) | Motor on the module, cell beside it: thinner than stacking the cell on the 3 mm module |
+| Size | **43.6 × 20.6 × 7.75 mm** body, 53.2 mm with band lugs (cells up to ~20.5 mm long; `lift_pod_v2_shell_long.stl` takes 22 mm cells) | Motor on the module, cell beside it: thinner than stacking the cell on the 3 mm module |
 | Data | **Bluetooth only** | Recordings download over BLE, firmware updates over BLE (MCUboot + mcumgr) |
 | Charging | **Google Fitbit Air charger** (5 V, 2 spring pins 18 mm apart, centre magnet) | Contacts on the underside 18 mm apart; a 5 mm steel disc on top of the board between them, for the charger's magnet. Full Schottky bridge, so the pod charges either way round |
 | Battery | **301120 LiPo, 40 mAh, with protection board** | Datasheet max 3.0 × 11.0 × 20.5 mm. Has its own DW01 + 8205 protection, so none on our board |

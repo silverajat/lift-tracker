@@ -4,16 +4,17 @@
 - PCB: 5 boards, 4 layers, 0.8 mm, black, ENIG. Standard PCBA (X-ray), top side, 2 boards.
   Checked in the cart: U102 = LSM6DSV16XTR (C5267406), placement preview OK.
   JLC shows 71 x 70 mm because it adds edge rails for Standard PCBA (snap off).
-- Case (JLC3DP, Black Resin, qty 2): **swap the STL before paying.** `lift_pod_v2_shell.stl`
-  is now 45.6 x 20.6 x 7.75 mm: a 2 mm pocket past the board's right end so a
-  301120/301020 cell up to 22 mm long (with its protection board and wire bend) fits.
+- Case (JLC3DP, Black Resin, qty 2): the original `lift_pod_v2_shell.stl` (43.6 x 20.6 x 7.75 mm),
+  kept as ordered. It fits cells up to ~20.5 mm long including the protection board.
+  If the cells arrive longer, reprint with `lift_pod_v2_shell_long.stl` (2 mm longer, takes 22 mm).
 
 ## Battery
 RS, DigiKey, Shopee and Lazada had nothing small enough (DigiKey's SparkFun
 40 mAh cells are discontinued; SparkFun won't ship them internationally).
 AliExpress: XINJ 301020 3.7 V "80 mAh", 5 pcs (S$6.08, 36 sold). Real capacity
 is ~30-40 mAh. Confirm with the seller that it has a protection board (PCM).
-Fits if <= 4.1 mm thick, <= 12 mm wide, <= 22 mm long.
+Fits the ordered case if <= 4.1 mm thick, <= 12 mm wide, <= ~20.5 mm long (incl. protection board).
+If too long: 301015 (3 x 10 x 15 mm, ~25-30 mAh) fits easily, or reprint with the long case.
 The old 302030 140 mAh cell is fine for bench testing (doesn't fit the case).
 
 ## Buy on AliExpress
