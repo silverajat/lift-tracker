@@ -283,7 +283,7 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
         }
         a?.let { an ->
             val mg = com.silverajat.lifttracker.health.MoveGoal.compute(an.energy, goalKg, an.weight.lastWeekAvg)
-            block("Moving enough for your goal?", if (mg == null) null else "Uses your burn as checked against your weight trend (the Fitbit alone runs ${abs(an.energy.fitbitOffPct)}% ${if (an.energy.fitbitOffPct >= 0) "high" else "low"}), what you've eaten, and your weight of %.1f kg.".format(mg.weightKg)) {
+            block("Moving enough for your goal?", if (mg == null) null else "Uses your burn as checked against your weight trend (the Fitbit alone runs ${abs(an.energy.fitbitOffPct)}%% ${if (an.energy.fitbitOffPct >= 0) "high" else "low"}), what you've eaten, and your weight of %.1f kg.".format(mg.weightKg)) {
                 if (mg == null) Text("Needs about 2 weeks of logged food and morning weigh-ins. Then this tells you whether your running, games and gym are enough to hold your weight goal.",
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                 else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
