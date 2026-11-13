@@ -144,6 +144,7 @@ class MainActivity : ComponentActivity() {
                                 Screen.Home -> HomeScreen(vm, onConnect = ::connectPod, onExport = ::share)
                                 is Screen.Workout -> WorkoutScreen(vm, s.day, onShare = ::share)
                                 is Screen.ExerciseInfo -> ExerciseScreen(vm, s.exerciseId)
+                                is Screen.Past -> com.silverajat.lifttracker.ui.SessionScreen(vm, s.sessionId, onShare = ::share)
                             }
                             Tab.MEALS -> MealsScreen(hub)
                             Tab.INSIGHTS -> InsightsScreen(hub)

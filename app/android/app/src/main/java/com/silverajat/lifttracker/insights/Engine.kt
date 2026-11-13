@@ -169,7 +169,14 @@ object InsightEngine {
         suspend fun days() = daysCache ?: (if (canHealth) runCatching { health.days(31, hrMax) }.getOrDefault(emptyList()) else emptyList())
             .also { daysCache = it }
         val goalKg = prefs.getFloat("goal_kg_week", 0.25f).toDouble()
-        suspend fun analysis() = Analysis.run(days(), sessions, meals.days(today.minusDays(60), today), meals.weights(), today, zone, goalKg)
+        suspend fun weights(): List<com.silverajat.lifttracker.meals.WeightEntry> {
+            val mine = meals.weights()
+            val have = mine.map { it.date }.toSet()
+            val scale = if (canHealth) health.weights(70).groupBy { it.first.atZone(zone).toLocalDate() }
+                .map { (d, v) -> com.silverajat.lifttracker.meals.WeightEntry(d, v.minBy { it.first }.second, 0) } else emptyList()
+            return (mine + scale.filter { it.date !in have }).sortedBy { it.date }
+        }
+        suspend fun analysis() = Analysis.run(days(), sessions, meals.days(today.minusDays(60), today), weights(), today, zone, goalKg)
 
         // morning summary: after you wake (sleep synced) or by 10 AM at the latest
         val mKey = "morning-$today"

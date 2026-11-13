@@ -134,7 +134,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         if (past.isNotEmpty()) {
             item { SectionLabel("History, ${past.size} workout${if (past.size > 1) "s" else ""}", Modifier.padding(top = 6.dp)) }
             items(if (showAll) past else past.take(8), key = { it.id }) { s ->
-                RecentRow(s, onExport = { onExport(s) }, onDelete = { toDelete = s })
+                RecentRow(s, onOpen = { vm.open(Screen.Past(s.id)) }, onExport = { onExport(s) }, onDelete = { toDelete = s })
             }
             if (past.size > 8) {
                 item {
@@ -213,10 +213,10 @@ private fun Pill(text: String) {
 }
 
 @Composable
-private fun RecentRow(s: Session, onExport: () -> Unit, onDelete: () -> Unit) {
+private fun RecentRow(s: Session, onOpen: () -> Unit, onExport: () -> Unit, onDelete: () -> Unit) {
     val color = if (s.day == Day.UPPER) C.UpperA else C.LowerA
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Surface).padding(14.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Surface).clickable(onClick = onOpen).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(color))
@@ -226,8 +226,8 @@ private fun RecentRow(s: Session, onExport: () -> Unit, onDelete: () -> Unit) {
             val dur = s.endMs?.let { elapsed(it - s.startMs) } ?: "not finished"
             val q = s.sets.mapNotNull { it.quality }.takeIf { it.isNotEmpty() }?.average()?.toInt()
             Text(
-                "${dayFmt.format(Date(s.startMs))}, ${timeFmt.format(Date(s.startMs))} · $dur · ${s.sets.size} sets" +
-                    (q?.let { " · quality $it" } ?: ""),
+                "${dayFmt.format(Date(s.startMs))}, ${timeFmt.format(Date(s.startMs))}, $dur, ${s.sets.size} sets" +
+                    (q?.let { ", quality $it" } ?: ""),
                 style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )

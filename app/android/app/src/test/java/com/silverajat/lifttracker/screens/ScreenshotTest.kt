@@ -156,5 +156,12 @@ class ScreenshotTest {
         }
     }
 
+    @Test fun pastWorkout() = shoot("past_workout") {
+        val s0 = sessions.first()
+        val s = s0.copy(sets = s0.sets.mapIndexed { i, l -> l.copy(repScores = List(l.reps) { r -> (95 - r * (3 + i % 4)).coerceAtLeast(40) },
+            speedDrop = if (i % 4 == 3) 24 else 8, liveReps = if (i == 2) l.reps - 1 else l.reps) })
+        com.silverajat.lifttracker.ui.SessionContent(s, sessions)
+    }
+
     @Suppress("unused") private val keepFoods = Foods.all.size
 }

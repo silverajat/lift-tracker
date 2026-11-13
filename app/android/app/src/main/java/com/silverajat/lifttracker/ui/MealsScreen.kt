@@ -79,6 +79,11 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
     val plan = remember(date) { MealPlan.day(date) }
 
     var editing by remember { mutableStateOf<MealEntry?>(null) }
+    var timing by remember { mutableStateOf<MealEntry?>(null) }
+    timing?.let { e ->
+        val t = Instant.ofEpochMilli(e.timeMs).atZone(ZoneId.systemDefault())
+        TimeDialog(t.hour, t.minute, onDismiss = { timing = null }) { h, m -> hub.setTime(e, h, m); timing = null }
+    }
     var customSlot by remember { mutableStateOf<Slot?>(null) }
     var weightDialog by remember { mutableStateOf(false) }
 
@@ -145,7 +150,7 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
 
                         // logged items
                         logged.forEach { e ->
-                            LoggedRow(e, zone, walk = if (isMain) walks[e.id] else null, onClick = { editing = e })
+                            LoggedRow(e, zone, walk = if (isMain) walks[e.id] else null, onClick = { editing = e }, onTime = { timing = e })
                         }
 
                         // planned items not yet logged
@@ -219,10 +224,13 @@ private fun short(f: Food): String = when (f.id) {
 }
 
 @Composable
-private fun LoggedRow(e: MealEntry, zone: ZoneId, walk: Long?, onClick: () -> Unit) {
+private fun LoggedRow(e: MealEntry, zone: ZoneId, walk: Long?, onClick: () -> Unit, onTime: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        // tap the time to change it
         Text(Instant.ofEpochMilli(e.timeMs).atZone(zone).format(hmFmt), style = MaterialTheme.typography.labelLarge.merge(Tnum),
-            color = C.Done, modifier = Modifier.width(44.dp))
+            color = C.Done, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(C.Raised).clickable(onClick = onTime)
+                .padding(horizontal = 8.dp, vertical = 4.dp))
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(e.name + if (e.portion != 1.0) "  ×${fmtPortion(e.portion)}" else "", style = MaterialTheme.typography.bodyMedium, maxLines = 2)
         }
@@ -251,15 +259,23 @@ private fun NumField(label: String, value: String, onChange: (String) -> Unit, m
 private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) {
     val zone = ZoneId.systemDefault()
     val t = Instant.ofEpochMilli(e.timeMs).atZone(zone)
-    var time by remember { mutableStateOf(t.format(hmFmt)) }
+    var hour by remember { mutableStateOf(t.hour) }
+    var minute by remember { mutableStateOf(t.minute) }
+    var picking by remember { mutableStateOf(false) }
     var portion by remember { mutableStateOf(e.portion) }
+    if (picking) TimeDialog(hour, minute, onDismiss = { picking = false }) { h, m -> hour = h; minute = m; picking = false }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Surface,
         title = { Text(e.name, style = MaterialTheme.typography.titleMedium) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                NumField("Time (H:MM)", time, { time = it })
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Eaten at", color = C.Muted, modifier = Modifier.weight(1f))
+                    Text("%d:%02d".format(hour, minute), style = MaterialTheme.typography.headlineSmall.merge(Tnum),
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(C.Raised).clickable { picking = true }
+                            .padding(horizontal = 14.dp, vertical = 6.dp))
+                }
                 Text("Portion", color = C.Muted)
                 FlowRowCompat(spacing = 6.dp) {
                     listOf(0.5, 0.75, 1.0, 1.25, 1.5, 2.0).forEach { p ->
@@ -270,12 +286,8 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
         },
         confirmButton = {
             TextButton(onClick = {
-                val parts = time.trim().split(':', '.')
-                val h = parts.getOrNull(0)?.toIntOrNull()
-                val min = parts.getOrNull(1)?.toIntOrNull() ?: 0
-                if (h != null) hub.setTime(e, h, min)
-                if (portion != e.portion) hub.setPortion(e.copy(timeMs = if (h != null) e.date.atTime(h.coerceIn(0, 23), min.coerceIn(0, 59))
-                    .atZone(zone).toInstant().toEpochMilli() else e.timeMs), portion)
+                hub.setTime(e, hour, minute)
+                if (portion != e.portion) hub.setPortion(e.copy(timeMs = e.date.atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()), portion)
                 onDismiss()
             }) { Text("Save", color = C.Accent, fontWeight = FontWeight.Bold) }
         },
@@ -285,6 +297,31 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
                 TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) }
             }
         },
+    )
+}
+
+/** Clock picker for when you ate something. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun TimeDialog(hour: Int, minute: Int, onDismiss: () -> Unit, onPick: (Int, Int) -> Unit) {
+    val state = androidx.compose.material3.rememberTimePickerState(hour, minute, is24Hour = true)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = C.Surface,
+        title = { Text("When did you eat it?") },
+        text = {
+            androidx.compose.material3.TimePicker(
+                state = state,
+                colors = androidx.compose.material3.TimePickerDefaults.colors(
+                    clockDialColor = C.Raised, clockDialSelectedContentColor = C.OnAccent, clockDialUnselectedContentColor = C.Text,
+                    selectorColor = C.Accent, containerColor = C.Surface,
+                    timeSelectorSelectedContainerColor = C.Accent, timeSelectorUnselectedContainerColor = C.Raised,
+                    timeSelectorSelectedContentColor = C.OnAccent, timeSelectorUnselectedContentColor = C.Text,
+                ),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onPick(state.hour, state.minute) }) { Text("Set time", color = C.Accent, fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) } },
     )
 }
 

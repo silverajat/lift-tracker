@@ -87,6 +87,14 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     private val _syncedAt = MutableStateFlow<Long?>(null)
     val syncedAt: StateFlow<Long?> = _syncedAt
     private var healthJob: Job? = null
+    private var scaleWeights: List<WeightEntry> = emptyList()
+
+    /** Your logged morning weights, plus smart-scale ones for days you didn't log (yours win). */
+    private fun allWeights(): List<WeightEntry> {
+        val mine = meals.weights()
+        val have = mine.map { it.date }.toSet()
+        return (mine + scaleWeights.filter { it.date !in have }).sortedBy { it.date }
+    }
 
     fun refreshHealth() {
         if (!health.available()) { _healthState.value = HealthState.UNAVAILABLE; return }
@@ -97,6 +105,9 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             if (_days.value.isEmpty()) _healthState.value = HealthState.LOADING
             val d = withContext(Dispatchers.IO) { runCatching { health.days(31, _hrMax.value) }.getOrDefault(emptyList()) }
             _days.value = d
+            // weigh-ins from a smart scale (via Google Health), one per day
+            scaleWeights = withContext(Dispatchers.IO) { health.weights(70) }
+                .groupBy { it.first.atZone(zone).toLocalDate() }.map { (day, v) -> WeightEntry(day, v.minBy { it.first }.second, 0) }
             refreshAnalysis()
             _syncedAt.value = System.currentTimeMillis()
             _healthState.value = HealthState.OK
@@ -163,7 +174,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             val today = LocalDate.now(zone)
             _analysis.value = withContext(Dispatchers.Default) {
                 runCatching {
-                    Analysis.run(_days.value, sessions.all(), meals.days(today.minusDays(60), today), meals.weights(), today, zone, _goal.value)
+                    Analysis.run(_days.value, sessions.all(), meals.days(today.minusDays(60), today), allWeights(), today, zone, _goal.value)
                 }.getOrNull()
             }
             if (_analysis.value != null && _healthState.value != HealthState.LOADING) refreshTake()
@@ -213,7 +224,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         refreshAnalysis()
     }
 
-    fun deleteWeight(d: LocalDate) { meals.deleteWeight(d); _weights.value = meals.weights() }
+    fun deleteWeight(d: LocalDate) { meals.deleteWeight(d); _weights.value = meals.weights(); refreshAnalysis() }
 
     private val mains = setOf("salad_egg", "salad_carrot", "chicken_rice", "mixed_rice")
 

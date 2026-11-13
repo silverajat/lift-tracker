@@ -427,8 +427,6 @@ private fun CoachTake(u: TodayUi, a: Analysis.Result?, onRefresh: () -> Unit, on
                 if (lines.isEmpty()) Text("Log a few days of food, weight and workouts and this fills in.",
                     style = MaterialTheme.typography.bodyLarge, color = C.Muted)
                 lines.forEach { Text(it, style = MaterialTheme.typography.bodyLarge) }
-                if (!u.hasKey) Text("Add your GPT key for a written analysis every morning",
-                    style = MaterialTheme.typography.titleSmall, color = C.Accent, modifier = Modifier.clickable(onClick = onAddKey))
             }
             u.takeError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = RedZ) }
         }
