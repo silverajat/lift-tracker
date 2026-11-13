@@ -87,13 +87,14 @@ fun Card(
 }
 
 @Composable
-fun Tag(text: String, color: Color = C.Muted, fill: Color = C.Raised) {
+fun Tag(text: String, color: Color = C.Muted, fill: Color = C.Raised, modifier: Modifier = Modifier) {
     Text(
         text,
         style = MaterialTheme.typography.labelMedium.merge(Tnum),
         color = color,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
+            .then(modifier)
             .background(fill)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )

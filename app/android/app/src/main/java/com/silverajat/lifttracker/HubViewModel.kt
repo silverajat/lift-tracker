@@ -1,0 +1,239 @@
+package com.silverajat.lifttracker
+
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.silverajat.lifttracker.chat.ChatContext
+import com.silverajat.lifttracker.chat.ChatMessage
+import com.silverajat.lifttracker.chat.ChatStore
+import com.silverajat.lifttracker.chat.Claude
+import com.silverajat.lifttracker.data.SessionStore
+import com.silverajat.lifttracker.health.HealthDay
+import com.silverajat.lifttracker.health.HealthRepo
+import com.silverajat.lifttracker.health.Analysis
+import com.silverajat.lifttracker.health.Scores
+import com.silverajat.lifttracker.meals.Food
+import com.silverajat.lifttracker.meals.Macros
+import com.silverajat.lifttracker.meals.MealEntry
+import com.silverajat.lifttracker.meals.MealStore
+import com.silverajat.lifttracker.meals.Slot
+import com.silverajat.lifttracker.meals.WeightEntry
+import com.silverajat.lifttracker.reps.RepModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+
+enum class HealthState { UNAVAILABLE, NEEDS_PERMISSION, LOADING, OK }
+
+/** Today, Meals and Chat: Fitbit data, the food log, weights and Claude. */
+class HubViewModel(app: Application) : AndroidViewModel(app) {
+    private val zone: ZoneId get() = ZoneId.systemDefault()
+    val health = HealthRepo(app)
+    private val meals = MealStore(app.filesDir)
+    private val chatStore = ChatStore(app.filesDir)
+    private val sessions = SessionStore(app)
+    private val prefs = app.getSharedPreferences("hub", Context.MODE_PRIVATE)
+
+    // ---- settings ---------------------------------------------------------------
+    private val _apiKey = MutableStateFlow(prefs.getString("anthropic_key", "") ?: "")
+    val apiKey: StateFlow<String> = _apiKey
+    private val _model = MutableStateFlow(prefs.getString("model", Claude.MODELS.first().first) ?: Claude.MODELS.first().first)
+    val model: StateFlow<String> = _model
+    private val _hrMax = MutableStateFlow(prefs.getInt("hr_max", Scores.DEFAULT_HR_MAX))
+    val hrMax: StateFlow<Int> = _hrMax
+
+    fun setApiKey(k: String) { _apiKey.value = k.trim(); prefs.edit().putString("anthropic_key", k.trim()).apply() }
+    fun setModel(m: String) { _model.value = m; prefs.edit().putString("model", m).apply() }
+    fun setHrMax(v: Int) { _hrMax.value = v.coerceIn(150, 230); prefs.edit().putInt("hr_max", _hrMax.value).apply(); refreshHealth() }
+
+    // ---- Health Connect -----------------------------------------------------------
+    private val _healthState = MutableStateFlow(if (health.available()) HealthState.LOADING else HealthState.UNAVAILABLE)
+    val healthState: StateFlow<HealthState> = _healthState
+    private val _days = MutableStateFlow<List<HealthDay>>(emptyList())
+    val days: StateFlow<List<HealthDay>> = _days
+    private val _analysis = MutableStateFlow<Analysis.Result?>(null)
+    val analysis: StateFlow<Analysis.Result?> = _analysis
+    private val _syncedAt = MutableStateFlow<Long?>(null)
+    val syncedAt: StateFlow<Long?> = _syncedAt
+    private var healthJob: Job? = null
+
+    fun refreshHealth() {
+        if (!health.available()) { _healthState.value = HealthState.UNAVAILABLE; return }
+        healthJob?.cancel()
+        healthJob = viewModelScope.launch {
+            val granted = health.granted()
+            if (granted.isEmpty()) { _healthState.value = HealthState.NEEDS_PERMISSION; return@launch }
+            if (_days.value.isEmpty()) _healthState.value = HealthState.LOADING
+            val d = withContext(Dispatchers.IO) { runCatching { health.days(31, _hrMax.value) }.getOrDefault(emptyList()) }
+            _days.value = d
+            refreshAnalysis()
+            _syncedAt.value = System.currentTimeMillis()
+            _healthState.value = HealthState.OK
+            refreshWalks()
+        }
+    }
+
+    // ---- meals ---------------------------------------------------------------------
+    private val _date = MutableStateFlow(LocalDate.now(zone))
+    val date: StateFlow<LocalDate> = _date
+    private val _entries = MutableStateFlow(meals.day(_date.value))
+    val entries: StateFlow<List<MealEntry>> = _entries
+    private val _todayEntries = MutableStateFlow(meals.day(LocalDate.now(zone)))
+    val todayEntries: StateFlow<List<MealEntry>> = _todayEntries
+    private val _weights = MutableStateFlow(meals.weights())
+    val weights: StateFlow<List<WeightEntry>> = _weights
+    /** Steps in the 45 min after each main meal (entry id -> steps), from Health Connect. */
+    private val _walks = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val walks: StateFlow<Map<String, Long>> = _walks
+
+    fun setDate(d: LocalDate) {
+        _date.value = d
+        reloadMeals()
+    }
+
+    private fun reloadMeals() {
+        _entries.value = meals.day(_date.value)
+        _todayEntries.value = meals.day(LocalDate.now(zone))
+        refreshWalks()
+        refreshAnalysis()
+    }
+
+    /**
+     * Re-run the analysis (Fitbit days + gym log + food + weight). Cheap:
+     * call it whenever the Today tab is shown or data changes.
+     */
+    fun refreshAnalysis() {
+        viewModelScope.launch {
+            val today = LocalDate.now(zone)
+            _analysis.value = withContext(Dispatchers.Default) {
+                runCatching {
+                    Analysis.run(_days.value, sessions.all(), meals.days(today.minusDays(30), today), meals.weights(), today, zone)
+                }.getOrNull()
+            }
+        }
+    }
+
+    /** Log a food at a time (default: now, or noon on another day). */
+    fun log(slot: Slot, food: Food, timeMs: Long? = null) {
+        val d = _date.value
+        val t = timeMs ?: if (d == LocalDate.now(zone)) System.currentTimeMillis()
+            else d.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        meals.add(MealEntry(MealStore.newId(), d, slot, food.id, food.name, food.macros, t))
+        reloadMeals()
+    }
+
+    fun logCustom(slot: Slot, name: String, macros: Macros) {
+        val d = _date.value
+        val t = if (d == LocalDate.now(zone)) System.currentTimeMillis() else d.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        meals.add(MealEntry(MealStore.newId(), d, slot, null, name, macros, t))
+        reloadMeals()
+    }
+
+    fun remove(e: MealEntry) { meals.remove(e); reloadMeals() }
+
+    fun setTime(e: MealEntry, hour: Int, minute: Int) {
+        val t = e.date.atTime(hour.coerceIn(0, 23), minute.coerceIn(0, 59)).atZone(zone).toInstant().toEpochMilli()
+        meals.update(e.copy(timeMs = t))
+        reloadMeals()
+    }
+
+    fun setPortion(e: MealEntry, portion: Double) {
+        val base = e.macros * (1.0 / e.portion)
+        meals.update(e.copy(portion = portion, macros = base * portion))
+        reloadMeals()
+    }
+
+    fun setWeight(kg: Double, d: LocalDate = LocalDate.now(zone)) {
+        meals.setWeight(WeightEntry(d, kg, System.currentTimeMillis()))
+        _weights.value = meals.weights()
+        refreshAnalysis()
+    }
+
+    fun deleteWeight(d: LocalDate) { meals.deleteWeight(d); _weights.value = meals.weights() }
+
+    private val mains = setOf("salad_egg", "salad_carrot", "chicken_rice", "mixed_rice")
+
+    private fun refreshWalks() {
+        val list = _entries.value.filter { it.foodId in mains }
+        if (list.isEmpty()) return
+        viewModelScope.launch {
+            val out = HashMap(_walks.value)
+            for (e in list) {
+                val from = Instant.ofEpochMilli(e.timeMs)
+                if (from.isAfter(Instant.now())) continue
+                val s = withContext(Dispatchers.IO) { health.steps(from, from.plus(Duration.ofMinutes(45))) } ?: continue
+                out[e.id] = s
+            }
+            _walks.value = out
+        }
+    }
+
+    // ---- chat --------------------------------------------------------------------------
+    private val _chat = MutableStateFlow(chatStore.load())
+    val chat: StateFlow<List<ChatMessage>> = _chat
+    private val _sending = MutableStateFlow(false)
+    val sending: StateFlow<Boolean> = _sending
+    private val _chatError = MutableStateFlow<String?>(null)
+    val chatError: StateFlow<String?> = _chatError
+
+    fun clearChat() { chatStore.clear(); _chat.value = emptyList(); _chatError.value = null }
+
+    /** The text Claude gets about you (also viewable in Chat settings). */
+    suspend fun contextText(): String = withContext(Dispatchers.IO) {
+        val today = LocalDate.now(zone)
+        val modelFile = File(getApplication<Application>().filesDir, "rep_model.json")
+        ChatContext.build(
+            now = Instant.now(), zone = zone,
+            sessions = sessions.all(),
+            model = RepModel.Model.fromJson(runCatching { modelFile.readText() }.getOrNull()),
+            health = _days.value.takeLast(14),
+            analysis = _analysis.value,
+            meals = meals.days(today.minusDays(13), today),
+            weights = meals.weights(),
+            hrMax = _hrMax.value,
+            healthNote = when (_healthState.value) {
+                HealthState.OK -> "synced this session"
+                HealthState.NEEDS_PERMISSION -> "not connected yet"
+                HealthState.UNAVAILABLE -> "Health Connect not available"
+                HealthState.LOADING -> "loading"
+            },
+        )
+    }
+
+    fun send(text: String) {
+        val key = _apiKey.value
+        if (text.isBlank() || _sending.value) return
+        if (key.isEmpty()) { _chatError.value = "Add your Anthropic API key in Chat settings first."; return }
+        val history = _chat.value + ChatMessage("user", text.trim(), System.currentTimeMillis())
+        _chat.value = history
+        chatStore.save(history)
+        _sending.value = true
+        _chatError.value = null
+        viewModelScope.launch {
+            val result = runCatching {
+                val system = contextText()
+                withContext(Dispatchers.IO) { Claude.send(key, _model.value, system, history.takeLast(30)) }
+            }
+            result.onSuccess { reply ->
+                val updated = _chat.value + ChatMessage("assistant", reply, System.currentTimeMillis())
+                _chat.value = updated
+                chatStore.save(updated)
+            }.onFailure { _chatError.value = it.message ?: "Couldn't reach Claude" }
+            _sending.value = false
+        }
+    }
+
+    init {
+        refreshHealth()
+        refreshAnalysis()
+    }
+}
