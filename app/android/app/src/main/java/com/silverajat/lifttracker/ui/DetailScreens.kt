@@ -243,8 +243,12 @@ fun RecoveryDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Uni
 /** Weekly load against a range from your last 4 weeks, the same idea as Cardio Load's target. */
 data class WeekLoad(val load: Int, val low: Int?, val high: Int?, val status: String)
 
-fun weekLoad(days: List<HealthDay>): WeekLoad {
-    val trimp = days.map { it.load?.trimp ?: 0 }
+fun weekLoad(days: List<HealthDay>): WeekLoad = weekLoadOf(days.map { it.load?.trimp ?: 0 })
+
+/** From the analysis: heart-rate load plus the gym's muscular load. */
+fun weekLoad(a: Analysis.Result): WeekLoad = weekLoadOf(a.days.map { it.strain?.trimp ?: 0 })
+
+fun weekLoadOf(trimp: List<Int>): WeekLoad {
     val week = trimp.takeLast(7).sum()
     val prior = trimp.dropLast(7).takeLast(21)
     if (prior.count { it > 0 } < 10) return WeekLoad(week, null, null, "Needs about 3 more weeks of heart rate to set your range.")
@@ -278,11 +282,15 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
                         else if (st.strain <= t.endInclusive) "In today's target (${t.start.toInt()} to ${t.endInclusive.toInt()}). Nice." else "Past today's target of ${t.endInclusive.toInt()}: rest up tonight.",
                         style = MaterialTheme.typography.bodyLarge)
                 }
-                Text("Strain is a daily score from your heart rate: every minute your heart works hard adds to it, and it gets harder to raise the higher it goes. 10 is a normal active day, 14+ is a hard training day, 18+ is a big one.",
+                st?.liftStrain?.let { ls ->
+                    Text("Includes today's gym session: muscular strain %.1f (heart rate alone undercounts lifting).".format(ls),
+                        style = MaterialTheme.typography.bodyMedium, color = StrainBlue)
+                }
+                Text("Strain is a daily score from your heart rate plus what your gym sessions did to your muscles: it gets harder to raise the higher it goes. 10 is a normal active day, 14+ is a hard training day, 18+ is a big one.",
                     style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
-        val wl = weekLoad(days)
+        val wl = if (a != null) weekLoad(a) else weekLoad(days)
         block("This week's load", wl.status) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.Bottom) {
@@ -290,7 +298,7 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
                     if (wl.low != null) Text("  your range ${wl.low} to ${wl.high}", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 6.dp))
                 }
                 if (wl.low != null && wl.high != null) LoadGauge(wl.load, wl.low, wl.high)
-                Text("Load is the 7-day total of heart-rate effort. Like Cardio Load, the range comes from your last 4 weeks.",
+                Text("Load is the 7-day total of heart-rate effort plus your gym sessions' muscular load. Like Cardio Load, the range comes from your last 4 weeks.",
                     style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }

@@ -101,6 +101,25 @@ class HubTest {
         assertNotNull(r2.nutrition)
     }
 
+    @Test fun muscularLoadHeavierScoresMore() {
+        val t0 = 1_760_000_000_000L
+        fun set(w: Double, reps: Int, drop: Int?, i: Int) = com.silverajat.lifttracker.data.SetLog(1, i, w, 0, reps, false, t0 + i * 60_000L, t0 + i * 60_000L + 40_000, null, null, speedDrop = drop)
+        val past = com.silverajat.lifttracker.data.Session(1, com.silverajat.lifttracker.data.Day.UPPER, t0 - 7 * 86_400_000L, t0 - 7 * 86_400_000L + 3_600_000,
+            listOf(set(60.0, 8, null, 0)))
+        val heavy = com.silverajat.lifttracker.data.Session(2, com.silverajat.lifttracker.data.Day.UPPER, t0, t0 + 3_600_000, (1..3).map { set(60.0, 8, 45, it) })
+        val light = com.silverajat.lifttracker.data.Session(3, com.silverajat.lifttracker.data.Day.UPPER, t0, t0 + 3_600_000, (1..3).map { set(30.0, 8, 5, it) })
+        val h = com.silverajat.lifttracker.health.MuscleLoad.score(heavy, listOf(past, heavy))
+        val l = com.silverajat.lifttracker.health.MuscleLoad.score(light, listOf(past, light))
+        assertTrue("heavy ${h.strain} > light ${l.strain}", h.strain > l.strain * 2)
+        assertTrue(h.strain in 0.0..21.0)
+        // a gym day with no heart-rate load still gets a strain
+        val zone = ZoneId.of("Asia/Singapore")
+        val d = java.time.Instant.ofEpochMilli(t0).atZone(zone).toLocalDate()
+        val r = Analysis.run(listOf(HealthDay(d, null, null, null, null, null, null, null, null, emptyList(), null)), listOf(past, heavy), emptyMap(), emptyList(), d, zone)
+        assertNotNull(r.today?.strain)
+        assertTrue((r.today?.strain?.liftStrain ?: 0.0) > 0)
+    }
+
     @Test fun healthCacheRoundTrip() {
         val dir = java.nio.file.Files.createTempDirectory("hc").toFile()
         val c = com.silverajat.lifttracker.health.HealthCache(dir)

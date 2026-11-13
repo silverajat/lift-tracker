@@ -109,6 +109,12 @@ object Insights {
             pct <= 85 -> "$pct% of your usual: a lighter one."
             else -> "Right on your usual volume."
         }
+        val ms = com.silverajat.lifttracker.health.MuscleLoad.score(s, history).strain
+        lines += "Muscular strain ${"%.1f".format(ms)}" + when {
+            ms >= 16 -> pick(s.id.toString() + "m", ": absolute beast mode.", ": your muscles felt that one.", ": big one, sleep well.")
+            ms >= 12 -> pick(s.id.toString() + "m", ": proper hard session.", ": solid work.", ": right on target.")
+            else -> pick(s.id.toString() + "m", ": on the lighter side.", ": an easy one.", ".")
+        }
         if (prs.isNotEmpty()) lines += "PR: " + prs.take(3).joinToString(", ") { "${it.name} ${it.e1rmNow.roundToInt()} kg (est. 1RM)" } + "."
         val q = work.filter { it.quality != null }
         if (q.size >= 3) {

@@ -86,6 +86,18 @@ fun SessionContent(s: Session, history: List<Session>, onBack: () -> Unit = {}, 
                     quality?.let { Big("$it", "rep quality", C.score(it)) }
                 }
             }
+            if (s.sets.isNotEmpty()) item {
+                val ml = com.silverajat.lifttracker.health.MuscleLoad.score(s, history)
+                Card(Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Muscular strain", style = MaterialTheme.typography.titleSmall)
+                            Text(muscleVerdict(ml.strain), style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                        }
+                        Text("%.1f".format(ml.strain), style = MaterialTheme.typography.displaySmall.merge(Tnum), color = StrainBlue)
+                    }
+                }
+            }
             items(groups, key = { it.first }) { (exId, sets) ->
                 val ex = runCatching { Routines.byId(exId) }.getOrNull()
                 val oneArm = ex != null && Routines.isOneArm(ex)

@@ -167,8 +167,10 @@ object ActivityLog {
         for (s in sessions.filter { it.sets.isNotEmpty() && it.endMs != null }) {
             val st = Instant.ofEpochMilli(s.startMs); val en = Instant.ofEpochMilli(s.endMs!!)
             val fw = fitbit.firstOrNull { it.start < en && it.end > st }?.also { used += it }
+            // the session's strain: its heart rate plus the muscular load from the pod
+            val ml = com.silverajat.lifttracker.health.MuscleLoad.score(s, sessions)
             out += ActivityItem("g-${s.id}", Sport.GYM, "${s.day.title} day", st, en, Duration.between(st, en).toMinutes().toInt(), null,
-                fw?.avgHr, fw?.maxHr, fw?.trimp?.let { Analysis.strainOf(it) }, "Pod", sessionId = s.id)
+                fw?.avgHr, fw?.maxHr, Analysis.strainOf((fw?.trimp ?: 0) + com.silverajat.lifttracker.health.MuscleLoad.trimpOf(ml.load)), "Pod", sessionId = s.id)
         }
         for (w in fitbit.filter { it !in used }) {
             val fixed = overrides[w.start.toEpochMilli()]

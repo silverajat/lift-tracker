@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.silverajat.lifttracker.HealthState
 import com.silverajat.lifttracker.chat.Coach
@@ -169,6 +170,14 @@ class ScreenshotTest {
         tryShoot("food_log") {
             val hub = androidx.lifecycle.viewmodel.compose.viewModel<com.silverajat.lifttracker.HubViewModel>()
             com.silverajat.lifttracker.ui.MealsScreen(hub, startOnLog = true)
+        }
+    }
+
+    @Test fun gymPlan() = shoot("gym_plan") {
+        val s0 = sessions.first()
+        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(20.dp)) {
+            com.silverajat.lifttracker.ui.PlanCard(com.silverajat.lifttracker.data.GymPlan.DEFAULT, java.time.LocalDate.of(2026, 11, 13),
+                com.silverajat.lifttracker.health.MuscleLoad.score(s0, sessions), onChange = {})
         }
     }
 

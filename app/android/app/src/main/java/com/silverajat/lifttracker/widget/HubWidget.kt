@@ -79,7 +79,7 @@ data class WidgetData(
         fun from(a: Analysis.Result, todayEntries: List<MealEntry>, today: LocalDate, now: LocalTime, days: List<HealthDay> = emptyList()): WidgetData {
             val d = a.today
             val t = if (todayEntries.isNotEmpty()) Energy.today(a.energy, todayEntries, today, now) else null
-            val wl = com.silverajat.lifttracker.ui.weekLoad(days)
+            val wl = com.silverajat.lifttracker.ui.weekLoad(a)
             return WidgetData(
                 date = today.toString(),
                 recovery = d?.recovery?.score, zone = d?.recovery?.zone?.name,

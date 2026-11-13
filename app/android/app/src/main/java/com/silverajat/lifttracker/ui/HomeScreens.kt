@@ -48,9 +48,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.silverajat.lifttracker.AppViewModel
 import com.silverajat.lifttracker.Screen
 import com.silverajat.lifttracker.data.Day
+import com.silverajat.lifttracker.data.GymPlan
 import com.silverajat.lifttracker.data.Routines
 import com.silverajat.lifttracker.data.Session
 import com.silverajat.lifttracker.data.Stats
+import com.silverajat.lifttracker.health.MuscleLoad
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -71,6 +75,14 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
     val status by vm.pod.status.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val session by vm.session.collectAsStateWithLifecycle()
+    val plan by vm.plan.collectAsStateWithLifecycle()
+    var editPlan by remember { mutableStateOf(false) }
+    if (editPlan) PlanDialog(plan, onSave = { vm.setPlan(it); editPlan = false }, onDismiss = { editPlan = false })
+    val zone = java.time.ZoneId.systemDefault()
+    val today = java.time.LocalDate.now()
+    // muscular strain for every session, and for today's (all of today's sessions together)
+    val lift = remember(history) { history.filter { it.sets.isNotEmpty() }.associate { it.id to MuscleLoad.score(it, history) } }
+    val todayLift = remember(history) { MuscleLoad.byDay(history, zone)[today] }
 
     var toDelete by remember { mutableStateOf<Session?>(null) }
     var showAll by remember { mutableStateOf(false) }
@@ -121,13 +133,17 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                 )
             }
         }
+        item { PlanCard(plan, today, todayLift, onChange = { editPlan = true }) }
         item { SectionLabel("Start a workout", Modifier.padding(top = 6.dp)) }
-        items(Day.entries.toList()) { day ->
+        // today's planned day first
+        val planned = plan[today.dayOfWeek]
+        items(Day.entries.sortedBy { if (it == planned) 0 else 1 }) { day ->
             val last = history.firstOrNull { it.day == day && it.id != session?.id && it.sets.isNotEmpty() }
             DayCard(
                 day = day,
                 live = session?.takeIf { it.day == day },
                 last = last,
+                today = day == planned,
                 onClick = { vm.open(Screen.Workout(day)) },
             )
         }
@@ -164,7 +180,6 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         val allPast = history.filter { it.id != session?.id && (it.sets.isNotEmpty() || it.endMs == null) }
         if (allPast.isNotEmpty()) {
             val monday = java.time.LocalDate.now().minusWeeks(weeksBack.toLong()).with(java.time.DayOfWeek.MONDAY)
-            val zone = java.time.ZoneId.systemDefault()
             val past = allPast.filter {
                 val d = java.time.Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate()
                 !d.isBefore(monday) && d.isBefore(monday.plusDays(7))
@@ -183,7 +198,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
             }
             if (past.isEmpty()) item { Text("No workouts this week.", style = MaterialTheme.typography.bodyMedium, color = C.Muted) }
             items(past, key = { it.id }) { s ->
-                RecentRow(s, onOpen = { vm.open(Screen.Past(s.id)) }, onExport = { onExport(s) }, onDelete = { toDelete = s })
+                RecentRow(s, lift[s.id]?.strain, onOpen = { vm.open(Screen.Past(s.id)) }, onExport = { onExport(s) }, onDelete = { toDelete = s })
             }
         }
     }
@@ -201,7 +216,7 @@ private fun StatTile(label: String, value: String, sub: String, modifier: Modifi
 }
 
 @Composable
-private fun DayCard(day: Day, live: Session?, last: Session?, onClick: () -> Unit) {
+private fun DayCard(day: Day, live: Session?, last: Session?, today: Boolean = false, onClick: () -> Unit) {
     val exercises = Routines.forDay(day)
     val groups = exercises.map { Routines.group(it).label }.distinct().joinToString(" · ")
     val brush = if (day == Day.UPPER) Brush.linearGradient(listOf(C.UpperA, C.UpperB))
@@ -224,6 +239,7 @@ private fun DayCard(day: Day, live: Session?, last: Session?, onClick: () -> Uni
             Text(groups, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (today) { Pill("Today"); Spacer(Modifier.width(8.dp)) }
                 Pill("${exercises.size} exercises")
             }
             Spacer(Modifier.height(10.dp))
@@ -255,7 +271,7 @@ private fun Pill(text: String) {
 }
 
 @Composable
-private fun RecentRow(s: Session, onOpen: () -> Unit, onExport: () -> Unit, onDelete: () -> Unit) {
+private fun RecentRow(s: Session, strain: Double?, onOpen: () -> Unit, onExport: () -> Unit, onDelete: () -> Unit) {
     val color = if (s.day == Day.UPPER) C.UpperA else C.LowerA
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Surface).clickable(onClick = onOpen).padding(14.dp),
@@ -273,6 +289,12 @@ private fun RecentRow(s: Session, onOpen: () -> Unit, onExport: () -> Unit, onDe
                 style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
+        }
+        strain?.let {
+            Column(horizontalAlignment = Alignment.End) {
+                Text("%.1f".format(it), style = MaterialTheme.typography.titleLarge.merge(Tnum), color = StrainBlue)
+                Text("muscle", style = MaterialTheme.typography.labelSmall, color = C.Muted)
+            }
         }
         IconButton(onClick = onExport) { Icon(Icons.Filled.Share, "Share", tint = C.Muted) }
         IconButton(onClick = onDelete) { Icon(Icons.Filled.DeleteOutline, "Delete", tint = C.Muted) }
@@ -295,4 +317,115 @@ fun TopBar(title: String, subtitle: String?, onBack: () -> Unit, trailing: @Comp
         }
         trailing()
     }
+}
+
+
+private fun DayOfWeek.short() = name.take(1) + name.substring(1, 3).lowercase()
+
+/** What today is in your week, the week at a glance, and today's muscular strain if you've trained. */
+@Composable
+fun PlanCard(week: Map<DayOfWeek, Day?>, today: LocalDate, todayLift: MuscleLoad.SessionLoad?, onChange: () -> Unit) {
+    val planned = week[today.dayOfWeek]
+    Card(Modifier.fillMaxWidth()) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Today", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    Text(if (planned != null) "${planned.title} day" else "Rest day", style = MaterialTheme.typography.headlineSmall,
+                        color = when (planned) { Day.UPPER -> C.UpperA; Day.LOWER -> C.LowerA; null -> C.Text })
+                    if (planned == null) {
+                        GymPlan.next(week, today)?.let { (d, day) ->
+                            Text("Next: ${day.title}, " + (if (d == today.plusDays(1)) "tomorrow" else d.dayOfWeek.short()),
+                                style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                        }
+                    }
+                }
+                Text("Change", style = MaterialTheme.typography.labelLarge, color = C.Accent,
+                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onChange).padding(horizontal = 10.dp, vertical = 6.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                DayOfWeek.entries.forEach { d ->
+                    val day = week[d]
+                    val isToday = d == today.dayOfWeek
+                    Column(
+                        Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                            .background(if (isToday) C.Raised else Color.Transparent).padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(d.short(), style = MaterialTheme.typography.labelSmall, color = if (isToday) C.Text else C.Muted)
+                        Text(when (day) { Day.UPPER -> "U"; Day.LOWER -> "L"; null -> "–" }, style = MaterialTheme.typography.titleMedium,
+                            color = when (day) { Day.UPPER -> C.UpperA; Day.LOWER -> C.LowerA; null -> C.Line })
+                    }
+                }
+            }
+            todayLift?.let { l ->
+                androidx.compose.material3.HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Muscular strain", style = MaterialTheme.typography.titleSmall)
+                        Text(muscleVerdict(l.strain), style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                    }
+                    Text("%.1f".format(l.strain), style = MaterialTheme.typography.displaySmall.merge(Tnum), color = StrainBlue)
+                }
+                val total = l.byGroup.values.sum().takeIf { it > 0 }
+                if (total != null) {
+                    Spacer(Modifier.height(10.dp))
+                    l.byGroup.entries.sortedByDescending { it.value }.take(4).forEach { (g, v) ->
+                        Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(g.label, style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.width(76.dp))
+                            Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)).background(C.Raised)) {
+                                Box(Modifier.fillMaxWidth((v / total).toFloat().coerceIn(0.02f, 1f)).height(6.dp).clip(RoundedCornerShape(3.dp)).background(StrainBlue))
+                            }
+                            Text("${(v / total * 100).roundToInt()}%", style = MaterialTheme.typography.bodySmall.merge(Tnum), color = C.Muted,
+                                modifier = Modifier.width(40.dp).padding(start = 8.dp))
+                        }
+                    }
+                }
+                Text("Counts into today's Strain. Heavier sets and sets closer to failure score more.",
+                    style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(top = 8.dp))
+            }
+        }
+    }
+}
+
+fun muscleVerdict(strain: Double) = when {
+    strain >= 16 -> "Brutal session. Eat and sleep like you mean it"
+    strain >= 12 -> "Hard session, right where it should be"
+    strain >= 8 -> "Solid, moderate session"
+    else -> "Light session"
+}
+
+@Composable
+private fun PlanDialog(week: Map<DayOfWeek, Day?>, onSave: (Map<DayOfWeek, Day?>) -> Unit, onDismiss: () -> Unit) {
+    var edit by remember { mutableStateOf(week) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = C.Surface,
+        title = { Text("Your week") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DayOfWeek.entries.forEach { d ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(d.short(), style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(44.dp))
+                        listOf<Pair<String, Day?>>("Upper" to Day.UPPER, "Lower" to Day.LOWER, "Rest" to null).forEach { (label, v) ->
+                            val on = edit[d] == v
+                            val col = when (v) { Day.UPPER -> C.UpperA; Day.LOWER -> C.LowerA; null -> C.Muted }
+                            Text(label, style = MaterialTheme.typography.labelLarge, color = if (on) Color.White else C.Muted,
+                                modifier = Modifier.padding(end = 6.dp).clip(RoundedCornerShape(50))
+                                    .background(if (on) col else C.Raised)
+                                    .clickable { edit = edit + (d to v) }.padding(horizontal = 12.dp, vertical = 6.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(edit) }) { Text("Save", color = C.Accent, fontWeight = FontWeight.Bold) } },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { edit = GymPlan.DEFAULT }) { Text("Default", color = C.Muted) }
+                TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) }
+            }
+        },
+    )
 }

@@ -173,6 +173,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val notes: StateFlow<Map<Int, com.silverajat.lifttracker.data.ExerciseNote>> = _notes
     fun setNote(exerciseId: Int, text: String) { noteStore.set(exerciseId, text); _notes.value = noteStore.all() }
 
+    // ---- which day is upper / lower / rest -------------------------------------------
+    private val planStore = com.silverajat.lifttracker.data.GymPlan(app.filesDir)
+    private val _plan = MutableStateFlow(planStore.week())
+    val plan: StateFlow<Map<java.time.DayOfWeek, Day?>> = _plan
+    fun setPlan(week: Map<java.time.DayOfWeek, Day?>) { planStore.set(week); _plan.value = planStore.week() }
+
     // ---- navigation -----------------------------------------------------------
 
     fun open(s: Screen) { _screen.value = s }

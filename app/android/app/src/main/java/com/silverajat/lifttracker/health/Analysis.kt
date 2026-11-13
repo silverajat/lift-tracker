@@ -68,9 +68,11 @@ object Analysis {
         val stages: List<SleepStage> = emptyList(),
     )
 
-    data class StrainResult(val strain: Double, val target: ClosedFloatingPointRange<Double>?, val trimp: Int, val moderateMin: Int, val vigorousMin: Int)
+    /** trimp = heart-rate load + the gym's muscular load (MuscleLoad.TO_TRIMP of it); liftStrain = that day's session score. */
+    data class StrainResult(val strain: Double, val target: ClosedFloatingPointRange<Double>?, val trimp: Int, val moderateMin: Int, val vigorousMin: Int,
+                            val liftStrain: Double? = null, val hrTrimp: Int = trimp)
 
-    data class MuscularLoad(val volumeKg: Double, val vsAvgPct: Int?, val sets: Int)
+    data class MuscularLoad(val volumeKg: Double, val vsAvgPct: Int?, val sets: Int, val strain: Double? = null)
 
     data class ExerciseTrend(
         val exerciseId: Int, val name: String, val e1rmNow: Double, val e1rmThen: Double?, val changePct: Double?,
@@ -331,10 +333,17 @@ object Analysis {
         val gymDays = vol.filterKeys { it >= today.minusDays(28) && it < today }.values.filter { it.second > 0 }
         val avgVol = gymDays.map { it.first }.takeIf { it.isNotEmpty() }?.average()
 
+        val lift = MuscleLoad.byDay(sessions, zone)
         val out = ArrayList<Day>()
         var prevStrain: Double? = null
         health.forEachIndexed { i, h ->
-            val strain = h.load?.let { StrainResult(strainOf(it.trimp), null, it.trimp, it.moderateMin, it.vigorousMin) }
+            // heart rate plus what the gym did to your muscles (heart rate alone undercounts lifting)
+            val ml = lift[h.date]
+            val strain = if (h.load == null && ml == null) null else {
+                val hr = h.load?.trimp ?: 0
+                val total = hr + (ml?.let { MuscleLoad.trimpOf(it.load) } ?: 0)
+                StrainResult(strainOf(total), null, total, h.load?.moderateMin ?: 0, h.load?.vigorousMin ?: 0, ml?.strain, hr)
+            }
             val sl = sleep(health, i, prevStrain, zone)
             val rec = recovery(health, i, sl?.performance)
             val v = vol[h.date]
@@ -342,7 +351,7 @@ object Analysis {
                 date = h.date, recovery = rec,
                 strain = strain?.copy(target = rec?.let { strainTarget(it.zone) }),
                 sleep = sl,
-                muscular = v?.let { MuscularLoad(it.first, avgVol?.takeIf { a -> a > 0 }?.let { a -> (it.first / a * 100).roundToInt() }, it.second) },
+                muscular = v?.let { MuscularLoad(it.first, avgVol?.takeIf { a -> a > 0 }?.let { a -> (it.first / a * 100).roundToInt() }, it.second, ml?.strain) },
                 food = meals[h.date]?.takeIf { it.isNotEmpty() }?.let { MealStore.totals(it) },
             )
             prevStrain = strain?.strain
