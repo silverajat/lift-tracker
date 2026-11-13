@@ -3,4 +3,5 @@
     <color name="bg">#FF1A1F27</color>
     <color name="accent">#FF3D8BFF</color>
     <color name="plate_blue">#FF3E7BFA</color>
+    <color name="icon_bg">#FFFFFFFF</color>
 </resources>

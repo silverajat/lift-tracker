@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed-icon version: the plate with its bar hole, one colour. -->
+<!-- Themed-icon version: heartbeat + plate in one colour. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="5.5"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M21,56L32,56L39,40L47,74L54,48L58,56L62,56" />
     <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
-        android:pathData="M54,22a32,32 0 1,0 0.01,0zM54,42a12,12 0 1,1 -0.01,0zM54,48.5a5.5,5.5 0 1,0 0.01,0z" />
+        android:pathData="M74,43.5a12.5,12.5 0 1,0 0.01,0zM74,51.4a4.6,4.6 0 1,1 -0.01,0zM74,53.8a2.2,2.2 0 1,0 0.01,0z" />
 </vector>

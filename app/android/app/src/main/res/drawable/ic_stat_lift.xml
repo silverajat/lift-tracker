@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Notification icon: the plate (white; the system tints it). -->
+<!-- Notification icon: heartbeat + plate (white; the system tints it). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M1.5,12.5L4.5,12.5L6.5,7.5L9,17L11,10L12.2,12.5L13.5,12.5" />
     <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
-        android:pathData="M12,2a10,10 0 1,0 0.01,0zM12,8.2a3.8,3.8 0 1,1 -0.01,0zM12,10.4a1.6,1.6 0 1,0 0.01,0z" />
+        android:pathData="M18.5,7.5a5,5 0 1,0 0.01,0zM18.5,10.6a1.9,1.9 0 1,1 -0.01,0z" />
 </vector>
