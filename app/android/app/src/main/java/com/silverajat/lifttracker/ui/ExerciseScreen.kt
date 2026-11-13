@@ -43,6 +43,8 @@ import com.silverajat.lifttracker.data.Metric
 import com.silverajat.lifttracker.data.Point
 import com.silverajat.lifttracker.data.Routines
 import com.silverajat.lifttracker.data.Stats
+import com.silverajat.lifttracker.reps.RepModel
+import com.silverajat.lifttracker.reps.unitLabel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -56,6 +58,8 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
     val ex = remember(exerciseId) { Routines.byId(exerciseId) }
     val history by vm.history.collectAsStateWithLifecycle()
     val sessions = remember(history, exerciseId) { vm.sessionsWith(exerciseId) }
+    val model by vm.model.collectAsStateWithLifecycle()
+    val training by vm.training.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(0) }
     var metric by remember { mutableStateOf(Metric.HEAVIEST) }
 
@@ -91,7 +95,8 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                             modifier = Modifier.padding(top = 6.dp))
                     }
                 }
-                val pts = if (metric == Metric.ROM) Stats.romSeries(ex, sessions) else Stats.series(metric, ex, sessions)
+                val pts = if (metric == Metric.ROM) Stats.romSeries(ex, sessions, AppViewModel.RepEngineVersion)
+                    else Stats.series(metric, ex, sessions)
                 val lastPt = pts.lastOrNull() ?: com.silverajat.lifttracker.data.Point("", null, 0.0)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
@@ -107,8 +112,8 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                 LineChart(pts, Modifier.fillMaxWidth().height(200.dp))
                 if (pts.size < 3) {
                     Text(
-                        if (metric == Metric.ROM) "Full ROM in degrees per session, measured by the pod (rotation lifts). Fills in once you log sets with it."
-                        else "The line fills in as you log sessions. The first point is what you did before the app.",
+                        if (metric == Metric.ROM) "Average ROM of your working sets each session, as % of your calibration set (100%). Fills in once you log sets with the pod."
+                        else "Working sets only (no warm-ups). The line fills in as you log sessions; the first point is what you did before the app.",
                         style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                     )
                 }
@@ -129,11 +134,11 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         SectionLabel("Personal records")
-                        vm.calibration(ex.id)?.let { (deg, at) ->
+                        vm.calibration(ex.id)?.let { c ->
                             Row {
-                                Text("Full ROM (calibrated)", style = MaterialTheme.typography.bodyLarge, color = C.Muted,
+                                Text("Full ROM (calibration = 100%)", style = MaterialTheme.typography.bodyLarge, color = C.Muted,
                                     modifier = Modifier.weight(1f))
-                                Text("${deg.toInt()}° · ${shortDate.format(Date(at))}",
+                                Text("${c.rom.toInt()}${unitLabel(c.unit)} · ${shortDate.format(Date(c.atMs))}",
                                     style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Pod)
                             }
                         }
@@ -146,6 +151,7 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                         }
                     }
                 }
+                CounterCard(model.perExercise[ex.id], training, Routines.isOneArm(ex))
             } else {
                 sessions.reversed().forEach { s ->
                     Card(Modifier.fillMaxWidth()) {
@@ -157,7 +163,8 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                                         l.romPct.takeIf { it.isNotEmpty() }?.let { "ROM ${it.average().toInt()}%" },
                                         l.quality?.let { "Q $it" },
                                     ).joinToString(" · ").ifEmpty { null }
-                                    Triple(l.warmup, compact(l.weight, l.addons, l.reps, ex.bodyweight), extra)
+                                    Triple(l.warmup, compact(l.weight, l.addons, l.reps, ex.bodyweight) +
+                                        (if (Routines.isOneArm(ex)) " /arm" else ""), extra)
                                 })
                         }
                     }
@@ -171,6 +178,52 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
             }
         }
     }
+}
+
+/** How well the rep counter does on this exercise, and what it has learned. */
+@Composable
+private fun CounterCard(fit: RepModel.Fit?, training: Boolean, oneArm: Boolean) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionLabel("Rep counter")
+            val line = when {
+                fit == null || fit.sets == 0 ->
+                    "No pod sets yet. Fix the count after each set: every correction is training data."
+                fit.sets < RepModel.MIN_SETS ->
+                    "Learning from ${fit.sets} corrected set${if (fit.sets > 1) "s" else ""}: " +
+                        "this exercise gets its own settings from ${RepModel.MIN_SETS}. " +
+                        "Exact on ${fit.exactLearned} of ${fit.sets}."
+                fit.params.changes() == 0 ->
+                    "Exact on ${fit.exactLearned} of ${fit.sets} sets with the standard settings " +
+                        "(${fit.missLearned} rep${if (fit.missLearned != 1) "s" else ""} off in total). Nothing to fix yet."
+                else ->
+                    "Learned from your ${fit.sets} corrected sets: exact on ${fit.exactLearned} of them " +
+                        "(was ${fit.exactDefault} before learning, ${fit.missDefault} → ${fit.missLearned} reps off)."
+            }
+            Text(line, style = MaterialTheme.typography.bodyLarge)
+            if (fit != null && fit.params.changes() > 0 && fit.sets >= RepModel.MIN_SETS) {
+                val p = fit.params
+                Text(
+                    "Settings: counts the ${signalName(p.signal)} · threshold ${(p.h * 100).toInt()}% · " +
+                        "ignores blips under ${(p.gap * 100).toInt()}% of a rep",
+                    style = MaterialTheme.typography.bodyMedium, color = C.Muted,
+                )
+            }
+            if (oneArm) {
+                Text("One arm at a time: the pod counts your right arm's reps (the last stretch of movement).",
+                    style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+            }
+            if (training) Text("Updating…", style = MaterialTheme.typography.labelMedium, color = C.Pod)
+        }
+    }
+}
+
+private fun signalName(s: String) = when (s) {
+    "turn" -> "forearm's turning speed"
+    "tilt" -> "forearm's tilt"
+    "lift" -> "wrist's up/down speed"
+    "push" -> "wrist's sideways speed"
+    else -> "best signal for each set"
 }
 
 @Composable

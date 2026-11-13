@@ -92,8 +92,14 @@ object Routines {
             listOf(s(30.0, 11), s(30.0, 11))),
     )
 
-    // Main compound lifts rest 2 min, isolation work 90 s.
-    private val compound = setOf(1, 2, 3, 4, 8, 21, 22)
+    // Rest: 3 min after the big lifts (incline bench, lat pulldown), 90 s
+    // after the last four arm moves, 2 min after everything else.
+    private val big = setOf(1, 4)
+    private val arms = setOf(9, 10, 11, 12)
+
+    // Done one arm at a time, left arm first. The pod is on the right wrist,
+    // so it counts the right arm's reps (you match them on the left).
+    private val oneArm = setOf(5, 9, 12)
 
     private val groups = mapOf(
         1 to Group.CHEST, 2 to Group.BACK, 3 to Group.SHOULDERS, 4 to Group.BACK,
@@ -103,8 +109,13 @@ object Routines {
         25 to Group.CORE, 26 to Group.LEGS, 27 to Group.LEGS, 28 to Group.LEGS, 29 to Group.BACK,
     )
 
-    fun restSeconds(ex: Exercise) = if (ex.id in compound) 120 else 90
-    fun isCompound(ex: Exercise) = ex.id in compound
+    fun restSeconds(ex: Exercise) = when (ex.id) {
+        in big -> 180
+        in arms -> 90
+        else -> 120
+    }
+    fun isOneArm(ex: Exercise) = ex.id in oneArm
+    fun isOneArm(exerciseId: Int) = exerciseId in oneArm
     fun group(ex: Exercise) = groups[ex.id] ?: Group.CORE
 
     fun forDay(day: Day) = if (day == Day.UPPER) upper else lower

@@ -78,9 +78,9 @@ import com.silverajat.lifttracker.data.Stats
 import com.silverajat.lifttracker.reps.SetAnalysis
 import kotlin.math.max
 
-/** "61+1 × 10": weight, add-on plates, reps, short enough for the table. */
+/** "61 +1A × 10": weight, add-on plates (A), reps, short enough for the table. */
 fun compact(weight: Double, addons: Int, reps: Int?, bodyweight: Boolean): String {
-    val w = if (bodyweight && weight == 0.0) "BW" else kg(weight) + if (addons > 0) "+$addons" else ""
+    val w = if (bodyweight && weight == 0.0) "BW" else kg(weight) + if (addons > 0) " +${addons}A" else ""
     return if (reps != null) "$w × $reps" else w
 }
 
@@ -285,6 +285,7 @@ private fun ExerciseCard(
                 Text(ex.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     listOfNotNull(group.label, ex.detail.ifEmpty { null },
+                        if (Routines.isOneArm(ex)) "one arm at a time" else null,
                         "rest ${clock(Routines.restSeconds(ex) * 1000L)}").joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                 )
@@ -293,8 +294,8 @@ private fun ExerciseCard(
         }
         val cal = vm.calibration(ex.id)
         Text(
-            if (cal != null) "◎ Full ROM ${cal.first.toInt()}° · calibrated ${calDate.format(java.util.Date(cal.second))}"
-            else "◎ ROM not calibrated: tap a set number until it shows C",
+            if (cal != null) "◎ 100% ROM = ${cal.rom.toInt()}${com.silverajat.lifttracker.reps.unitLabel(cal.unit)} · calibrated ${calDate.format(java.util.Date(cal.atMs))}"
+            else "◎ ROM not calibrated: tap a set number until it shows C, do a slow full-range set",
             style = MaterialTheme.typography.labelMedium,
             color = if (cal != null) C.Pod else C.Muted,
             modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp),
@@ -314,6 +315,7 @@ private fun ExerciseCard(
             Spacer(Modifier.width(ACTION))
         }
         var working = 0
+        var addonEdit by remember { mutableStateOf<androidx.compose.runtime.MutableIntState?>(null) }
         for (i in 0 until rows) key(ex.id, i) {
             val p = plan.getOrNull(i)
             val d = done.firstOrNull { it.setNo == i + 1 }
@@ -334,12 +336,15 @@ private fun ExerciseCard(
             val weightText = remember(ex.id, i, d) {
                 mutableStateOf(d?.let { kg(it.weight) } ?: fallback?.let { kg(it.weight) } ?: "")
             }
+            val addons = remember(ex.id, i, d) { mutableIntStateOf(d?.addons ?: fallback?.addons ?: 0) }
             SetRow(
                 label = label,
                 kind = kind.intValue,
                 previous = p?.let { compact(it.weight, it.addons, it.reps, ex.bodyweight) } ?: "–",
                 weight = weightText.value,
                 onWeight = { weightText.value = it },
+                addons = addons.intValue,
+                onAddons = { if (d == null && !isActive) addonEdit = addons },
                 reps = d?.reps?.toString(),
                 repsHint = p?.reps?.toString() ?: "",
                 quality = d?.quality,
@@ -347,13 +352,35 @@ private fun ExerciseCard(
                 active = isActive,
                 canStart = canStart && d == null,
                 onToggleWarm = { if (d == null && !isActive) kind.intValue = (kind.intValue + 1) % 3 },
-                onCopyPrev = { p?.let { weightText.value = kg(it.weight) } },
+                onCopyPrev = { p?.let { weightText.value = kg(it.weight); addons.intValue = it.addons } },
                 onStart = {
                     val w = weightText.value.replace(',', '.').toDoubleOrNull() ?: 0.0
-                    vm.requestSet(ex, i + 1, w, fallback?.addons ?: 0,
+                    vm.requestSet(ex, i + 1, w, addons.intValue,
                         warmup = kind.intValue >= 1, calibration = kind.intValue == 2)
                 },
                 onDone = { d?.let(onRemove) },
+            )
+        }
+        addonEdit?.let { st ->
+            AlertDialog(
+                onDismissRequest = { addonEdit = null },
+                containerColor = C.Surface,
+                title = { Text("Add-ons") },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text("Add-on weights you put on the stack for this set (not counted in kg or volume).",
+                            style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
+                            RoundBtn(Icons.Filled.Remove) { st.intValue = max(0, st.intValue - 1) }
+                            Text("${st.intValue}", style = MaterialTheme.typography.displayMedium.merge(Tnum),
+                                textAlign = TextAlign.Center, modifier = Modifier.width(96.dp))
+                            RoundBtn(Icons.Filled.Add) { st.intValue = minOf(9, st.intValue + 1) }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { addonEdit = null }) { Text("Done", color = C.Accent, fontWeight = FontWeight.Bold) }
+                },
             )
         }
         TextButton(
@@ -382,6 +409,8 @@ private fun SetRow(
     previous: String,
     weight: String,
     onWeight: (String) -> Unit,
+    addons: Int,
+    onAddons: () -> Unit,
     reps: String?,
     repsHint: String,
     quality: Int?,
@@ -423,7 +452,7 @@ private fun SetRow(
             color = C.Muted, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(W_PREV).clickable(onClick = onCopyPrev).padding(vertical = 6.dp),
         )
-        Box(Modifier.weight(W_KG).padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+        Column(Modifier.weight(W_KG).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             if (done || active) {
                 Text(weight, style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Text)
             } else {
@@ -439,6 +468,16 @@ private fun SetRow(
                         .background(C.Raised).padding(vertical = 8.dp),
                 )
             }
+            // Add-ons: tap to set how many you put on
+            Text(
+                if (addons > 0) "+$addons add-on" + (if (addons > 1) "s" else "") else "+ add-on",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (addons > 0) C.Warm else C.Muted.copy(alpha = 0.7f),
+                maxLines = 1,
+                modifier = Modifier.padding(top = 3.dp).clip(RoundedCornerShape(6.dp))
+                    .then(if (!done && !active) Modifier.clickable(onClick = onAddons) else Modifier)
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            )
         }
         Column(Modifier.weight(W_REPS), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -524,7 +563,8 @@ private fun BottomPanel(
                                 Text("$live", style = MaterialTheme.typography.displayLarge.merge(Tnum)
                                     .copy(fontSize = 92.sp, lineHeight = 92.sp), color = C.Text)
                                 Spacer(Modifier.width(8.dp))
-                                Text("reps", style = MaterialTheme.typography.titleMedium, color = C.Muted,
+                                Text(if (ex != null && Routines.isOneArm(ex)) "reps\nright arm" else "reps",
+                                    style = MaterialTheme.typography.titleMedium, color = C.Muted,
                                     modifier = Modifier.padding(bottom = 16.dp))
                             }
                         } else {
@@ -542,13 +582,17 @@ private fun BottomPanel(
                 var reps by remember(active?.startMs) { mutableIntStateOf(if (live > 0) live else 0) }
                 Text("${ex?.name ?: ""} · set ${active?.setNo ?: ""}",
                     style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Fix the count if it's wrong: the counter learns from every correction.",
+                    style = MaterialTheme.typography.labelMedium, color = C.Muted)
                 if (analysis != null) {
                     Spacer(Modifier.height(10.dp))
                     QualityView(analysis, warmup = active?.warmup == true, calibration = active?.calibration == true)
                 }
                 Spacer(Modifier.height(10.dp))
+                val perArm = ex != null && Routines.isOneArm(ex)
                 Text(
-                    if (active?.podStarted == true) "How many reps? (pod counted $live)" else "How many reps?",
+                    (if (perArm) "Reps per arm?" else "How many reps?") +
+                        if (active?.podStarted == true) " (pod counted $live)" else "",
                     style = MaterialTheme.typography.bodyLarge, color = C.Muted,
                 )
                 Row(
@@ -593,7 +637,11 @@ private fun BottomPanel(
                     Column(Modifier.weight(1f)) {
                         Text(if (doneRest) "Rest done: next set" else "Resting",
                             style = MaterialTheme.typography.titleMedium)
-                        Text(if (restS >= 120) "Main lift · 2:00" else "Isolation · 1:30",
+                        Text(when {
+                                restS >= 180 -> "Big lift · ${clock(restS * 1000L)}"
+                                restS <= 90 -> "Arms · ${clock(restS * 1000L)}"
+                                else -> clock(restS * 1000L)
+                            },
                             style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                         Row {
                             TextButton(onClick = { vm.addRest(-15) }) { Text("−15", color = C.Text, fontWeight = FontWeight.Bold) }
@@ -626,13 +674,11 @@ private fun QualityView(a: SetAnalysis, warmup: Boolean, calibration: Boolean) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(if (calibration) "ROM calibration" else "Rep quality", style = MaterialTheme.typography.titleMedium)
+                val u = com.silverajat.lifttracker.reps.unitLabel(a.unit)
                 val romLine = when {
-                    calibration && a.setRomDeg != null -> "Calibrated: your full ROM is ${a.setRomDeg.toInt()}°"
-                    calibration -> "Calibration saved (this lift is scored relative for now)"
-                    warmup && a.setRomDeg != null -> "Warm-up ROM: ${a.setRomDeg.toInt()}°"
-                    a.rotation && a.fullRomDeg != null ->
-                        "ROM ${a.avgRomPct}% of your full ${a.fullRomDeg.toInt()}°"
-                    else -> "ROM ${a.avgRomPct}% of your best rep"
+                    calibration -> "Calibrated: this set is your 100% ROM (${a.setRom.toInt()}$u)"
+                    warmup -> "Warm-up ROM: ${a.setRom.toInt()}$u"
+                    else -> "ROM ${a.avgRomPct}% of ${a.ref.source.label} (${a.ref.value.toInt()}$u)"
                 }
                 Text(romLine, style = MaterialTheme.typography.bodyMedium, color = C.Text)
                 Text(
@@ -654,7 +700,7 @@ private fun QualityView(a: SetAnalysis, warmup: Boolean, calibration: Boolean) {
                     verticalArrangement = Arrangement.Bottom) {
                     Box(
                         Modifier.fillMaxWidth()
-                            .height((44 * r.romPct / 100f).coerceAtLeast(4f).dp)
+                            .height((44 * minOf(r.romPct, 120) / 100f).coerceAtLeast(4f).dp)
                             .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
                             .background(if (r.partial) C.Stop else C.score(r.score)),
                     )
@@ -663,7 +709,7 @@ private fun QualityView(a: SetAnalysis, warmup: Boolean, calibration: Boolean) {
             }
         }
         Text(
-            "Bars: range of motion per rep. Beta: tuned on your gym data next.",
+            "Bars: range of motion per rep (full height = 100%).",
             style = MaterialTheme.typography.labelMedium, color = C.Muted,
         )
     }

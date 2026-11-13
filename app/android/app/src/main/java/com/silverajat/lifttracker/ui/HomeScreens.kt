@@ -72,6 +72,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
     val session by vm.session.collectAsStateWithLifecycle()
 
     var toDelete by remember { mutableStateOf<Session?>(null) }
+    var showAll by remember { mutableStateOf(false) }
     toDelete?.let { s ->
         AlertDialog(
             onDismissRequest = { toDelete = null },
@@ -133,11 +134,19 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                 onClick = { vm.open(Screen.Workout(day)) },
             )
         }
-        val recent = history.filter { it.endMs != null && it.sets.isNotEmpty() }.take(10)
-        if (recent.isNotEmpty()) {
-            item { SectionLabel("Recent", Modifier.padding(top = 6.dp)) }
-            items(recent, key = { it.id }) { s ->
+        // Every past workout (unfinished ones too), newest first, each with delete.
+        val past = history.filter { it.id != session?.id && (it.sets.isNotEmpty() || it.endMs == null) }
+        if (past.isNotEmpty()) {
+            item { SectionLabel("History · ${past.size} workout${if (past.size > 1) "s" else ""}", Modifier.padding(top = 6.dp)) }
+            items(if (showAll) past else past.take(8), key = { it.id }) { s ->
                 RecentRow(s, onExport = { onExport(s) }, onDelete = { toDelete = s })
+            }
+            if (past.size > 8) {
+                item {
+                    TextButton(onClick = { showAll = !showAll }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (showAll) "Show fewer" else "Show all ${past.size}", color = C.Muted)
+                    }
+                }
             }
         }
     }
@@ -219,7 +228,7 @@ private fun RecentRow(s: Session, onExport: () -> Unit, onDelete: () -> Unit) {
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text("${s.day.title} day", style = MaterialTheme.typography.titleMedium)
-            val dur = s.endMs?.let { elapsed(it - s.startMs) } ?: ""
+            val dur = s.endMs?.let { elapsed(it - s.startMs) } ?: "not finished"
             val q = s.sets.mapNotNull { it.quality }.takeIf { it.isNotEmpty() }?.average()?.toInt()
             Text(
                 "${dayFmt.format(Date(s.startMs))}, ${timeFmt.format(Date(s.startMs))} · $dur · ${s.sets.size} sets" +

@@ -35,7 +35,7 @@ object ShareText {
                 else -> " + ${l.addons} add-ons"
             }
         }
-        return "$w × ${l.reps}" + when {
+        return "$w × ${l.reps}" + (if (Routines.isOneArm(ex)) " each arm" else "") + when {
             l.calibration -> " (ROM calibration)"
             l.warmup -> " (warm-up)"
             else -> ""

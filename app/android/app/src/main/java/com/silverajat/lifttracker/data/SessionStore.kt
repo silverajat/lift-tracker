@@ -20,9 +20,11 @@ data class SetLog(
     val quality: Int? = null,  // overall rep quality 0..100 (pod sets only)
     val repScores: List<Int> = emptyList(),
     val speedDrop: Int? = null, // % slower at the end of the set
-    val romDeg: List<Float> = emptyList(),  // per-rep ROM in degrees (rotation lifts)
-    val romPct: List<Int> = emptyList(),    // per-rep ROM as % of full ROM
+    val rom: List<Float> = emptyList(),     // per-rep ROM, in romUnit
+    val romPct: List<Int> = emptyList(),    // per-rep ROM as % of the reference (calibration = 100)
     val calibration: Boolean = false,       // light full-ROM set that sets the baseline
+    val romUnit: String = "deg",            // "deg" (forearm turns) or "cm" (wrist travels)
+    val counter: Int = 0,                   // rep counter version that measured rom (0 = v0)
 )
 
 data class Session(
@@ -81,7 +83,9 @@ class SessionStore(context: Context) {
                     put("quality", l.quality ?: JSONObject.NULL)
                     put("speedDrop", l.speedDrop ?: JSONObject.NULL)
                     put("repScores", JSONArray(l.repScores))
-                    put("romDeg", JSONArray(l.romDeg.map { it.toDouble() }))
+                    put("romDeg", JSONArray(l.rom.map { it.toDouble() }))   // key kept for old files
+                    put("romUnit", l.romUnit)
+                    put("counter", l.counter)
                     put("romPct", JSONArray(l.romPct))
                     put("calibration", l.calibration)
                 })
@@ -108,11 +112,13 @@ class SessionStore(context: Context) {
                 repScores = l.optJSONArray("repScores")?.let { a -> (0 until a.length()).map { a.getInt(it) } }
                     ?: emptyList(),
                 speedDrop = if (!l.has("speedDrop") || l.isNull("speedDrop")) null else l.getInt("speedDrop"),
-                romDeg = l.optJSONArray("romDeg")?.let { a -> (0 until a.length()).map { a.getDouble(it).toFloat() } }
+                rom = l.optJSONArray("romDeg")?.let { a -> (0 until a.length()).map { a.getDouble(it).toFloat() } }
                     ?: emptyList(),
                 romPct = l.optJSONArray("romPct")?.let { a -> (0 until a.length()).map { a.getInt(it) } }
                     ?: emptyList(),
                 calibration = l.optBoolean("calibration", false),
+                romUnit = l.optString("romUnit", "deg"),
+                counter = l.optInt("counter", 0),
             )
         }
         return Session(

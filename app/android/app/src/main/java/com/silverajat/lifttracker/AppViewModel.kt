@@ -12,12 +12,17 @@ import com.silverajat.lifttracker.ble.PodProtocol
 import com.silverajat.lifttracker.data.Day
 import com.silverajat.lifttracker.data.Exercise
 import com.silverajat.lifttracker.data.PlanSet
+import com.silverajat.lifttracker.data.RawStore
 import com.silverajat.lifttracker.data.Routines
 import com.silverajat.lifttracker.data.Session
 import com.silverajat.lifttracker.data.SessionStore
 import com.silverajat.lifttracker.data.SetLog
 import com.silverajat.lifttracker.reps.RepCounter
+import com.silverajat.lifttracker.reps.RepEngine
+import com.silverajat.lifttracker.reps.RepModel
+import com.silverajat.lifttracker.reps.RomRef
 import com.silverajat.lifttracker.reps.SetAnalysis
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +32,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 
 sealed interface Screen {
     data object Home : Screen
@@ -54,6 +61,8 @@ data class ActiveSet(
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val pod = PodClient(app, viewModelScope)
     private val store = SessionStore(app)
+    private val raw = RawStore(app)
+    private val modelFile = File(app.filesDir, "rep_model.json")
     private val prefs = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     private val _history = MutableStateFlow(store.all())
@@ -95,6 +104,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val counter = RepCounter(PodProtocol.STREAM_HZ)
     private var restJob: Job? = null
+    private var countJob: Job? = null
+    private var collecting = false
+    /** The finished set's 25 Hz data, kept from Stop until Save. */
+    private var setData: List<FloatArray> = emptyList()
+
+    /** The rep counter's learned settings (refitted after every saved set). */
+    private val _model = MutableStateFlow(
+        RepModel.Model.fromJson(runCatching { modelFile.readText() }.getOrNull())
+    )
+    val model: StateFlow<RepModel.Model> = _model
+    private val _training = MutableStateFlow(false)
+    val training: StateFlow<Boolean> = _training
+    private var trainJob: Job? = null
 
     init {
         // Pick up a workout that was still open (app killed, phone restarted).
@@ -103,7 +125,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             pod.samples.collect { s ->
-                if (_phase.value == Phase.LIFTING) _liveReps.value = counter.add(s)
+                if (collecting && counter.add(s) && countJob?.isActive != true) {
+                    countJob = viewModelScope.launch {
+                        val n = withContext(Dispatchers.Default) { counter.countNow() }
+                        if (collecting) _liveReps.value = n
+                    }
+                }
             }
         }
         viewModelScope.launch {
@@ -161,18 +188,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Your full ROM for an exercise, in degrees (rotation lifts only):
-     *  1. today's warm-up set, if you did one with the pod: light weight is
-     *     where your range is best, so working sets are scored against it;
-     *  2. otherwise your best logged set (median of its 3 biggest reps);
-     *  3. otherwise null, and the set is scored against its own best reps.
+     * What 100% ROM is for an exercise (in degrees or cm, matching the set):
+     *  1. your latest calibration set (C): that set IS 100%;
+     *  2. otherwise today's warm-up, if you did one with the pod;
+     *  3. otherwise your best logged set (median of its 3 biggest reps);
+     *  4. otherwise null, and the set is scored against its own best reps.
+     * Only sets measured by the current counter count (older numbers used a
+     * different method).
      */
-    fun fullRomDeg(exerciseId: Int): Float? {
-        calibration(exerciseId)?.let { return it.first }
-        val warm = _session.value?.sets
-            ?.filter { it.exerciseId == exerciseId && it.warmup && it.romDeg.size >= 2 }
-            ?.maxOfOrNull { top3(it.romDeg) }
-        return warm ?: bestRomDeg(exerciseId)
+    fun romRef(exerciseId: Int, unit: String): RomRef? {
+        val sets = allSets(exerciseId).filter { it.counter >= RepEngineVersion && it.romUnit == unit && it.rom.size >= 2 }
+        sets.filter { it.calibration }.maxByOrNull { it.startMs }?.let {
+            return RomRef(top3(it.rom), unit, RomRef.Source.CALIBRATION)
+        }
+        val today = _session.value?.sets ?: emptyList()
+        sets.filter { it.warmup && it in today }
+            .maxOfOrNull { top3(it.rom) }?.let { return RomRef(it, unit, RomRef.Source.WARMUP) }
+        sets.filter { !it.warmup }.maxOfOrNull { top3(it.rom) }?.let { return RomRef(it, unit, RomRef.Source.BEST) }
+        return null
     }
 
     /** Every logged set of an exercise, this workout included. */
@@ -182,25 +215,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return (past + (cur?.sets ?: emptyList())).filter { it.exerciseId == exerciseId }
     }
 
-    /**
-     * The calibrated full ROM (degrees) and when it was set: the latest C set,
-     * raised by any later set that went further (your range improved).
-     * Null if the exercise was never calibrated with the pod.
-     */
-    fun calibration(exerciseId: Int): Pair<Float, Long>? {
-        val sets = allSets(exerciseId).filter { it.romDeg.size >= 2 }
-        val cal = sets.filter { it.calibration }.maxByOrNull { it.startMs } ?: return null
-        val later = sets.filter { it.startMs > cal.startMs }.map { top3(it.romDeg) }
-        return Pair((later + top3(cal.romDeg)).max(), cal.startMs)
-    }
+    /** The latest calibration (C set) of an exercise: its full ROM, unit and date. */
+    data class Calibration(val rom: Float, val unit: String, val atMs: Long)
+
+    fun calibration(exerciseId: Int): Calibration? =
+        allSets(exerciseId).filter { it.calibration && it.counter >= RepEngineVersion && it.rom.size >= 2 }
+            .maxByOrNull { it.startMs }?.let { Calibration(top3(it.rom), it.romUnit, it.startMs) }
 
     private fun top3(x: List<Float>): Float = x.sortedDescending().take(3).let { t -> t.sorted()[t.size / 2] }
-
-    private fun bestRomDeg(exerciseId: Int): Float? =
-        _history.value.flatMap { it.sets }
-            .filter { it.exerciseId == exerciseId && it.romDeg.size >= 2 }
-            .map { s -> s.romDeg.sortedDescending().take(3).let { t -> t.sorted()[t.size / 2] } }
-            .maxOrNull()
 
     /** Every finished session, oldest first (for charts and the history tab). */
     fun sessionsWith(exerciseId: Int): List<Session> =
@@ -273,8 +295,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             calibration = calibration,
         )
         _active.value = set
-        counter.reset()
+        counter.reset(_model.value.params(ex.id), Routines.isOneArm(ex))
         _liveReps.value = 0
+        collecting = true
         _phase.value = Phase.LIFTING
         restJob?.cancel()
         _restEndsAt.value = null
@@ -292,11 +315,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun stopSet() {
         val set = _active.value ?: return
-        if (_phase.value != Phase.LIFTING) return
+        if (_phase.value != Phase.LIFTING || !collecting) return
+        collecting = false
+        countJob?.cancel()
         _active.value = set.copy(endMs = System.currentTimeMillis())
-        // Warm-up and calibration sets are the baseline, so they're scored on their own reps.
-        _analysis.value = counter.analyze(if (set.warmup) null else fullRomDeg(set.exerciseId))
-        _phase.value = Phase.CONFIRM
+        val data = counter.snapshot()
+        setData = data
+        val p = counter.params
+        val oneArm = counter.oneArm
+        viewModelScope.launch {
+            // Final count and quality on the whole set. Warm-up and
+            // calibration sets are the baseline, so they're scored on their own reps.
+            val ref: (String) -> RomRef? = if (set.warmup) { _ -> null } else { u -> romRef(set.exerciseId, u) }
+            val (n, a) = withContext(Dispatchers.Default) {
+                val a = RepCounter.analyze(data, PodProtocol.STREAM_HZ, p, oneArm, ref)
+                Pair(a?.reps ?: RepCounter.count(data, PodProtocol.STREAM_HZ, p, oneArm), a)
+            }
+            if (data.isNotEmpty()) _liveReps.value = n
+            _analysis.value = a
+            _phase.value = Phase.CONFIRM
+            sendStop(set)
+        }
+    }
+
+    private fun sendStop(set: ActiveSet) {
         val live = _liveReps.value
         // Send Stop whenever the pod is there (even if Start's reply was slow):
         // Stop with nothing recording is harmless.
@@ -321,14 +363,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             exerciseId = set.exerciseId, setNo = set.setNo, weight = set.weight,
             addons = set.addons, reps = reps, warmup = set.warmup,
             startMs = set.startMs, endMs = set.endMs ?: System.currentTimeMillis(),
-            liveReps = if (set.podStarted) _liveReps.value else null, podRec = set.podRec,
+            liveReps = if (set.podStarted || setData.isNotEmpty()) _liveReps.value else null, podRec = set.podRec,
             quality = _analysis.value?.overall,
             repScores = _analysis.value?.perRep?.map { it.score } ?: emptyList(),
             speedDrop = _analysis.value?.speedDropPct,
-            romDeg = _analysis.value?.perRep?.mapNotNull { it.romDeg } ?: emptyList(),
+            rom = _analysis.value?.perRep?.map { it.rom } ?: emptyList(),
             romPct = _analysis.value?.perRep?.map { it.romPct } ?: emptyList(),
             calibration = set.calibration,
+            romUnit = _analysis.value?.unit ?: "deg",
+            counter = RepEngineVersion,
         )
+        // Keep the set's data: with the count you confirmed, it's what the counter learns from.
+        if (setData.size >= PodProtocol.STREAM_HZ) {
+            val d = setData
+            viewModelScope.launch(Dispatchers.IO) { raw.save(session.id, log.exerciseId, log.setNo, d) }
+        }
+        setData = emptyList()
         val updated = session.copy(sets = session.sets.filterNot {
             it.exerciseId == log.exerciseId && it.setNo == log.setNo
         } + log)
@@ -339,9 +389,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _analysis.value = null
         _phase.value = Phase.READY
         startRest(Routines.restSeconds(Routines.byId(set.exerciseId)))
+        retrain()
     }
 
     fun discardSet() {
+        setData = emptyList()
         _active.value = null
         _analysis.value = null
         _phase.value = Phase.READY
@@ -357,7 +409,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _restEndsAt.value = null
         }
         store.delete(id)
+        raw.deleteSession(id)
         _history.value = store.all()
+        retrain()
     }
 
     fun deleteSet(log: SetLog) {
@@ -365,6 +419,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val updated = session.copy(sets = session.sets - log)
         _session.value = updated
         saveSession(updated)
+        raw.delete(session.id, log.exerciseId, log.setNo)
+        retrain()
+    }
+
+    // ---- learning from your corrections ---------------------------------------------
+
+    /**
+     * Refit the rep counter on every saved set that has pod data, using the
+     * counts you confirmed as the truth (RepModel). Runs in the background
+     * after each saved set; a newer call replaces one still running.
+     */
+    fun retrain() {
+        trainJob?.cancel()
+        trainJob = viewModelScope.launch {
+            _training.value = true
+            val m = withContext(Dispatchers.Default) {
+                val hz = PodProtocol.STREAM_HZ
+                val examples = store.all().flatMap { s ->
+                    s.sets.filter { it.liveReps != null }.mapNotNull { l ->
+                        val d = raw.load(s.id, l.exerciseId, l.setNo) ?: return@mapNotNull null
+                        val cut = if (Routines.isOneArm(l.exerciseId)) d.slice(RepEngine.lastBout(d, hz)) else d
+                        if (cut.size < hz) null
+                        else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps)
+                    }
+                }
+                RepModel.train(examples)
+            }
+            _model.value = m
+            runCatching { modelFile.writeText(m.toJson()) }
+            _training.value = false
+        }
     }
 
     fun finishWorkout() {
@@ -413,7 +498,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         prefs.edit().putInt("rest_s", s).apply()
     }
 
-    companion object { const val COUNTDOWN_MS = 3_000L }
+    companion object {
+        const val COUNTDOWN_MS = 3_000L
+        /** Bump when the counter's method changes (older ROM numbers then aren't compared). */
+        const val RepEngineVersion = 1
+    }
 
     private fun buzz() {
         val vm = getApplication<Application>().getSystemService(VibratorManager::class.java) ?: return

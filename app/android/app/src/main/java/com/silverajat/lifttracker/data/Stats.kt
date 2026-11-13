@@ -2,7 +2,8 @@ package com.silverajat.lifttracker.data
 
 /**
  * Progress numbers for the exercise page, Hevy-style. Add-on plates aren't
- * weighed, so they don't count toward weight or volume.
+ * weighed, so they don't count toward weight or volume. Warm-up and
+ * calibration sets are left out of every chart and record.
  */
 enum class Metric(val label: String, val unit: String) {
     HEAVIEST("Heaviest weight", "kg"),
@@ -10,7 +11,7 @@ enum class Metric(val label: String, val unit: String) {
     BEST_SET("Best set volume", "kg"),
     VOLUME("Session volume", "kg"),
     REPS("Total reps", "reps"),
-    ROM("Full ROM", "°"),
+    ROM("ROM", "% of calibration"),
 }
 
 data class Point(val label: String, val timeMs: Long?, val value: Double)
@@ -19,15 +20,17 @@ object Stats {
     /** Epley: weight x (1 + reps / 30). */
     fun oneRm(weight: Double, reps: Int) = if (reps <= 1) weight else weight * (1 + reps / 30.0)
 
-    fun value(m: Metric, sets: List<PlanSet>): Double {
-        val work = sets.filter { !it.warmup }.ifEmpty { sets }
+    /** Null when there are no working sets (warm-ups only). */
+    fun value(m: Metric, sets: List<PlanSet>): Double? {
+        val work = sets.filter { !it.warmup }
+        if (work.isEmpty()) return null
         return when (m) {
-            Metric.HEAVIEST -> work.maxOfOrNull { it.weight } ?: 0.0
-            Metric.ONE_RM -> work.maxOfOrNull { oneRm(it.weight, it.reps) } ?: 0.0
-            Metric.BEST_SET -> work.maxOfOrNull { it.weight * it.reps } ?: 0.0
-            Metric.VOLUME -> sets.sumOf { it.weight * it.reps }
-            Metric.REPS -> sets.sumOf { it.reps }.toDouble()
-            Metric.ROM -> 0.0   // from the pod's per-rep data: see romSeries
+            Metric.HEAVIEST -> work.maxOf { it.weight }
+            Metric.ONE_RM -> work.maxOf { oneRm(it.weight, it.reps) }
+            Metric.BEST_SET -> work.maxOf { it.weight * it.reps }
+            Metric.VOLUME -> work.sumOf { it.weight * it.reps }
+            Metric.REPS -> work.sumOf { it.reps }.toDouble()
+            Metric.ROM -> null   // from the pod's per-rep data: see romSeries
         }
     }
 
@@ -36,20 +39,21 @@ object Stats {
      * before the app) come first, labelled "before".
      */
     fun series(m: Metric, ex: Exercise, sessions: List<Session>): List<Point> {
-        val pts = mutableListOf(Point("before", null, value(m, ex.last)))
+        val pts = mutableListOf<Point>()
+        value(m, ex.last)?.let { pts += Point("before", null, it) }
         sessions.forEach { s ->
             val sets = s.sets.filter { it.exerciseId == ex.id }
                 .map { PlanSet(it.weight, it.reps, it.warmup, it.addons) }
-            if (sets.isNotEmpty()) pts += Point("", s.startMs, value(m, sets))
+            value(m, sets)?.let { pts += Point("", s.startMs, it) }
         }
         return pts
     }
 
-    /** Full ROM (degrees) per session: best set's median of its 3 biggest reps. */
-    fun romSeries(ex: Exercise, sessions: List<Session>): List<Point> = sessions.mapNotNull { s ->
-        s.sets.filter { it.exerciseId == ex.id && it.romDeg.size >= 2 }
-            .map { l -> l.romDeg.sortedDescending().take(3).let { t -> t.sorted()[t.size / 2].toDouble() } }
-            .maxOrNull()?.let { Point("", s.startMs, it) }
+    /** ROM per session: average ROM % of the working sets (calibration set = 100). */
+    fun romSeries(ex: Exercise, sessions: List<Session>, minCounter: Int): List<Point> = sessions.mapNotNull { s ->
+        s.sets.filter { it.exerciseId == ex.id && !it.warmup && it.counter >= minCounter && it.romPct.isNotEmpty() }
+            .flatMap { it.romPct }.takeIf { it.isNotEmpty() }
+            ?.let { Point("", s.startMs, it.average()) }
     }
 
     data class Record(val label: String, val value: String)
@@ -58,7 +62,7 @@ object Stats {
         val all = ex.last + sessions.flatMap { s ->
             s.sets.filter { it.exerciseId == ex.id }.map { PlanSet(it.weight, it.reps, it.warmup, it.addons) }
         }
-        val work = all.filter { !it.warmup }.ifEmpty { all }
+        val work = all.filter { !it.warmup }
         if (work.isEmpty()) return emptyList()
         val heaviest = work.maxBy { it.weight }
         val best1rm = work.maxBy { oneRm(it.weight, it.reps) }
