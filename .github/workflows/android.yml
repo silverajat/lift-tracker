@@ -33,6 +33,15 @@ jobs:
           name: screens
           path: app/android/app/build/outputs/roborazzi/
           if-no-files-found: ignore
+      - name: Publish screenshots as the "screens-latest" release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls app/build/outputs/roborazzi/*.png >/dev/null 2>&1 || exit 0
+          gh release delete screens-latest --yes --cleanup-tag || true
+          gh release create screens-latest app/build/outputs/roborazzi/*.png \
+            --title "App screenshots (sample data)" --notes "Built from ${GITHUB_SHA::7}" --prerelease
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
       - name: Rename
