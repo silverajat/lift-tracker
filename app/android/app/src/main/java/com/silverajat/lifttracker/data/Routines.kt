@@ -92,8 +92,8 @@ object Routines {
 
     // Rest: 3 min after the big lifts (incline bench, lat pulldown), 90 s
     // after the last four arm moves, 2 min after everything else.
-    private val big = setOf(1, 4)
-    private val arms = setOf(9, 10, 11, 12)
+    private val big = setOf(1, 4, 21, 22)          // 3 min: heavy compounds (lower: leg press, RDL)
+    private val arms = setOf(9, 10, 11, 12, 25, 28) // 1:30: arms, woodchoppers, calf raises
 
     // Done one arm at a time, left arm first. The pod is on the right wrist,
     // so it counts the right arm's reps (you match them on the left).
