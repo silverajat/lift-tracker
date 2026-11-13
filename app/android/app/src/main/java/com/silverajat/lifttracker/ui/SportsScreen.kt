@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.silverajat.lifttracker.HubViewModel
 import com.silverajat.lifttracker.activity.Activity
@@ -205,11 +206,13 @@ private fun BigStat(value: String, label: String, color: Color = C.Text) {
 @Composable
 private fun StartTile(name: String, emoji: String, sub: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
     Column(
-        modifier.clip(RoundedCornerShape(22.dp)).background(color.copy(alpha = 0.16f)).clickable(onClick = onClick).padding(14.dp),
+        modifier.clip(RoundedCornerShape(22.dp)).background(color.copy(alpha = 0.16f)).clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(emoji, style = MaterialTheme.typography.headlineMedium)
-        Text(name, style = MaterialTheme.typography.titleLarge, color = color)
+        // one line even for "Badminton" on a narrow phone
+        Text(name, style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp), color = color, maxLines = 1, softWrap = false)
         Text("Start, $sub", style = MaterialTheme.typography.bodySmall, color = C.Muted)
     }
 }
