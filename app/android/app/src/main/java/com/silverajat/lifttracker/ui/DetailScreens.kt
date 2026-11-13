@@ -283,11 +283,9 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
                         style = MaterialTheme.typography.bodyLarge)
                 }
                 st?.liftStrain?.let { ls ->
-                    Text("Includes today's gym session: muscular strain %.1f (heart rate alone undercounts lifting).".format(ls),
+                    Text("Gym: muscular strain %.1f".format(ls),
                         style = MaterialTheme.typography.bodyMedium, color = StrainBlue)
                 }
-                Text("Strain is a daily score from your heart rate plus what your gym sessions did to your muscles: it gets harder to raise the higher it goes. 10 is a normal active day, 14+ is a hard training day, 18+ is a big one.",
-                    style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
         val wl = if (a != null) weekLoad(a) else weekLoad(days)
@@ -298,8 +296,6 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
                     if (wl.low != null) Text("  your range ${wl.low} to ${wl.high}", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 6.dp))
                 }
                 if (wl.low != null && wl.high != null) LoadGauge(wl.load, wl.low, wl.high)
-                Text("Load is the 7-day total of heart-rate effort plus your gym sessions' muscular load. Like Cardio Load, the range comes from your last 4 weeks.",
-                    style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
         a?.let { an ->

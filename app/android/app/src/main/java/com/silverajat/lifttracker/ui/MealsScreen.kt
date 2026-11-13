@@ -133,12 +133,6 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
             }
         }
 
-        if (date == Targets.reviewDate) item {
-            Card(Modifier.fillMaxWidth(), border = C.Warm.copy(alpha = 0.6f)) {
-                Text("Plan review day: compare this week's average weight with last week's (Body card on Today) and adjust.",
-                    color = C.Warm)
-            }
-        }
 
         // ---- slots ----
         Slot.entries.forEach { slot ->

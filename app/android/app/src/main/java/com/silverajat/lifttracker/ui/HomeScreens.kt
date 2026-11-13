@@ -170,8 +170,6 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                                 }
                             }
                         }
-                        Text("Estimated one-rep max, and what to do next session. Tap a lift for its progress.", style = MaterialTheme.typography.bodySmall, color = C.Muted,
-                            modifier = Modifier.padding(top = 12.dp))
                     }
                 }
             }
@@ -382,8 +380,6 @@ fun PlanCard(week: Map<DayOfWeek, Day?>, today: LocalDate, todayLift: MuscleLoad
                         }
                     }
                 }
-                Text("Counts into today's Strain. Heavier sets and sets closer to failure score more.",
-                    style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }

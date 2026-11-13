@@ -138,7 +138,6 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
                     StartTile("Football", Sport.FOOTBALL.emoji, "timer", Plate.Green, Modifier.weight(1f)) { RunTracker.start(ctx, Sport.FOOTBALL) }
                     StartTile("Badminton", Sport.BADMINTON.emoji, "timer", Plate.Yellow, Modifier.weight(1f)) { RunTracker.start(ctx, Sport.BADMINTON) }
                 }
-                Text("Tap to start. Forgot to? Log a past one in each section below.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
 
@@ -160,7 +159,7 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
                             HorizontalDivider(color = C.Line)
                             Text("Sunday 10Ks", style = MaterialTheme.typography.titleSmall)
                             TimeTrend(tens.map { (it.durationS * 10 / it.distanceKm!!).roundToInt() })
-                            Text("Lower is faster. Last: ${ActivityLog.clock((tens.last().durationS * 10 / tens.last().distanceKm!!).roundToInt())}",
+                            Text("Last: ${ActivityLog.clock((tens.last().durationS * 10 / tens.last().distanceKm!!).roundToInt())}",
                                 style = MaterialTheme.typography.bodySmall, color = C.Muted)
                         }
                     }
@@ -176,8 +175,6 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
         if (other.isNotEmpty()) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Other, from your Fitbit", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
-                Text("Walks, swims, rides and anything else the Fitbit detects by itself.", style = MaterialTheme.typography.bodySmall,
-                    color = C.Muted, modifier = Modifier.padding(start = 4.dp))
                 ShortList(other, ::open, "")
             }
         }
@@ -305,8 +302,6 @@ fun LiveSession(s: RunTracker.State, onFinish: (String) -> Unit) {
             } else Spacer(Modifier.weight(1f))
             if (s.splitsS.isNotEmpty()) Text("Last km ${ActivityLog.clock(s.splitsS.last())}", style = MaterialTheme.typography.titleMedium)
         } else {
-            Text("Keep your Fitbit on: its heart rate fills in your strain for this ${s.sport.label.lowercase()} afterwards.",
-                style = MaterialTheme.typography.bodyMedium, color = C.Muted)
             Spacer(Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -395,7 +390,6 @@ fun RunDetail(r: Activity, item: ActivityItem?, onBack: () -> Unit, onDelete: ()
                                     Text(ActivityLog.clock(s), style = MaterialTheme.typography.titleSmall.merge(Tnum), modifier = Modifier.width(64.dp).padding(start = 10.dp))
                                 }
                             }
-                            Text("Green is your fastest km.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                         }
                     }
                 }
@@ -454,7 +448,6 @@ fun LogActivityDialog(start: Sport, onDismiss: () -> Unit, onSave: (Sport, Long,
                         modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), colors = colors)
                 }
                 OutlinedTextField(note, { note = it }, label = { Text("Note (optional)") }, singleLine = true, colors = colors)
-                Text("Heart rate and strain come from your Fitbit for that time.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         },
         confirmButton = {
@@ -494,7 +487,6 @@ fun ActivityInfo(it: ActivityItem, onDismiss: () -> Unit, onDelete: (() -> Unit)
                         }
                         if (it.manualId == null) Text("Not an activity: hide it", style = MaterialTheme.typography.labelLarge, color = C.Stop,
                             modifier = Modifier.clickable { onChange(null) })
-                        Text("Heart rate and strain stay the same; it just moves to the right sport.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                     }
                 }
             }

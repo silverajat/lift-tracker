@@ -206,10 +206,6 @@ private fun CounterCard(fit: RepModel.Fit?, training: Boolean, oneArm: Boolean) 
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                 )
             }
-            if (oneArm) {
-                Text("One arm at a time: the pod counts your right arm's reps (the last stretch of movement).",
-                    style = MaterialTheme.typography.bodyMedium, color = C.Muted)
-            }
             if (training) Text("Updating…", style = MaterialTheme.typography.labelMedium, color = C.Pod)
         }
     }

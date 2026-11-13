@@ -83,15 +83,11 @@ fun InsightsScreen(hub: HubViewModel) {
     ) {
         item {
             Text("Insights", style = MaterialTheme.typography.headlineMedium)
-            Text("Summaries after workouts and walks, a morning brief with the weather, an evening net-calorie check, a 9:45 PM wrap-up of your day and a Monday review.",
-                color = C.Muted, style = MaterialTheme.typography.bodyMedium)
         }
         item {
             Card(Modifier.fillMaxWidth(), onClick = { chat = true }) {
                 Column {
                     Text("Brainstorm", style = MaterialTheme.typography.titleMedium)
-                    Text("Chat with GPT about anything. It sees your training, food, weight and Fitbit data. Change the key or model with the gear inside.",
-                        color = C.Muted, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }

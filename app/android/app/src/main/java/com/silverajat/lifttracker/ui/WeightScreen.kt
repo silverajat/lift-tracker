@@ -116,9 +116,8 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                         Text("%.1f".format(now.trend), style = MaterialTheme.typography.displayLarge.merge(Tnum))
                         Text(" kg", style = MaterialTheme.typography.displaySmall, color = C.Muted, modifier = Modifier.padding(bottom = 14.dp))
                     }
-                    Text("Your trend weight: the weigh-ins smoothed, so one salty dinner doesn't move it." +
-                        (weights.lastOrNull()?.let { " Last weigh-in %.1f kg on %s.".format(it.kg, it.date.format(wFmt)) } ?: ""),
-                        style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                    weights.lastOrNull()?.let { Text("Trend · last weigh-in %.1f kg on %s".format(it.kg, it.date.format(wFmt)),
+                        style = MaterialTheme.typography.bodyMedium, color = C.Muted) }
                 }
             }
             item {
@@ -151,7 +150,6 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                             Row {
                                 Column(Modifier.weight(1f)) {
                                     Text("Your goal", style = MaterialTheme.typography.titleSmall)
-                                    Text("set on the Net page", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                                 }
                                 Text("$goalWord kg/week", style = MaterialTheme.typography.titleMedium)
                             }
@@ -187,7 +185,6 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                                         color = C.Muted, modifier = Modifier.width(64.dp))
                                 }
                             }
-                            Text("Monday to Sunday averages; only finished weeks.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                         }
                     }
                 }
@@ -211,7 +208,7 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                                 Text("By day of the week", style = MaterialTheme.typography.titleSmall)
                                 WeekdayBars(wd)
                                 val hi = wd.maxBy { it.value }
-                                Text("You weigh most on ${hi.key.getDisplayName(TextStyle.FULL, Locale.getDefault())}s (%+.1f kg vs trend): usually the day after bigger meals or more salt.".format(hi.value),
+                                Text("You weigh most on ${hi.key.getDisplayName(TextStyle.FULL, Locale.getDefault())}s (%+.1f kg vs trend)".format(hi.value),
                                     style = MaterialTheme.typography.bodySmall, color = C.Muted)
                             }
                         }

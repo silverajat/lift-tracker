@@ -603,8 +603,6 @@ private fun BottomPanel(
                 var reps by remember(active?.startMs) { mutableIntStateOf(if (live > 0) live else 0) }
                 Text("${ex?.name ?: ""} · set ${active?.setNo ?: ""}",
                     style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("Fix the count if it's wrong: the counter learns from every correction.",
-                    style = MaterialTheme.typography.labelMedium, color = C.Muted)
                 if (analysis != null) {
                     Spacer(Modifier.height(10.dp))
                     QualityView(analysis, warmup = active?.warmup == true, calibration = active?.calibration == true)
@@ -791,7 +789,6 @@ private fun NoteDialog(initial: String, onDismiss: () -> Unit, onSave: (String) 
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = C.Accent, unfocusedBorderColor = C.Line, focusedTextColor = C.Text, unfocusedTextColor = C.Text),
                 )
-                Text("It stays on this exercise every session until you change it.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
             }
         },
         confirmButton = { TextButton(onClick = { onSave(text) }) { Text("Save", color = C.Accent, fontWeight = FontWeight.Bold) } },
