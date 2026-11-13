@@ -16,6 +16,12 @@ enum class Sport(val label: String, val emoji: String) {
     RUN("Run", "🏃"), FOOTBALL("Football", "⚽"), BADMINTON("Badminton", "🏸"), GYM("Gym", "🏋️"),
     WALK("Walk", "🚶"), SWIM("Swim", "🏊"), CYCLE("Cycle", "🚴"), OTHER("Other", "⚡");
 
+    /** The workout name the rest of the app uses for this sport. */
+    val fitbitType: String get() = when (this) {
+        RUN -> "Run"; WALK -> "Walk"; SWIM -> "Swim"; CYCLE -> "Bike"; GYM -> "Strength training"
+        FOOTBALL -> "Football"; BADMINTON -> "Badminton"; OTHER -> "Workout"
+    }
+
     companion object {
         fun ofFitbit(type: String) = when (type) {
             "Run" -> RUN; "Walk" -> WALK; "Swim" -> SWIM; "Bike" -> CYCLE
@@ -99,6 +105,20 @@ class ActivityOverrides(root: File) {
         val o = JSONObject(f.readText())
         o.keys().asSequence().associate { k -> k.toLong() to o.getString(k).let { v -> if (v == "HIDDEN") null else Sport.valueOf(v) } }
     }.getOrDefault(emptyMap())
+
+    /** The Fitbit's workouts with your corrections applied (renamed, or hidden ones removed). */
+    fun apply(days: List<HealthDay>): List<HealthDay> {
+        val o = all()
+        if (o.isEmpty()) return days
+        return days.map { d -> d.copy(workouts = d.workouts.mapNotNull { w -> fix(w, o) }) }
+    }
+
+    fun fix(w: Workout, o: Map<Long, Sport?> = all()): Workout? {
+        val k = w.start.toEpochMilli()
+        if (!o.containsKey(k)) return w
+        val s = o[k] ?: return null
+        return w.copy(type = s.fitbitType, title = null)
+    }
 
     fun set(startMs: Long, sport: Sport?) {
         val o = runCatching { JSONObject(f.readText()) }.getOrDefault(JSONObject())

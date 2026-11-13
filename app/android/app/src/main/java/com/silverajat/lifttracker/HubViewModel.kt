@@ -304,7 +304,21 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         val manual = item.manualId?.let { id -> activityStore.all().firstOrNull { it.id == id } }
         when {
             manual != null -> if (sport == null) activityStore.delete(manual.id) else activityStore.add(manual.copy(sport = sport))
-            item.key.startsWith("f-") -> overrides.set(item.start.toEpochMilli(), sport)
+            item.key.startsWith("f-") -> {
+                overrides.set(item.start.toEpochMilli(), sport)
+                // rewrite its summary in the Insights feed too (no new notification), or remove it if hidden
+                val key = "act-${item.start.toEpochMilli()}"
+                val old = insightStore.all().firstOrNull { it.key == key }
+                if (old != null) viewModelScope.launch {
+                    val w = _days.value.flatMap { it.workouts }.firstOrNull { it.start == item.start }?.let { overrides.fix(it) }
+                    val updated = if (w == null) null else {
+                        val st = withContext(Dispatchers.IO) { health.activityStats(w.start, w.end) }
+                        com.silverajat.lifttracker.insights.Insights.activity(w, st, meals.day(w.start.atZone(zone).toLocalDate()), old.timeMs)
+                    }
+                    withContext(Dispatchers.IO) { insightStore.replace(key, updated) }
+                    reloadInsights()
+                }
+            }
         }
         refreshActivities()
     }
@@ -360,7 +374,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             now = Instant.now(), zone = zone,
             sessions = sessions.all(),
             model = RepModel.Model.fromJson(runCatching { modelFile.readText() }.getOrNull()),
-            health = _days.value.takeLast(14),
+            health = overrides.apply(_days.value.takeLast(14)),
             analysis = _analysis.value,
             meals = meals.days(today.minusDays(13), today),
             weights = meals.weights(),

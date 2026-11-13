@@ -47,6 +47,14 @@ class InsightStore(root: File) {
         }
     }.getOrDefault(emptyList())
 
+    /** Replace an insight in place (same position in the feed), or remove it with null. */
+    fun replace(key: String, i: Insight?) {
+        val list = all().mapNotNull { if (it.key == key) i else it }
+        val a = JSONArray()
+        list.forEach { a.put(JSONObject().put("key", it.key).put("kind", it.kind.name).put("title", it.title).put("body", it.body).put("t", it.timeMs)) }
+        f.writeText(a.toString())
+    }
+
     fun add(i: Insight) {
         val list = (listOf(i) + all().filter { it.key != i.key }).take(150)
         val a = JSONArray()
@@ -212,7 +220,7 @@ object InsightEngine {
                             val context = com.silverajat.lifttracker.chat.ChatContext.build(
                                 now = Instant.now(), zone = zone, sessions = sessions,
                                 model = com.silverajat.lifttracker.reps.RepModel.Model.fromJson(runCatching { java.io.File(ctx.filesDir, "rep_model.json").readText() }.getOrNull()),
-                                health = days().takeLast(14), analysis = a, meals = meals.days(today.minusDays(13), today),
+                                health = com.silverajat.lifttracker.activity.ActivityOverrides(ctx.filesDir).apply(days().takeLast(14)), analysis = a, meals = meals.days(today.minusDays(13), today),
                                 weights = meals.weights(), hrMax = hrMax, healthNote = "background check",
                             )
                             com.silverajat.lifttracker.chat.Coach.ask(key, prefs.getString("openai_model", com.silverajat.lifttracker.chat.Gpt.DEFAULT_MODEL)!!,
@@ -226,7 +234,9 @@ object InsightEngine {
 
         // Fitbit workouts that ended in the last 6 hours
         if (canHealth) {
+            val fixes = com.silverajat.lifttracker.activity.ActivityOverrides(ctx.filesDir)
             val recent = runCatching { health.workouts(Instant.now().minus(Duration.ofHours(6)), Instant.now()) }.getOrDefault(emptyList())
+                .mapNotNull { fixes.fix(it) }          // your corrections (soccer -> walk), hidden ones dropped
             for (w in recent) {
                 val key = "act-${w.start.toEpochMilli()}"
                 if (key in sent || Insights.overlapsGym(w, sessions)) continue
