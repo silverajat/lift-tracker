@@ -48,7 +48,7 @@ class ScreenshotTest {
     private val zone = ZoneId.systemDefault()
     private val today = LocalDate.now()
     private val rnd = Random(7)
-    private fun ms(d: LocalDate, h: Int, m: Int = 0) = d.atTime(h, m).atZone(zone).toInstant().toEpochMilli()
+    private fun ms(d: LocalDate, h: Int, m: Int = 0) = d.atTime(h, 0).plusMinutes(m.toLong()).atZone(zone).toInstant().toEpochMilli()
 
     private val days: List<HealthDay> = (0 until 30).map { i ->
         val d = today.minusDays((29 - i).toLong())
