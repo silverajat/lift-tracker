@@ -106,17 +106,13 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Sync from Health Connect. The first time ever: a full read (90 days).
-     * After that: nothing if the saved copy is under 30 minutes old, otherwise
-     * just the last 3 days on top of it. [force] skips the 3-hour wait;
+     * After that: the last 3 days on top of the saved copy, every time the app
+     * opens (the saved data stays on screen meanwhile). [force] restarts a running sync;
      * [full] re-reads everything (after changing max heart rate).
      */
     fun refreshHealth(force: Boolean = false, full: Boolean = false) {
         if (!health.available()) { _healthState.value = HealthState.UNAVAILABLE; return }
-        val savedNow = cache.load()
-        if (!force && !full && savedNow != null && savedNow.days.size >= 20 && System.currentTimeMillis() - savedNow.savedMs < SYNC_EVERY_MS) {
-            if (_healthState.value == HealthState.LOADING) _healthState.value = HealthState.OK
-            return
-        }
+        // a sync already running (opening the app fires this from two places): let it finish
         if (healthJob?.isActive == true && !force && !full) return
         healthJob?.cancel()
         healthJob = viewModelScope.launch {
