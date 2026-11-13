@@ -240,7 +240,7 @@ fun WorkoutScreen(vm: AppViewModel, day: Day, onShare: (Session) -> Unit) {
 @Composable
 private fun StatCell(label: String, value: String, modifier: Modifier) {
     Column(modifier) {
-        Text(label.uppercase(), style = MaterialTheme.typography.labelMedium, color = C.Text.copy(alpha = 0.7f))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = C.Text.copy(alpha = 0.7f))
         Text(value, style = MaterialTheme.typography.titleLarge.merge(Tnum), color = C.Text)
     }
 }

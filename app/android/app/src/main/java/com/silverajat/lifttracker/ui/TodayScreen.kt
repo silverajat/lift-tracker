@@ -280,7 +280,7 @@ fun TodayContent(
                             Row(verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
                                     Text(e.name, style = MaterialTheme.typography.titleSmall)
-                                    Text(e.suggestion, style = MaterialTheme.typography.bodyMedium, color = C.Accent)
+                                    Text(e.suggestion, style = MaterialTheme.typography.bodyMedium)
                                     Text("Last: ${e.lastSets.substringBefore(" (")}", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                                 }
                                 Column(horizontalAlignment = Alignment.End) {

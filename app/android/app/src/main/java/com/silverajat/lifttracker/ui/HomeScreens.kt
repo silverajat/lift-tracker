@@ -105,11 +105,6 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                     Text(dayFmt.format(Date()), style = MaterialTheme.typography.titleSmall, color = C.Muted)
                     Text(greeting(), style = MaterialTheme.typography.headlineLarge)
                 }
-                Box(
-                    Modifier.size(44.dp).clip(CircleShape)
-                        .background(Brush.linearGradient(listOf(C.UpperA, C.UpperB))),
-                    contentAlignment = Alignment.Center,
-                ) { Text("R", style = MaterialTheme.typography.titleLarge, color = Color.White) }
             }
         }
         item { PodBar(conn, status, onConnect) }

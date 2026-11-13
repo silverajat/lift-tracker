@@ -182,7 +182,21 @@ object InsightEngine {
                 }
                 // Monday: last week's review
                 if (today.dayOfWeek == java.time.DayOfWeek.MONDAY && now.hour >= 8) {
-                    Insights.weekly(a, sessions, today, zone, nowMs)?.let { post(ctx, it) }
+                    Insights.weekly(a, sessions, today, zone, nowMs)?.let { rules ->
+                        // with a GPT key, GPT writes the review from the same data (the numbers version is the fallback)
+                        val key = prefs.getString("openai_key", "") ?: ""
+                        val written = if (key.isEmpty() || rules.key in sent) null else runCatching {
+                            val context = com.silverajat.lifttracker.chat.ChatContext.build(
+                                now = Instant.now(), zone = zone, sessions = sessions,
+                                model = com.silverajat.lifttracker.reps.RepModel.Model.fromJson(runCatching { java.io.File(ctx.filesDir, "rep_model.json").readText() }.getOrNull()),
+                                health = days().takeLast(14), analysis = a, meals = meals.days(today.minusDays(13), today),
+                                weights = meals.weights(), hrMax = hrMax, healthNote = "background check",
+                            )
+                            com.silverajat.lifttracker.chat.Coach.ask(key, prefs.getString("openai_model", com.silverajat.lifttracker.chat.Gpt.DEFAULT_MODEL)!!,
+                                context, com.silverajat.lifttracker.chat.Coach.WEEKLY)
+                        }.getOrNull()?.takeIf { it.isNotBlank() }
+                        post(ctx, if (written != null) rules.copy(body = written.replace("**", "")) else rules)
+                    }
                 }
             }
         }
