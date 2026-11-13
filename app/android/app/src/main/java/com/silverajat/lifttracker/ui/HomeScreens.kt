@@ -74,6 +74,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
 
     var toDelete by remember { mutableStateOf<Session?>(null) }
     var showAll by remember { mutableStateOf(false) }
+    var weeksBack by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
     toDelete?.let { s ->
         AlertDialog(
             onDismissRequest = { toDelete = null },
@@ -138,7 +139,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                     Column {
                         strength.forEachIndexed { i, e ->
                             if (i > 0) androidx.compose.material3.HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 12.dp))
-                            Row(verticalAlignment = Alignment.Top) {
+                            Row(Modifier.clickable { vm.open(Screen.ExerciseInfo(e.exerciseId, fromHome = true)) }, verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
                                     Text(e.name, style = MaterialTheme.typography.titleSmall)
                                     Text(e.suggestion, style = MaterialTheme.typography.bodyMedium)
@@ -153,25 +154,36 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                                 }
                             }
                         }
-                        Text("Estimated one-rep max, and what to do next session.", style = MaterialTheme.typography.bodySmall, color = C.Muted,
+                        Text("Estimated one-rep max, and what to do next session. Tap a lift for its progress.", style = MaterialTheme.typography.bodySmall, color = C.Muted,
                             modifier = Modifier.padding(top = 12.dp))
                     }
                 }
             }
         }
-        // Every past workout (unfinished ones too), newest first, each with delete.
-        val past = history.filter { it.id != session?.id && (it.sets.isNotEmpty() || it.endMs == null) }
-        if (past.isNotEmpty()) {
-            item { SectionLabel("History, ${past.size} workout${if (past.size > 1) "s" else ""}", Modifier.padding(top = 6.dp)) }
-            items(if (showAll) past else past.take(8), key = { it.id }) { s ->
-                RecentRow(s, onOpen = { vm.open(Screen.Past(s.id)) }, onExport = { onExport(s) }, onDelete = { toDelete = s })
+        // Past workouts one week (Mon-Sun) at a time, newest first, each with delete.
+        val allPast = history.filter { it.id != session?.id && (it.sets.isNotEmpty() || it.endMs == null) }
+        if (allPast.isNotEmpty()) {
+            val monday = java.time.LocalDate.now().minusWeeks(weeksBack.toLong()).with(java.time.DayOfWeek.MONDAY)
+            val zone = java.time.ZoneId.systemDefault()
+            val past = allPast.filter {
+                val d = java.time.Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate()
+                !d.isBefore(monday) && d.isBefore(monday.plusDays(7))
             }
-            if (past.size > 8) {
-                item {
-                    TextButton(onClick = { showAll = !showAll }, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (showAll) "Show fewer" else "Show all ${past.size}", color = C.Muted)
-                    }
+            item {
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel("History", Modifier.weight(1f))
+                    Text("‹", style = MaterialTheme.typography.headlineSmall, color = C.Text,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { weeksBack++ }.padding(horizontal = 12.dp))
+                    Text(when (weeksBack) { 0 -> "This week"; 1 -> "Last week"
+                        else -> "Week of " + monday.format(java.time.format.DateTimeFormatter.ofPattern("d MMM")) },
+                        style = MaterialTheme.typography.titleSmall)
+                    Text("›", style = MaterialTheme.typography.headlineSmall, color = if (weeksBack > 0) C.Text else C.Line,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(enabled = weeksBack > 0) { weeksBack-- }.padding(horizontal = 12.dp))
                 }
+            }
+            if (past.isEmpty()) item { Text("No workouts this week.", style = MaterialTheme.typography.bodyMedium, color = C.Muted) }
+            items(past, key = { it.id }) { s ->
+                RecentRow(s, onOpen = { vm.open(Screen.Past(s.id)) }, onExport = { onExport(s) }, onDelete = { toDelete = s })
             }
         }
     }

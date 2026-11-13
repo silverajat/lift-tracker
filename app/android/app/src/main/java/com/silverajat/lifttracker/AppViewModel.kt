@@ -39,7 +39,7 @@ import java.io.File
 sealed interface Screen {
     data object Home : Screen
     data class Workout(val day: Day) : Screen
-    data class ExerciseInfo(val exerciseId: Int) : Screen
+    data class ExerciseInfo(val exerciseId: Int, val fromHome: Boolean = false) : Screen
     /** A past workout, in full. */
     data class Past(val sessionId: Long) : Screen
 }
@@ -179,7 +179,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun back(): Boolean {
         when (val s = _screen.value) {
-            is Screen.ExerciseInfo -> _screen.value = Screen.Workout(Routines.byId(s.exerciseId).day)
+            is Screen.ExerciseInfo -> _screen.value = if (s.fromHome) Screen.Home else Screen.Workout(Routines.byId(s.exerciseId).day)
             is Screen.Workout -> _screen.value = Screen.Home
             is Screen.Past -> _screen.value = Screen.Home
             Screen.Home -> return false

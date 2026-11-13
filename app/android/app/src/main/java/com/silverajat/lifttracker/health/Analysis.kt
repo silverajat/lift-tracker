@@ -267,7 +267,7 @@ object Analysis {
 
     // ---- food, weight ------------------------------------------------------------------------
 
-    fun weight(weights: List<WeightEntry>, today: LocalDate): WeightResult {
+    fun weight(weights: List<WeightEntry>, today: LocalDate, goalKgPerWeek: Double = 0.0): WeightResult {
         val weeks = MealStore.weekAverages(weights, today).filter { it.days >= 3 }
         val last = weeks.getOrNull(0)
         val prev = weeks.getOrNull(1)
@@ -275,11 +275,15 @@ object Analysis {
         if (prev == null) return WeightResult(last.avgKg, null, null, null, "One full week so far: next week gives the first comparison")
         val ch = last.avgKg - prev.avgKg
         val pct = ch / prev.avgKg * 100
+        // judged against your goal (maintain = 0); within 0.15 kg a week counts as on target
+        val off = ch - goalKgPerWeek
+        val kcal = (kotlin.math.abs(off) * 7700 / 7 / 50).roundToInt() * 50
+        val goalWord = if (goalKgPerWeek == 0.0) "maintain" else if (goalKgPerWeek > 0) "gain goal" else "cut"
         val verdict = when {
-            pct > 0.6 -> "Gaining fast (${"%.2f".format(pct)}%/week). Plan: small cut, peanut butter first"
-            pct >= 0.2 -> "Gaining at a lean-bulk pace (${"%.2f".format(pct)}%/week): keep the plan"
-            pct > -0.2 -> "Holding steady (${"%.2f".format(pct)}%/week): if you want to gain, add ~150-200 kcal"
-            else -> "Losing (${"%.2f".format(pct)}%/week): eat more if that's not the goal"
+            kotlin.math.abs(off) <= 0.15 -> if (goalKgPerWeek == 0.0) "Holding steady (%+.2f kg on the week): right on maintenance".format(ch)
+                else "%+.2f kg on the week: right on your $goalWord".format(ch)
+            off > 0 -> "Up %.2f kg on the week, above your $goalWord: trim about $kcal kcal a day (peanut butter first)".format(ch)
+            else -> "Down %.2f kg on the week, below your $goalWord: about $kcal kcal a day more".format(-ch)
         }
         return WeightResult(last.avgKg, prev.avgKg, ch, pct, verdict)
     }
@@ -321,7 +325,7 @@ object Analysis {
 
     fun run(
         health: List<HealthDay>, sessions: List<Session>, meals: Map<LocalDate, List<MealEntry>>,
-        weights: List<WeightEntry>, today: LocalDate, zone: ZoneId, goalKgPerWeek: Double = 0.25,
+        weights: List<WeightEntry>, today: LocalDate, zone: ZoneId, goalKgPerWeek: Double = 0.0,
     ): Result {
         val vol = volumeByDay(sessions, zone)
         val gymDays = vol.filterKeys { it >= today.minusDays(28) && it < today }.values.filter { it.second > 0 }
@@ -379,7 +383,7 @@ object Analysis {
         val effects = effects(habits, recMap)
 
         val nutrition = nutrition(meals, healthMap, today, lastKg)
-        val weight = weight(weights, today)
+        val weight = weight(weights, today, goalKgPerWeek)
 
         // headline
         val head = ArrayList<String>()

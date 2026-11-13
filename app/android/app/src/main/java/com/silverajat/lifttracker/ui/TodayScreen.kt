@@ -260,27 +260,6 @@ fun TodayContent(
             }
         }
 
-        a?.effects?.takeIf { it.isNotEmpty() }?.let { effects ->
-            section("What moves your recovery") {
-                Card(Modifier.fillMaxWidth()) {
-                    Column {
-                        effects.take(6).forEachIndexed { i, e ->
-                            if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(e.habit, style = MaterialTheme.typography.titleSmall)
-                                    Text(if (e.clear) "Clear pattern over ${e.nWith + e.nWithout} days" else "Early signal, ${e.nWith + e.nWithout} days",
-                                        style = MaterialTheme.typography.bodySmall, color = C.Muted)
-                                }
-                                Text("${if (e.delta >= 0) "+" else ""}${e.delta.roundToInt()}", style = MaterialTheme.typography.headlineSmall.merge(Tnum),
-                                    color = if (!e.clear) C.Muted else if (e.delta >= 0) Recover else RedZ)
-                            }
-                        }
-                    }
-                }
-                Note("Next-morning recovery on days with it versus without.")
-            }
-        }
     }
 }
 

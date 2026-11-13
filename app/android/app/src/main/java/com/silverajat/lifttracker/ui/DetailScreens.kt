@@ -196,6 +196,19 @@ fun RecoveryDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Uni
                 Axis(ds.firstOrNull()?.date)
             }
         }
+        a?.effects?.takeIf { it.isNotEmpty() }?.let { effects ->
+            block("What moves your recovery", "Your next-morning recovery on days you did each thing versus days you didn't. " +
+                "Early signals become clear patterns after a few weeks of both kinds of day.") {
+                Column {
+                    effects.take(6).forEachIndexed { i, e ->
+                        if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
+                        Kv(e.habit, "${if (e.delta >= 0) "+" else ""}${e.delta.roundToInt()}",
+                            if (e.clear) "clear pattern, ${e.nWith + e.nWithout} days" else "early signal, ${e.nWith + e.nWithout} days",
+                            if (!e.clear) C.Muted else if (e.delta >= 0) Recover else RedZ)
+                    }
+                }
+            }
+        }
         val hd = days.takeLast(30)
         val hrv = hd.map { it.hrvMs }
         block("Heart rate variability", "Higher than your normal (the shaded band) usually means well recovered. Measured while you sleep.") {
