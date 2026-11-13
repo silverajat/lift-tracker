@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -269,6 +270,12 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
     var minute by remember { mutableStateOf(t.minute) }
     var picking by remember { mutableStateOf(false) }
     var portion by remember { mutableStateOf(e.portion) }
+    // weighed foods: grams/ml per ingredient instead of a portion
+    val parts = e.foodId?.let { Foods.base(it) }?.let { Foods.withAmounts(it, e.amounts.ifEmpty { null }) }
+    val amountText = remember { mutableStateMapOf<String, String>().apply {
+        parts?.amounts?.forEach { (k, v) -> put(k, if (v == Math.floor(v)) "%.0f".format(v) else v.toString()) } } }
+    var usual by remember { mutableStateOf(true) }
+    val amounts = parts?.parts?.associate { p -> p.key to (amountText[p.key]?.toDoubleOrNull() ?: p.default) }
     if (picking) TimeDialog(hour, minute, onDismiss = { picking = false }) { h, m -> hour = h; minute = m; picking = false }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -282,10 +289,25 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(C.Raised).clickable { picking = true }
                             .padding(horizontal = 14.dp, vertical = 6.dp))
                 }
-                Text("Portion", color = C.Muted)
-                FlowRowCompat(spacing = 6.dp) {
-                    listOf(0.5, 0.75, 1.0, 1.25, 1.5, 2.0).forEach { p ->
-                        Tag("×${fmtPortion(p)}", color = if (p == portion) C.Accent else C.Text, modifier = Modifier.clickable { portion = p })
+                if (parts != null && parts.parts.isNotEmpty()) {
+                    parts.parts.forEach { p ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(p.label, modifier = Modifier.weight(1f))
+                            NumField(p.unit, amountText[p.key] ?: "", { amountText[p.key] = it.filter { c -> c.isDigit() || c == '.' } },
+                                Modifier.width(96.dp))
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { usual = !usual }) {
+                        androidx.compose.material3.Checkbox(usual, { usual = it },
+                            colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = C.Accent, uncheckedColor = C.Muted, checkmarkColor = C.OnAccent))
+                        Text("Make this my usual", color = C.Text)
+                    }
+                } else {
+                    Text("Portion", color = C.Muted)
+                    FlowRowCompat(spacing = 6.dp) {
+                        listOf(0.5, 0.75, 1.0, 1.25, 1.5, 2.0).forEach { p ->
+                            Tag("×${fmtPortion(p)}", color = if (p == portion) C.Accent else C.Text, modifier = Modifier.clickable { portion = p })
+                        }
                     }
                 }
             }
@@ -293,7 +315,9 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
         confirmButton = {
             TextButton(onClick = {
                 hub.setTime(e, hour, minute)
-                if (portion != e.portion) hub.setPortion(e.copy(timeMs = e.date.atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()), portion)
+                if (amounts != null && amounts.isNotEmpty() && (amounts != parts?.amounts || usual))
+                    hub.setAmounts(e.copy(timeMs = e.date.atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()), amounts, usual)
+                else if (portion != e.portion) hub.setPortion(e.copy(timeMs = e.date.atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()), portion)
                 onDismiss()
             }) { Text("Save", color = C.Accent, fontWeight = FontWeight.Bold) }
         },

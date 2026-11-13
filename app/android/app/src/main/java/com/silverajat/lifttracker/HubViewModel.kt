@@ -17,6 +17,7 @@ import com.silverajat.lifttracker.insights.Insight
 import com.silverajat.lifttracker.insights.InsightEngine
 import com.silverajat.lifttracker.insights.InsightStore
 import com.silverajat.lifttracker.meals.Food
+import com.silverajat.lifttracker.meals.Foods
 import com.silverajat.lifttracker.meals.Macros
 import com.silverajat.lifttracker.meals.MealEntry
 import com.silverajat.lifttracker.meals.MealStore
@@ -217,7 +218,16 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         val d = _date.value
         val t = timeMs ?: if (d == LocalDate.now(zone)) System.currentTimeMillis()
             else d.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
-        meals.add(MealEntry(MealStore.newId(), d, slot, food.id, food.name, food.macros, t))
+        meals.add(MealEntry(MealStore.newId(), d, slot, food.id, food.name, food.macros, t, amounts = food.amounts))
+        reloadMeals()
+    }
+
+    /** Change the grams/ml of a logged food; [usual] also makes them the default from now on. */
+    fun setAmounts(e: MealEntry, amounts: Map<String, Double>, usual: Boolean) {
+        val base = e.foodId?.let { Foods.base(it) } ?: return
+        val f = Foods.withAmounts(base, amounts)
+        meals.update(e.copy(name = f.name, macros = f.macros * e.portion, amounts = f.amounts))
+        if (usual) meals.setUsual(base.id, f.amounts)
         reloadMeals()
     }
 

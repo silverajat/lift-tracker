@@ -20,10 +20,52 @@ data class Macros(val kcal: Double, val protein: Double, val carbs: Double, val 
     }
 }
 
-data class Food(val id: String, val name: String, val macros: Macros, val note: String = "")
+/** A weighed ingredient: [per] is the macros for one gram or ml. */
+data class Part(val key: String, val label: String, val unit: String, val default: Double, val per: Macros)
+
+/** [parts] = the amounts you can change (grams/ml); [amounts] = what this one has. */
+data class Food(val id: String, val name: String, val macros: Macros, val note: String = "",
+                val parts: List<Part> = emptyList(), val amounts: Map<String, Double> = emptyMap())
 
 object Foods {
-    val all: List<Food> = listOf(
+    private fun per(m: Macros, amount: Double) = m * (1.0 / amount)
+    private fun one(key: String, label: String, unit: String, amount: Double, m: Macros) = listOf(Part(key, label, unit, amount, per(m, amount)))
+
+    /** Things you weigh or measure, and their ingredients. */
+    private val weighed: Map<String, List<Part>> = mapOf(
+        // ON Gold Standard Whey ~120 kcal / 31 g scoop; milks from the plan's shake totals
+        "shake" to listOf(
+            Part("whey", "Whey (ON Gold Standard)", "g", 32.0, Macros(3.87, 0.774, 0.10, 0.048)),
+            Part("creatine", "Creatine", "g", 3.0, Macros.ZERO),
+            Part("hl", "Marigold HL milk", "ml", 100.0, Macros(0.48, 0.036, 0.050, 0.015)),
+            Part("soy", "NutriSoy no sugar", "ml", 100.0, Macros(0.45, 0.060, 0.011, 0.019, 0.005)),
+        ),
+        "coconut_water" to one("ml", "Coconut water", "ml", 250.0, Macros(48.0, 0.5, 11.0, 0.0)),
+        "honey20" to one("g", "Honey", "g", 20.0, Macros(61.0, 0.1, 16.5, 0.0)),
+        "honey10" to one("g", "Honey", "g", 10.0, Macros(30.0, 0.0, 8.2, 0.0)),
+        "mayvers10" to one("g", "Mayver's", "g", 10.0, Macros(62.0, 2.4, 2.2, 5.0, 0.8)),
+        "clusters" to one("g", "Protein clusters", "g", 50.0, Macros(215.0, 10.0, 28.0, 7.0, 4.0)),
+        "yoghurt" to one("g", "Yoghurt", "g", 125.0, Macros(105.0, 5.5, 20.0, 0.2)),
+        "blueberries" to one("g", "Blueberries", "g", 125.0, Macros(71.0, 0.9, 18.0, 0.4, 3.0)),
+        "psyllium" to one("g", "Psyllium husk", "g", 5.0, Macros(15.0, 0.1, 4.5, 0.0, 4.0)),
+    )
+
+    /** Your usual amounts (food id -> part -> amount), loaded from the meal store. */
+    @Volatile var usual: Map<String, Map<String, Double>> = emptyMap()
+
+    /** [f] with these amounts: macros and name worked out from the grams. */
+    fun withAmounts(f: Food, amounts: Map<String, Double>?): Food {
+        val parts = weighed[f.id] ?: return f
+        val a = parts.associate { it.key to (amounts?.get(it.key) ?: it.default) }
+        val m = parts.fold(Macros.ZERO) { acc, p -> acc + p.per * a.getValue(p.key) }
+        fun n(v: Double) = if (v == Math.floor(v)) "%.0f".format(v) else "%.1f".format(v)
+        val name = if (f.id == "shake")
+            "Whey ${n(a.getValue("whey"))} g + creatine ${n(a.getValue("creatine"))} g, ${n(a.getValue("hl"))} ml HL milk + ${n(a.getValue("soy"))} ml NutriSoy"
+            else f.name.substringBeforeLast(",") + ", ${n(a.values.first())} ${parts.first().unit}"
+        return f.copy(name = name, macros = m, parts = parts, amounts = a)
+    }
+
+    private val base: List<Food> = listOf(
         Food("coconut_water", "UFC Refresh coconut water, 250 ml", Macros(48.0, 0.5, 11.0, 0.0)),
         Food("bread", "FairPrice Enriched White Bread, 1 slice", Macros(72.0, 2.5, 13.5, 0.9, 0.7)),
         Food("honey20", "Honey, 20 g", Macros(61.0, 0.1, 16.5, 0.0)),
@@ -55,9 +97,13 @@ object Foods {
         Food("meiji", "Meiji protein drink (30 g protein)", Macros(170.0, 30.0, 10.0, 1.5), "estimate"),
         Food("konjac", "Konjac jelly", Macros(15.0, 0.0, 4.0, 0.0, 0.5)),
     )
-    private val byId = all.associateBy { it.id }
-    fun get(id: String): Food = byId.getValue(id)
-    fun find(id: String): Food? = byId[id]
+    private val byId = base.associateBy { it.id }
+    val all: List<Food> get() = base.map { withAmounts(it, usual[it.id]) }
+    /** The food with your usual amounts. */
+    fun get(id: String): Food = withAmounts(byId.getValue(id), usual[id])
+    fun find(id: String): Food? = byId[id]?.let { withAmounts(it, usual[id]) }
+    /** The food as listed (no amounts applied). */
+    fun base(id: String): Food? = byId[id]
 }
 
 /** Parts of the day, in order. */
@@ -142,7 +188,7 @@ object MealPlan {
     fun describe(): String = """
         Daily targets: protein 120-125 g, fat ~60-70 g. Activity: average 3,000 kcal burned/day (tracker estimate), Google Health Cardio Load target 800, walk 15 min after every meal. Plan review date: ${Targets.reviewDate}.
         Breakfast (pre-workout): 250 ml UFC Refresh coconut water on waking, 1 slice FairPrice Enriched White Bread, 20 g honey, 1 banana, caffeine pill 200 mg.
-        Post-workout: 29 g Optimum Nutrition Gold Standard Whey (Mocha Cappuccino) + 3 g creatine in 100 ml Marigold HL Green + 100 ml NutriSoy No Sugar Added (~32 g protein, ~4.8 g fat). Measure everything.
+        Post-workout: ${Foods.get("shake").amounts["whey"]?.toInt() ?: 32} g Optimum Nutrition Gold Standard Whey (Mocha Cappuccino) + 3 g creatine in 100 ml Marigold HL Green + 100 ml NutriSoy No Sugar Added (~32 g protein, ~4.8 g fat). Measure everything.
         Mains: (1) Salad bowl: citrus-lime chicken breast, Japanese roasted sesame dressing (ask for less), brown rice + broccoli, chickpeas + edamame + egg (carrot instead of egg on Tue/Thu). (2) Steamed chicken rice set + extra skinless chicken (ask for breast), extra rice, bok choy, half a boiled egg. (3) Mixed rice: rice, 2 portions curry chicken, tofu, egg, cabbage or broccoli.
         Rotation: Mon-Fri salad + chicken rice; Sat and Sun chicken rice + mixed rice. Salad is usually weekday lunch and should be early (shop may close); chicken rice can be lunch or dinner; order flexible.
         Afternoon snack: 1 slice bread, 10 g Mayver's Chocolate Hazelnut Peanut Butter, 10 g honey.

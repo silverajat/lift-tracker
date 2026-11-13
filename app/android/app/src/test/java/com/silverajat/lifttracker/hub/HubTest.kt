@@ -101,6 +101,25 @@ class HubTest {
         assertNotNull(r2.nutrition)
     }
 
+    @Test fun weighedFoodsFollowGrams() {
+        val base = com.silverajat.lifttracker.meals.Foods.base("shake")!!
+        val old = com.silverajat.lifttracker.meals.Foods.withAmounts(base, mapOf("whey" to 29.0, "creatine" to 3.0, "hl" to 100.0, "soy" to 100.0))
+        assertEquals(205.0, old.macros.kcal, 3.0)
+        val usual = com.silverajat.lifttracker.meals.Foods.withAmounts(base, null)
+        assertTrue(usual.name, usual.name.startsWith("Whey 32 g + creatine 3 g"))
+        assertTrue(usual.macros.kcal > old.macros.kcal)
+        val honey = com.silverajat.lifttracker.meals.Foods.withAmounts(com.silverajat.lifttracker.meals.Foods.base("honey20")!!, mapOf("g" to 30.0))
+        assertEquals("Honey, 30 g", honey.name)
+        assertEquals(91.5, honey.macros.kcal, 0.5)
+        // usual amounts are saved and come back
+        val dir = java.nio.file.Files.createTempDirectory("meals").toFile()
+        val store = com.silverajat.lifttracker.meals.MealStore(dir)
+        store.setUsual("shake", mapOf("whey" to 35.0, "creatine" to 3.0, "hl" to 100.0, "soy" to 100.0))
+        com.silverajat.lifttracker.meals.MealStore(dir)
+        assertEquals(35.0, com.silverajat.lifttracker.meals.Foods.get("shake").amounts["whey"]!!, 0.01)
+        com.silverajat.lifttracker.meals.Foods.usual = emptyMap()
+    }
+
     @Test fun muscularLoadHeavierScoresMore() {
         val t0 = 1_760_000_000_000L
         fun set(w: Double, reps: Int, drop: Int?, i: Int) = com.silverajat.lifttracker.data.SetLog(1, i, w, 0, reps, false, t0 + i * 60_000L, t0 + i * 60_000L + 40_000, null, null, speedDrop = drop)

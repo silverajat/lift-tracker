@@ -18,6 +18,7 @@ data class MealEntry(
     val macros: Macros,       // for the portion eaten
     val timeMs: Long,
     val portion: Double = 1.0,
+    val amounts: Map<String, Double> = emptyMap(),   // grams/ml per ingredient, for weighed foods
 )
 
 data class WeightEntry(val date: LocalDate, val kg: Double, val timeMs: Long)
@@ -32,6 +33,21 @@ data class WeekAverage(val weekStart: LocalDate, val avgKg: Double, val days: In
 class MealStore(root: File) {
     private val dir = File(root, "meals").apply { mkdirs() }
     private val weightFile = File(root, "weights.json")
+    private val usualFile = File(root, "usual_amounts.json")
+
+    init { Foods.usual = usual() }
+
+    /** Your usual grams/ml for weighed foods (food id -> ingredient -> amount). */
+    fun usual(): Map<String, Map<String, Double>> = runCatching {
+        val o = JSONObject(usualFile.readText())
+        o.keys().asSequence().associateWith { id -> o.getJSONObject(id).let { a -> a.keys().asSequence().associateWith { a.getDouble(it) } } }
+    }.getOrDefault(emptyMap())
+
+    fun setUsual(foodId: String, amounts: Map<String, Double>) {
+        val all = usual() + (foodId to amounts)
+        runCatching { usualFile.writeText(JSONObject(all.mapValues { JSONObject(it.value) }).toString()) }
+        Foods.usual = all
+    }
 
     private fun file(d: LocalDate) = File(dir, "$d.json")
 
@@ -107,6 +123,7 @@ class MealStore(root: File) {
             put("foodId", e.foodId ?: JSONObject.NULL); put("name", e.name)
             put("kcal", e.macros.kcal); put("protein", e.macros.protein); put("carbs", e.macros.carbs)
             put("fat", e.macros.fat); put("fibre", e.macros.fibre); put("timeMs", e.timeMs); put("portion", e.portion)
+            if (e.amounts.isNotEmpty()) put("amounts", JSONObject(e.amounts))
         }
 
         private fun fromJson(o: JSONObject) = MealEntry(
@@ -119,6 +136,7 @@ class MealStore(root: File) {
                 o.getDouble("fat"), o.optDouble("fibre", 0.0)),
             timeMs = o.getLong("timeMs"),
             portion = o.optDouble("portion", 1.0),
+            amounts = o.optJSONObject("amounts")?.let { a -> a.keys().asSequence().associateWith { a.getDouble(it) } } ?: emptyMap(),
         )
     }
 }
