@@ -591,7 +591,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     s.sets.filter { it.liveReps != null }.mapNotNull { l ->
                         val d = raw.load(s.id, l.exerciseId, l.setNo) ?: return@mapNotNull null
                         val oneArm = Routines.isOneArm(l.exerciseId)
-                        val t = RepCounter.trimTail(d, hz, CounterParams(), oneArm)
+                        val t = RepCounter.trimTail(d, hz, com.silverajat.lifttracker.reps.CounterParams(), oneArm)
                         val cut = if (oneArm) t.slice(RepEngine.lastBout(t, hz)) else t
                         if (cut.size < hz) null
                         else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps)
