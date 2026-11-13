@@ -107,6 +107,9 @@ object Routines {
         25 to Group.CORE, 26 to Group.LEGS, 27 to Group.LEGS, 28 to Group.LEGS, 29 to Group.BACK,
     )
 
+    /** Rest after a warm-up set (they're light). */
+    const val WARMUP_REST_S = 60
+
     fun restSeconds(ex: Exercise) = when (ex.id) {
         in big -> 180
         in arms -> 90

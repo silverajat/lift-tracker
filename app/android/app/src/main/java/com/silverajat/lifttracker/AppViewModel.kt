@@ -532,7 +532,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _analysis.value = null
         _phase.value = Phase.READY
         _nextUp.value = nextSet(set.exerciseId)
-        startRest(Routines.restSeconds(Routines.byId(set.exerciseId)))
+        startRest(if (log.warmup) Routines.WARMUP_REST_S else Routines.restSeconds(Routines.byId(set.exerciseId)))
         retrain()
     }
 

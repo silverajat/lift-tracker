@@ -286,7 +286,7 @@ private fun ExerciseCard(
                 Text(
                     listOfNotNull(group.label, ex.detail.ifEmpty { null },
                         if (Routines.isOneArm(ex)) "one arm at a time" else null,
-                        "rest ${clock(Routines.restSeconds(ex) * 1000L)}").joinToString(" · "),
+                        "rest ${clock(Routines.restSeconds(ex) * 1000L)} (warm-up 1:00)").joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                 )
             }
