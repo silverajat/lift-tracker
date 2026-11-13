@@ -41,7 +41,7 @@ Top view of the board (x 0–41, y 0–18 mm):
 | Battery | **301120 LiPo, 40 mAh, with protection board** | Datasheet max 3.0 × 11.0 × 20.5 mm. Has its own DW01 + 8205 protection, so none on our board |
 | Button | **None** | Tap gestures from the IMU |
 | Heart rate | **None** | HR comes from the Fitbit into the merged app |
-| Features | Rep tracking, ROM/quality, buzz alerts, sleep alarm | Firmware on the same IMU + motor |
+| Features | Rep tracking, ROM/quality, buzz alerts (rest over, next set) | Worn only for gym sessions; sleep, steps and alarms stay on the Fitbit |
 
 ## Circuit
 
@@ -104,9 +104,10 @@ P0.00/P0.01 are the 32 kHz crystal pins, used here as GPIO, so the firmware must
 | State | Current | Per day |
 |---|---|---|
 | Gym session (IMU 100 Hz + BLE stream), 1.5 h | ~2 mA | ~3 mAh |
-| Idle on wrist (IMU wake-on-motion, slow advertising) | ~20–40 µA | ~0.6 mAh |
-| Night (sleep alarm: 1 Hz actigraphy) | ~30–50 µA | ~0.4 mAh |
-| **Total with daily gym** | | **~4–5 mAh/day → ~5–6 days with margin** |
+| Off the wrist the rest of the day (IMU wake-on-motion, no advertising) | ~10–15 µA | ~0.3 mAh |
+| **Total with daily gym** | | **~3.5 mAh/day → ~10 days with margin** |
+
+Worn only at the gym: no sleep tracking or alarm (the Fitbit does those). After ~20 min without motion the pod stops advertising and waits for the IMU's wake-on-motion; picking it up wakes it.
 
 ## Firmware changes for v2
 
@@ -116,7 +117,7 @@ P0.00/P0.01 are the 32 kHz crystal pins, used here as GPIO, so the firmware must
 - Charger detection from CHG_STAT (GPIO sense) instead of VBUS.
 - MCUboot + mcumgr over BLE for updates; recording dump over BLE.
 - Low power: IMU any-motion wake; the phone re-syncs the time on every connection.
-- Tap gestures, buzz alerts, sleep alarm.
+- Tap gestures and buzz alerts. No sleep alarm: the pod is worn only for gym sessions.
 
 ## Assembly
 

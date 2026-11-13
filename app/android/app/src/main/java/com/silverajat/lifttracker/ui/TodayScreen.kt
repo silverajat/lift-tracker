@@ -104,7 +104,7 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
                     name = "Pod",
                     ok = conn == PodConn.READY,
                     sub = if (conn == PodConn.READY) (status?.let { "${it.batteryPct}%" + if (it.charging) " · charging" else "" } ?: "connected")
-                        else "tap to connect",
+                        else "for the gym",
                     onClick = onConnectPod,
                 )
             }

@@ -13,6 +13,9 @@ import com.silverajat.lifttracker.health.HealthDay
 import com.silverajat.lifttracker.health.HealthRepo
 import com.silverajat.lifttracker.health.Analysis
 import com.silverajat.lifttracker.health.Scores
+import com.silverajat.lifttracker.insights.Insight
+import com.silverajat.lifttracker.insights.InsightEngine
+import com.silverajat.lifttracker.insights.InsightStore
 import com.silverajat.lifttracker.meals.Food
 import com.silverajat.lifttracker.meals.Macros
 import com.silverajat.lifttracker.meals.MealEntry
@@ -79,6 +82,31 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             _syncedAt.value = System.currentTimeMillis()
             _healthState.value = HealthState.OK
             refreshWalks()
+            checkInsights()
+        }
+    }
+
+    // ---- insights (notifications) -------------------------------------------------------
+    private val insightStore = InsightStore(app.filesDir)
+    private val _insights = MutableStateFlow(insightStore.all())
+    val insights: StateFlow<List<Insight>> = _insights
+    private val _notifyOn = MutableStateFlow(prefs.getBoolean(InsightEngine.NOTIFY_ON, true))
+    val notifyOn: StateFlow<Boolean> = _notifyOn
+    private val _checking = MutableStateFlow(false)
+    val checking: StateFlow<Boolean> = _checking
+
+    fun setNotifyOn(on: Boolean) { _notifyOn.value = on; prefs.edit().putBoolean(InsightEngine.NOTIFY_ON, on).apply() }
+
+    fun reloadInsights() { _insights.value = insightStore.all() }
+
+    /** Send anything that's due (the app opening counts as a check). [force]: a fresh morning summary now. */
+    fun checkInsights(force: Boolean = false) {
+        if (_checking.value) return
+        _checking.value = true
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { InsightEngine.run(getApplication(), force) } }
+            reloadInsights()
+            _checking.value = false
         }
     }
 

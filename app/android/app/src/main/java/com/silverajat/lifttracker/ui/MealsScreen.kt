@@ -308,7 +308,7 @@ private fun CustomDialog(slot: Slot, onDismiss: () -> Unit, onSave: (String, Mac
                     NumField("carbs g", c, { c = it }, Modifier.weight(1f))
                     NumField("fat g", f, { f = it }, Modifier.weight(1f))
                 }
-                Text("Don't know the numbers? Log a rough kcal, or ask the coach in Chat to estimate.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                Text("Don't know the numbers? Log a rough kcal, or ask Claude in Insights → Brainstorm to estimate.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
             }
         },
         confirmButton = {

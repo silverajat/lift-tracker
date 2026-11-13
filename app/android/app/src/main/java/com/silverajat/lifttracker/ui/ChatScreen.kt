@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -56,16 +57,16 @@ import com.silverajat.lifttracker.chat.Claude
 import kotlinx.coroutines.launch
 
 private val suggestions = listOf(
-    "How am I recovering this week, and what should today look like?",
-    "What should I eat for the rest of today to hit protein?",
-    "Am I on track to lose weight this week?",
-    "Which lifts are stalling, and what should I change?",
-    "What's been hurting my sleep?",
+    "My weight has been flat: how should I change the plan to gain ~0.25 kg a week?",
+    "Swap the mixed rice for something with less fat but the same protein.",
+    "Give me 3 cheaper hawker options that fit my lunch macros.",
+    "Should I move the shake or the yoghurt bowl on rest days?",
+    "Rewrite my whole plan with ~2,900 kcal and 125 g protein.",
 )
 
 /** Chat with Claude, with everything the app knows attached to every message. */
 @Composable
-fun ChatScreen(hub: HubViewModel) {
+fun ChatScreen(hub: HubViewModel, onBack: () -> Unit) {
     val chat by hub.chat.collectAsStateWithLifecycle()
     val sending by hub.sending.collectAsStateWithLifecycle()
     val error by hub.chatError.collectAsStateWithLifecycle()
@@ -78,10 +79,11 @@ fun ChatScreen(hub: HubViewModel) {
     if (settings) SettingsDialog(hub) { settings = false }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = C.Text) }
             Column(Modifier.weight(1f)) {
-                Text("Coach", style = MaterialTheme.typography.headlineMedium)
-                Text("Claude, with your gym, Fitbit, food and weight data", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                Text("Meal plan brainstorm", style = MaterialTheme.typography.titleLarge)
+                Text("Claude, with your food, weight, gym and Fitbit data", style = MaterialTheme.typography.labelMedium, color = C.Muted)
             }
             if (chat.isNotEmpty()) TextButton(onClick = { hub.clearChat() }) { Text("New chat", color = C.Muted) }
             IconButton(onClick = { settings = true }) { Icon(Icons.Filled.Settings, "Chat settings", tint = C.Muted) }
@@ -182,7 +184,7 @@ private fun SettingsDialog(hub: HubViewModel, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Surface,
-        title = { Text("Coach settings") },
+        title = { Text("Brainstorm settings") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(k, { k = it }, label = { Text("Anthropic API key") }, singleLine = true,

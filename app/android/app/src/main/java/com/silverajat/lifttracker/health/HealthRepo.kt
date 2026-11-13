@@ -46,6 +46,12 @@ class HealthRepo(private val context: Context) {
         HealthPermission.getReadPermission(RespiratoryRateRecord::class),
     )
 
+    /** Lets the hourly check read new data while the app is closed (Android 14+). */
+    val backgroundPermission = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+
+    /** What the "Connect" button asks for. */
+    val requested: Set<String> get() = permissions + backgroundPermission
+
     fun available(): Boolean = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
     private val client by lazy { HealthConnectClient.getOrCreate(context) }
@@ -152,6 +158,35 @@ class HealthRepo(private val context: Context) {
         return runCatching {
             client.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), TimeRangeFilter.between(from, to)))[StepsRecord.COUNT_TOTAL] ?: 0L
         }.getOrNull()
+    }
+
+    /** Workouts (Fitbit exercise sessions) that ended between [from] and [to]. */
+    suspend fun workouts(from: Instant, to: Instant): List<Workout> {
+        if (HealthPermission.getReadPermission(ExerciseSessionRecord::class) !in granted()) return emptyList()
+        return runCatching {
+            readAll(ExerciseSessionRecord::class, from.minus(Duration.ofHours(4)), to)
+                .filter { it.endTime >= from && it.endTime <= to }
+                .map { Workout(it.startTime, it.endTime, exerciseName(it.exerciseType), it.title) }
+        }.getOrDefault(emptyList())
+    }
+
+    /** Heart rate, steps and calories during a window. */
+    suspend fun activityStats(from: Instant, to: Instant): com.silverajat.lifttracker.insights.ActivityStats {
+        val g = granted()
+        val metrics = buildSet {
+            if (HealthPermission.getReadPermission(HeartRateRecord::class) in g) { add(HeartRateRecord.BPM_AVG); add(HeartRateRecord.BPM_MAX) }
+            if (HealthPermission.getReadPermission(StepsRecord::class) in g) add(StepsRecord.COUNT_TOTAL)
+            if (HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class) in g) add(TotalCaloriesBurnedRecord.ENERGY_TOTAL)
+        }
+        if (metrics.isEmpty()) return com.silverajat.lifttracker.insights.ActivityStats(null, null, null, null)
+        val r = runCatching { client.aggregate(AggregateRequest(metrics, TimeRangeFilter.between(from, to))) }.getOrNull()
+            ?: return com.silverajat.lifttracker.insights.ActivityStats(null, null, null, null)
+        return com.silverajat.lifttracker.insights.ActivityStats(
+            steps = r[StepsRecord.COUNT_TOTAL],
+            avgHr = r[HeartRateRecord.BPM_AVG]?.toInt(),
+            maxHr = r[HeartRateRecord.BPM_MAX]?.toInt(),
+            kcal = r[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories,
+        )
     }
 
     /** Weights logged in Google Health (e.g. from a smart scale), newest last. */

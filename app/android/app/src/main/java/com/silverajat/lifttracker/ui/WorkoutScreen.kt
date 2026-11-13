@@ -527,12 +527,24 @@ private fun BottomPanel(
         when (phase) {
             Phase.COUNTDOWN -> {
                 val endsAt by vm.countdownEndsAt.collectAsStateWithLifecycle()
-                val left = (((endsAt ?: now) - now + 999) / 1000).coerceIn(1, 3)
+                val total by vm.countdownSeconds.collectAsStateWithLifecycle()
+                val left = (((endsAt ?: now) - now + 999) / 1000).coerceIn(1, total.toLong())
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("${ex?.name ?: ""} · set ${active?.setNo ?: ""}",
                             style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("Get into position…", style = MaterialTheme.typography.bodyLarge, color = C.Muted)
+                        if (active?.auto == true) {
+                            Text("Next set starts by itself" + if (active.warmup) " · warm-up" else "",
+                                style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { vm.adjustPending(-2.5) }) { Text("−2.5", color = C.Text, fontWeight = FontWeight.Bold) }
+                                Text(compact(active.weight, active.addons, null, ex?.bodyweight == true) + " kg",
+                                    style = MaterialTheme.typography.titleMedium.merge(Tnum))
+                                TextButton(onClick = { vm.adjustPending(2.5) }) { Text("+2.5", color = C.Text, fontWeight = FontWeight.Bold) }
+                            }
+                        } else {
+                            Text("Get into position…", style = MaterialTheme.typography.bodyLarge, color = C.Muted)
+                        }
                         Row {
                             TextButton(onClick = { vm.cancelCountdown() }) { Text("Cancel", color = C.Muted) }
                             TextButton(onClick = { vm.goNow() }) { Text("Go now", color = C.Accent, fontWeight = FontWeight.Bold) }
@@ -547,6 +559,7 @@ private fun BottomPanel(
                 }
             }
             Phase.LIFTING -> {
+                val paused by vm.paused.collectAsStateWithLifecycle()
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("${ex?.name ?: ""} · set ${active?.setNo ?: ""}",
@@ -555,7 +568,7 @@ private fun BottomPanel(
                             (active?.let { compact(it.weight, it.addons, null, ex?.bodyweight == true) + " kg" } ?: "") +
                                 (if (active?.calibration == true) " · calibration: slow, full stretch"
                                 else if (active?.warmup == true) " · warm-up" else "") +
-                                "  ·  " + elapsed(now - (active?.startMs ?: now)),
+                                "  ·  " + elapsed(now - (active?.startMs ?: now) - vm.pausedMs(now)),
                             style = MaterialTheme.typography.bodyLarge.merge(Tnum), color = C.Muted,
                         )
                         if (podReady) {
@@ -571,11 +584,24 @@ private fun BottomPanel(
                             Text("Pod not connected: count yourself", style = MaterialTheme.typography.bodyMedium,
                                 color = C.Warm, modifier = Modifier.padding(top = 8.dp))
                         }
+                        if (paused) Text("Paused: not counting. Resume when you're back in the set.",
+                            style = MaterialTheme.typography.bodyMedium, color = C.Warm)
                     }
-                    Box(
-                        Modifier.size(108.dp).clip(CircleShape).background(C.Stop).clickable { vm.stopSet() },
-                        contentAlignment = Alignment.Center,
-                    ) { Text("STOP", style = MaterialTheme.typography.headlineMedium, color = Color.White) }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(
+                            Modifier.size(108.dp).clip(CircleShape).background(C.Stop).clickable { vm.stopSet() },
+                            contentAlignment = Alignment.Center,
+                        ) { Text("STOP", style = MaterialTheme.typography.headlineMedium, color = Color.White) }
+                        Box(
+                            Modifier.size(width = 108.dp, height = 44.dp).clip(RoundedCornerShape(22.dp))
+                                .background(if (paused) C.Accent else C.Raised)
+                                .clickable { if (paused) vm.resumeSet() else vm.pauseSet() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(if (paused) "▶ RESUME" else "❚❚ PAUSE", style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold, color = if (paused) Color.White else C.Text)
+                        }
+                    }
                 }
             }
             Phase.CONFIRM -> {
@@ -616,6 +642,8 @@ private fun BottomPanel(
                 }
             }
             Phase.READY -> restEndsAt?.let { end ->
+                val next by vm.nextUp.collectAsStateWithLifecycle()
+                val auto by vm.autoNext.collectAsStateWithLifecycle()
                 val left = end - now
                 val doneRest = left <= 0
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -637,6 +665,10 @@ private fun BottomPanel(
                     Column(Modifier.weight(1f)) {
                         Text(if (doneRest) "Rest done: next set" else "Resting",
                             style = MaterialTheme.typography.titleMedium)
+                        Text(next?.let { "Next: ${it.ex.name} · set ${it.setNo} · " + compact(it.weight, it.addons, null, it.ex.bodyweight) + " kg" }
+                                ?: "All planned sets done: tap Finish",
+                            style = MaterialTheme.typography.bodyMedium, color = if (next != null) C.Text else C.Done,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(when {
                                 restS >= 180 -> "Big lift · ${clock(restS * 1000L)}"
                                 restS <= 90 -> "Arms · ${clock(restS * 1000L)}"
@@ -646,7 +678,12 @@ private fun BottomPanel(
                         Row {
                             TextButton(onClick = { vm.addRest(-15) }) { Text("−15", color = C.Text, fontWeight = FontWeight.Bold) }
                             TextButton(onClick = { vm.addRest(15) }) { Text("+15", color = C.Text, fontWeight = FontWeight.Bold) }
-                            TextButton(onClick = { vm.skipRest() }) { Text(if (doneRest) "Close" else "Skip", color = C.Muted) }
+                            TextButton(onClick = { if (doneRest || next == null) vm.closeRest() else vm.skipRest() }) {
+                                Text(if (doneRest || next == null) "Close" else "Skip", color = C.Muted)
+                            }
+                            TextButton(onClick = { vm.setAutoNext(!auto) }) {
+                                Text(if (auto) "Auto ✓" else "Auto off", color = if (auto) C.Accent else C.Muted)
+                            }
                         }
                     }
                 }

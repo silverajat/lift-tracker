@@ -56,7 +56,12 @@ data class ActiveSet(
     val podStarted: Boolean = false,
     val podRec: Int? = null,
     val calibration: Boolean = false,
+    /** Started by itself after rest (10 s countdown) rather than by tapping ▶. */
+    val auto: Boolean = false,
 )
+
+/** The set that comes after the rest: same exercise until its sets are done, then the next one. */
+data class NextSet(val ex: Exercise, val setNo: Int, val weight: Double, val addons: Int, val warmup: Boolean)
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val pod = PodClient(app, viewModelScope)
@@ -103,6 +108,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), System.currentTimeMillis())
 
     private val counter = RepCounter(PodProtocol.STREAM_HZ)
+
+    /** Pause during a set (someone bumps you, you re-rack): those samples aren't counted. */
+    private val _paused = MutableStateFlow(false)
+    val paused: StateFlow<Boolean> = _paused
+    /** Pieces of the set between pauses; each is counted on its own, then added up. */
+    private val segments = ArrayList<List<FloatArray>>()
+    private var segmentReps = 0
+    private var pausedTotalMs = 0L
+    private var pausedAt: Long? = null
+    /** Time spent paused in the current set (the set timer leaves it out). */
+    fun pausedMs(now: Long): Long = pausedTotalMs + (pausedAt?.let { now - it } ?: 0L)
+
+    /** After rest: 10 s countdown, then the next set starts by itself. */
+    private val _autoNext = MutableStateFlow(prefs.getBoolean("auto_next", true))
+    val autoNext: StateFlow<Boolean> = _autoNext
+    fun setAutoNext(on: Boolean) { _autoNext.value = on; prefs.edit().putBoolean("auto_next", on).apply() }
+    private val _nextUp = MutableStateFlow<NextSet?>(null)
+    val nextUp: StateFlow<NextSet?> = _nextUp
     private var restJob: Job? = null
     private var countJob: Job? = null
     private var collecting = false
@@ -128,7 +151,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (collecting && counter.add(s) && countJob?.isActive != true) {
                     countJob = viewModelScope.launch {
                         val n = withContext(Dispatchers.Default) { counter.countNow() }
-                        if (collecting) _liveReps.value = n
+                        if (collecting) _liveReps.value = segmentReps + n
                     }
                 }
             }
@@ -233,28 +256,76 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---- 3-2-1 countdown before a set (time to get into position) ----------
     private val _countdownEndsAt = MutableStateFlow<Long?>(null)
     val countdownEndsAt: StateFlow<Long?> = _countdownEndsAt
+    private val _countdownSeconds = MutableStateFlow(3)
+    val countdownSeconds: StateFlow<Int> = _countdownSeconds
     private var countdownJob: Job? = null
     private var pendingStart: (() -> Unit)? = null
 
     /** ▶ pressed: count down 3 s, then start the set (and the pod recording). */
-    fun requestSet(ex: Exercise, setNo: Int, weight: Double, addons: Int, warmup: Boolean, calibration: Boolean = false) {
+    fun requestSet(
+        ex: Exercise, setNo: Int, weight: Double, addons: Int, warmup: Boolean, calibration: Boolean = false,
+        countdownMs: Long = COUNTDOWN_MS, auto: Boolean = false,
+    ) {
         if (_phase.value != Phase.READY) return
         restJob?.cancel()
         _restEndsAt.value = null
-        pendingStart = { startSet(ex, setNo, weight, addons, warmup, calibration) }
+        // weight and add-ons are read when it starts: they can be changed during the countdown
+        pendingStart = {
+            val a = _active.value
+            startSet(ex, setNo, a?.weight ?: weight, a?.addons ?: addons, warmup, calibration)
+        }
         _active.value = ActiveSet(ex.id, setNo, weight, addons, warmup || calibration,
-            startMs = System.currentTimeMillis(), calibration = calibration)
+            startMs = System.currentTimeMillis(), calibration = calibration, auto = auto)
         _phase.value = Phase.COUNTDOWN
-        val end = System.currentTimeMillis() + COUNTDOWN_MS
+        val secs = (countdownMs / 1000).toInt()
+        _countdownSeconds.value = secs
+        val end = System.currentTimeMillis() + countdownMs
         _countdownEndsAt.value = end
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
-            for (left in (COUNTDOWN_MS / 1000).toInt() downTo 1) {
-                tick(40)
+            for (left in secs downTo 1) {
+                if (left <= 3 || left == secs) tick(40)
                 delay((end - System.currentTimeMillis()) - (left - 1) * 1000L)
             }
             goNow()
         }
+    }
+
+    /** Change the weight of the set that's counting down (auto-start carries the last set's weight). */
+    fun adjustPending(deltaKg: Double) {
+        if (_phase.value != Phase.COUNTDOWN) return
+        val a = _active.value ?: return
+        _active.value = a.copy(weight = (a.weight + deltaKg).coerceAtLeast(0.0))
+    }
+
+    /** What comes after [lastExId]'s set: the same exercise until its rows are done, then the next unfinished one. */
+    fun nextSet(lastExId: Int): NextSet? {
+        val s = _session.value ?: return null
+        val exs = Routines.forDay(s.day)
+        val i = exs.indexOfFirst { it.id == lastExId }.coerceAtLeast(0)
+        for (ex in exs.drop(i) + exs.take(i)) {
+            val plan = lastTime(ex)
+            val done = s.sets.filter { it.exerciseId == ex.id }
+            val rows = maxOf(plan.size, done.maxOfOrNull { it.setNo } ?: 0) + (_extraRows.value[ex.id] ?: 0)
+            val doneNos = done.map { it.setNo }.toSet()
+            val n = (1..rows).firstOrNull { it !in doneNos } ?: continue
+            val p = plan.getOrNull(n - 1) ?: plan.lastOrNull()
+            val warm = p?.warmup ?: false
+            // same weight as the working set you just did ("same sets throughout")
+            val prev = done.filter { !it.warmup && it.setNo < n }.maxByOrNull { it.setNo }
+            val (w, add) = if (!warm && prev != null) prev.weight to prev.addons else (p?.weight ?: 0.0) to (p?.addons ?: 0)
+            return NextSet(ex, n, w, add, warm)
+        }
+        return null
+    }
+
+    private fun autoStartNext() {
+        val n = _nextUp.value ?: return
+        if (!_autoNext.value || _phase.value != Phase.READY) return
+        // only with the workout on screen, so a set never records out of sight
+        val scr = _screen.value
+        if (scr !is Screen.Workout || scr.day != n.ex.day) return
+        requestSet(n.ex, n.setNo, n.weight, n.addons, n.warmup, countdownMs = AUTO_COUNTDOWN_MS, auto = true)
     }
 
     /** Skip the rest of the countdown. */
@@ -271,6 +342,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun cancelCountdown() {
         if (_phase.value != Phase.COUNTDOWN) return
         countdownJob?.cancel()
+        _nextUp.value = null
         _countdownEndsAt.value = null
         pendingStart = null
         _active.value = null
@@ -296,6 +368,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
         _active.value = set
         counter.reset(_model.value.params(ex.id), Routines.isOneArm(ex))
+        segments.clear()
+        segmentReps = 0
+        pausedTotalMs = 0
+        pausedAt = null
+        _paused.value = false
+        _nextUp.value = null
         _liveReps.value = 0
         collecting = true
         _phase.value = Phase.LIFTING
@@ -313,29 +391,79 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun stopSet() {
-        val set = _active.value ?: return
-        if (_phase.value != Phase.LIFTING || !collecting) return
+    /** Pause the set: stop counting until resume (the set timer stops too). */
+    fun pauseSet() {
+        if (_phase.value != Phase.LIFTING || _paused.value) return
         collecting = false
         countJob?.cancel()
-        _active.value = set.copy(endMs = System.currentTimeMillis())
-        val data = counter.snapshot()
-        setData = data
+        _paused.value = true
+        pausedAt = System.currentTimeMillis()
+        val seg = counter.snapshot()
+        segments += seg
         val p = counter.params
         val oneArm = counter.oneArm
         viewModelScope.launch {
-            // Final count and quality on the whole set. Warm-up and
+            val n = if (seg.size < PodProtocol.STREAM_HZ) 0
+                else withContext(Dispatchers.Default) { RepCounter.count(seg, PodProtocol.STREAM_HZ, p, oneArm) }
+            segmentReps += n
+            _liveReps.value = segmentReps
+        }
+    }
+
+    fun resumeSet() {
+        if (_phase.value != Phase.LIFTING || !_paused.value) return
+        pausedAt?.let { pausedTotalMs += System.currentTimeMillis() - it }
+        pausedAt = null
+        counter.reset(counter.params, counter.oneArm)
+        _paused.value = false
+        collecting = true
+    }
+
+    fun stopSet() {
+        val set = _active.value ?: return
+        if (_phase.value != Phase.LIFTING) return
+        collecting = false
+        countJob?.cancel()
+        if (!_paused.value) segments += counter.snapshot()
+        pausedAt?.let { pausedTotalMs += System.currentTimeMillis() - it }
+        pausedAt = null
+        _paused.value = false
+        _active.value = set.copy(endMs = System.currentTimeMillis())
+        val segs = segments.toList()
+        val data = segs.flatten()
+        // A set with a pause has a jump where the pause was: don't train on it.
+        setData = if (segs.size == 1) segs[0] else emptyList()
+        val p = counter.params
+        val oneArm = counter.oneArm
+        viewModelScope.launch {
+            // Final count and quality, each piece on its own. Warm-up and
             // calibration sets are the baseline, so they're scored on their own reps.
             val ref: (String) -> RomRef? = if (set.warmup) { _ -> null } else { u -> romRef(set.exerciseId, u) }
             val (n, a) = withContext(Dispatchers.Default) {
-                val a = RepCounter.analyze(data, PodProtocol.STREAM_HZ, p, oneArm, ref)
-                Pair(a?.reps ?: RepCounter.count(data, PodProtocol.STREAM_HZ, p, oneArm), a)
+                val hz = PodProtocol.STREAM_HZ
+                val parts = segs.filter { it.size >= hz }.map { seg ->
+                    val a = RepCounter.analyze(seg, hz, p, oneArm, ref)
+                    Triple(seg.size, a?.reps ?: RepCounter.count(seg, hz, p, oneArm), a)
+                }
+                Pair(parts.sumOf { it.second }, mergeAnalyses(parts.mapNotNull { it.third }))
             }
             if (data.isNotEmpty()) _liveReps.value = n
             _analysis.value = a
             _phase.value = Phase.CONFIRM
             sendStop(set)
         }
+    }
+
+    /** One analysis from the pieces of a paused set (reps in order; the longest piece's reference). */
+    private fun mergeAnalyses(list: List<SetAnalysis>): SetAnalysis? {
+        if (list.size <= 1) return list.firstOrNull()
+        val main = list.maxBy { it.perRep.size }
+        var k = 0
+        val reps = list.flatMap { a -> a.perRep.map { it.copy(rep = ++k) } }
+        return main.copy(
+            reps = list.sumOf { it.reps }, perRep = reps,
+            avgTempoS = list.map { it.avgTempoS }.average().toFloat(),
+        )
     }
 
     private fun sendStop(set: ActiveSet) {
@@ -388,12 +516,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _active.value = null
         _analysis.value = null
         _phase.value = Phase.READY
+        _nextUp.value = nextSet(set.exerciseId)
         startRest(Routines.restSeconds(Routines.byId(set.exerciseId)))
         retrain()
     }
 
     fun discardSet() {
         setData = emptyList()
+        segments.clear()
         _active.value = null
         _analysis.value = null
         _phase.value = Phase.READY
@@ -457,10 +587,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val done = s.copy(endMs = System.currentTimeMillis())
         if (done.sets.isEmpty()) store.delete(done.id) else store.save(done)
         _history.value = store.all()
+        if (done.sets.isNotEmpty()) {
+            val app = getApplication<Application>()
+            val hist = _history.value
+            viewModelScope.launch(Dispatchers.Default) {
+                runCatching {
+                    com.silverajat.lifttracker.insights.InsightEngine.post(app,
+                        com.silverajat.lifttracker.insights.Insights.workout(done, hist, java.time.ZoneId.systemDefault()))
+                }
+            }
+        }
         _session.value = null
         _extraRows.value = emptyMap()
         restJob?.cancel()
         _restEndsAt.value = null
+        _nextUp.value = null
         // The workout screen shows the "saved, share it?" dialog, then goes home.
     }
 
@@ -474,6 +615,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         restJob = viewModelScope.launch {
             delay(end - System.currentTimeMillis())
             buzz()
+            autoStartNext()
         }
     }
 
@@ -484,12 +626,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         restJob = viewModelScope.launch {
             delay((end - System.currentTimeMillis()).coerceAtLeast(0))
             buzz()
+            autoStartNext()
         }
     }
 
+    /** Skip: straight to the next set's countdown (or just close the timer with auto-start off). */
     fun skipRest() {
         restJob?.cancel()
         _restEndsAt.value = null
+        autoStartNext()
+    }
+
+    /** Close the rest panel without starting anything. */
+    fun closeRest() {
+        restJob?.cancel()
+        _restEndsAt.value = null
+        _nextUp.value = null
     }
 
     fun setDefaultRest(seconds: Int) {
@@ -500,6 +652,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         const val COUNTDOWN_MS = 3_000L
+        const val AUTO_COUNTDOWN_MS = 10_000L
         /** Bump when the counter's method changes (older ROM numbers then aren't compared). */
         const val RepEngineVersion = 1
     }

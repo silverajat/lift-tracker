@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Restaurant
@@ -35,7 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.silverajat.lifttracker.ui.C
-import com.silverajat.lifttracker.ui.ChatScreen
+import com.silverajat.lifttracker.ui.InsightsScreen
+import com.silverajat.lifttracker.insights.InsightEngine
 import com.silverajat.lifttracker.ui.ExerciseScreen
 import com.silverajat.lifttracker.ui.HomeScreen
 import com.silverajat.lifttracker.ui.LiftTheme
@@ -43,11 +44,21 @@ import com.silverajat.lifttracker.ui.MealsScreen
 import com.silverajat.lifttracker.ui.TodayScreen
 import com.silverajat.lifttracker.ui.WorkoutScreen
 
-enum class Tab(val title: String) { TODAY("Today"), GYM("Gym"), MEALS("Meals"), CHAT("Coach") }
+enum class Tab(val title: String) { TODAY("Today"), GYM("Gym"), MEALS("Meals"), INSIGHTS("Insights") }
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
     private val hub: HubViewModel by viewModels()
+
+    private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    /** Tab to open (a notification opens Insights). */
+    private val startTab = kotlinx.coroutines.flow.MutableStateFlow<Tab?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra("tab")?.let { t -> startTab.value = runCatching { Tab.valueOf(t) }.getOrNull() }
+    }
 
     /** Health Connect's own permission screen (Fitbit data via the Google Health app). */
     private val askHealth = registerForActivityResult(
@@ -55,7 +66,7 @@ class MainActivity : ComponentActivity() {
     ) { hub.refreshHealth() }
 
     private fun connectHealth() {
-        if (hub.health.available()) askHealth.launch(hub.health.permissions)
+        if (hub.health.available()) askHealth.launch(hub.health.requested)
         else runCatching {
             startActivity(Intent(Intent.ACTION_VIEW,
                 android.net.Uri.parse("market://details?id=com.google.android.apps.healthdata")))
@@ -88,7 +99,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        connectPod()
+        InsightEngine.channels(this)
+        InsightEngine.schedule(this)
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+            askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+        intent?.getStringExtra("tab")?.let { t -> startTab.value = runCatching { Tab.valueOf(t) }.getOrNull() }
 
         setContent {
             LiftTheme {
@@ -102,12 +117,21 @@ class MainActivity : ComponentActivity() {
                     else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 }
                 var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
+                val wanted by startTab.collectAsStateWithLifecycle()
+                LaunchedEffect(wanted) { wanted?.let { tab = it; startTab.value = null } }
                 // in a workout or an exercise page the gym tab owns the whole screen
                 val fullScreen = screen != Screen.Home
                 val shown = if (fullScreen) Tab.GYM else tab
                 BackHandler(enabled = screen != Screen.Home) { vm.back() }
                 BackHandler(enabled = screen == Screen.Home && tab != Tab.TODAY) { tab = Tab.TODAY }
-                LaunchedEffect(tab) { if (tab == Tab.TODAY) hub.refreshAnalysis() }
+                LaunchedEffect(shown == Tab.GYM || session != null) {
+                    wantPod = shown == Tab.GYM || session != null
+                    if (wantPod) connectPod()
+                }
+                LaunchedEffect(tab) {
+                    if (tab == Tab.TODAY) hub.refreshAnalysis()
+                    if (tab == Tab.INSIGHTS) hub.reloadInsights()
+                }
 
                 Column(Modifier.fillMaxSize().background(C.Bg).imePadding()) {
                     Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -120,7 +144,7 @@ class MainActivity : ComponentActivity() {
                                 is Screen.ExerciseInfo -> ExerciseScreen(vm, s.exerciseId)
                             }
                             Tab.MEALS -> MealsScreen(hub)
-                            Tab.CHAT -> ChatScreen(hub)
+                            Tab.INSIGHTS -> InsightsScreen(hub)
                         }
                     }
                     if (!fullScreen) NavigationBar(containerColor = C.Surface) {
@@ -133,7 +157,7 @@ class MainActivity : ComponentActivity() {
                                         Tab.TODAY -> Icons.Filled.Favorite
                                         Tab.GYM -> Icons.Filled.FitnessCenter
                                         Tab.MEALS -> Icons.Filled.Restaurant
-                                        Tab.CHAT -> Icons.AutoMirrored.Filled.Chat
+                                        Tab.INSIGHTS -> Icons.Filled.Notifications
                                     }, t.title)
                                 },
                                 label = { Text(t.title) },
@@ -149,9 +173,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** The pod is only worn at the gym: look for it on the Gym tab or during a workout. */
+    private var wantPod = false
+
     override fun onResume() {
         super.onResume()
-        if (vm.pod.hasPermissions()) vm.pod.connect()
+        if (wantPod && vm.pod.hasPermissions()) vm.pod.connect()
         hub.refreshHealth()
     }
 }
