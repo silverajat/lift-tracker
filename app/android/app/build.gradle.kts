@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.silverajat.lifttracker"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.silverajat.lifttracker"
