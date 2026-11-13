@@ -1,7 +1,7 @@
 {
     "$schema": "https://schemas.kicad.org/erc.v1.json",
     "coordinate_units": "mm",
-    "date": "2026-11-12T23:50:13+0800",
+    "date": "2026-11-13T09:17:26+0800",
     "included_severities": [
         "error",
         "warning"
@@ -21,7 +21,7 @@
                                 "x": 0.508,
                                 "y": 1.4478
                             },
-                            "uuid": "e7562702-46b7-4267-b380-312e3f0a0fcf"
+                            "uuid": "00957ba9-6725-42b3-9168-ccd95f33ea5f"
                         },
                         {
                             "description": "Symbol U104 Pin 2 [VO, Power output, Line]",
@@ -29,7 +29,7 @@
                                 "x": 4.3434,
                                 "y": 2.4638
                             },
-                            "uuid": "8febaa16-c1a3-4cf4-8419-7a447c974632"
+                            "uuid": "84ca2964-974c-459b-af4c-072669d0815e"
                         }
                     ],
                     "severity": "warning",
@@ -44,7 +44,7 @@
                                 "x": 0.508,
                                 "y": 1.4732
                             },
-                            "uuid": "211688da-f4ed-44e5-a110-f18006043801"
+                            "uuid": "1fcff8f0-32ef-44d1-b8d8-8da50f432e8a"
                         },
                         {
                             "description": "Symbol U104 Pin 2 [VO, Power output, Line]",
@@ -52,11 +52,49 @@
                                 "x": 4.3434,
                                 "y": 2.4638
                             },
-                            "uuid": "8febaa16-c1a3-4cf4-8419-7a447c974632"
+                            "uuid": "84ca2964-974c-459b-af4c-072669d0815e"
                         }
                     ],
                     "severity": "warning",
                     "type": "pin_to_pin"
+                },
+                {
+                    "description": "Pins of type Bidirectional and Power output are connected",
+                    "items": [
+                        {
+                            "description": "Symbol U102 Pin 2 [SDX, Bidirectional, Line]",
+                            "pos": {
+                                "x": 2.8956,
+                                "y": 0.4826
+                            },
+                            "uuid": "cb03da13-b0b9-4dfb-a00e-2fc055d63cee"
+                        },
+                        {
+                            "description": "Symbol #FLG01 Pin 1 [Power output, Line]",
+                            "pos": {
+                                "x": 2.3622,
+                                "y": 3.3909
+                            },
+                            "uuid": "b20ae56c-f060-4b0b-a28b-5e90e48e8932"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "pin_to_pin"
+                },
+                {
+                    "description": "Symbol 'LSM6DSL' doesn't match copy in library 'Sensor_Motion'",
+                    "items": [
+                        {
+                            "description": "Symbol U102 [LSM6DSL]",
+                            "pos": {
+                                "x": 3.048,
+                                "y": 0.5334
+                            },
+                            "uuid": "504ba64a-26ad-5e50-bbc9-2fce4d2c1360"
+                        }
+                    ],
+                    "severity": "warning",
+                    "type": "lib_symbol_mismatch"
                 },
                 {
                     "description": "Symbol 'AO3400A' doesn't match copy in library 'Transistor_FET'",

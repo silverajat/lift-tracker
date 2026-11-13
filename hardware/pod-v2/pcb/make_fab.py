@@ -11,7 +11,7 @@ b = pcbnew.LoadBoard(PCB)
 bb = b.GetBoardEdgesBoundingBox()
 x0 = bb.GetX() / 1e6 + 0.05
 y1 = bb.GetBottom() / 1e6 - 0.05
-ROT_FIX = {"C2836813": 180}   # BMI270: JLC's model has pin 1 in the opposite corner
+ROT_FIX = {"C2836813": 180}   # BMI270 (old IMU): JLC model has pin 1 in the opposite corner
 rows, bom, skipped = [], OrderedDict(), []
 for fp in b.GetFootprints():
     ref = fp.GetReference()

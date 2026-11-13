@@ -59,13 +59,13 @@ PARTS = [
          lcsc="C1525", pins={"1": "+3V3", "2": "GND"}),
 
 
-    # ---- IMU: BMI270 on SPI (BMI160 symbol: same LGA-14 pinout) ----------
-    dict(ref="U2", sym=("Sensor_Motion", "BMI160"), value="BMI270",
-         fp="Package_LGA:Bosch_LGA-14_3x2.5mm_P0.5mm", lcsc="C2836813",
-         pins={"1": "SPI_MISO",    # SDO
-               "2": NC, "3": NC,   # ASDx/ASCx: aux I2C unused, may float
+    # ---- IMU: ST LSM6DSV16X on SPI (LSM6DSL symbol: same LGA-14 pinout) ----
+    dict(ref="U2", sym=("Sensor_Motion", "LSM6DSL"), value="LSM6DSV16X",
+         fp="Package_LGA:LGA-14_3x2.5mm_P0.5mm_LayoutBorder3x4y", lcsc="C5267406",
+         pins={"1": "SPI_MISO",    # SDO/SA0
+               "2": "GND", "3": "GND",   # SDx/SCx: analog hub/Qvar unused -> GND (datasheet)
                "4": "IMU_INT1", "5": "+3V3", "6": "GND", "7": "GND", "8": "+3V3",
-               "9": NC, "10": NC, "11": NC,   # INT2 unused (INT1 does wake + taps); OCSB/OSDO open
+               "9": NC, "10": NC, "11": NC,   # INT2 unused (INT1 does wake + taps); OCS_Aux/SDO_Aux open
                "12": "IMU_CS", "13": "SPI_SCK", "14": "SPI_MOSI"}),
     dict(ref="C4", sym=("Device", "C"), value="100nF", fp=C0402,
          lcsc="C1525", pins={"1": "+3V3", "2": "GND"}),   # VDD

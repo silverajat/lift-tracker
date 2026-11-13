@@ -1,6 +1,6 @@
 # Pod v2: the final, Fitbit-sized lift tracker
 
-**Status (Nov 12, late):** rev A uses the **Ebyte E73-2G4M08S1C** nRF52840 module, which JLC has in stock. The Raytac MDBT50Q we started with is out of stock. Board: 41 × 18 mm, 4 layers, 0.8 mm. Case: 43.6 × 20.6 × 7.75 mm. Release files are in `release/liftpod_v2_revA/`.
+**Status (Nov 13):** IMU is now the ST LSM6DSV16X (same footprint position as the BMI270 it replaced). **Earlier (Nov 12, late):** rev A uses the **Ebyte E73-2G4M08S1C** nRF52840 module, which JLC has in stock. The Raytac MDBT50Q we started with is out of stock. Board: 41 × 18 mm, 4 layers, 0.8 mm. Case: 43.6 × 20.6 × 7.75 mm. Release files are in `release/liftpod_v2_revA/`.
 
 **Goal:** close to a Google Fitbit Air pebble (34.9 × 17 × 8.3 mm), with no USB port, no button, charging on the Fitbit Air charger, and everything over Bluetooth. Result: **0.55 mm thinner** than the Fitbit Air and about 9 mm longer. The E73 is bigger and taller than the Raytac module (13 × 18 × 3 mm vs 10 × 15.5 × 2.2), and we picked thin over short.
 
@@ -53,7 +53,7 @@ Top view of the board (x 0–41, y 0–18 mm):
                                                                           ├─ 1M/1M divider -> nRF AIN5
                                                                           └─ coin motor ── AO3400A + flyback diode
  +3V3 ── Ebyte E73 (nRF52840), antenna at the board's left edge
-           ├─ one SPI bus: BMI270 IMU (CS + INT1) and W25Q16 2 MB flash (CS), 100k CS pull-ups
+           ├─ one SPI bus: LSM6DSV16X IMU (CS + INT1) and W25Q16 2 MB flash (CS), 100k CS pull-ups
            ├─ green status LED
            └─ SWD pads on the underside (no reset pad: nRF52 programs and recovers over SWD alone)
 ```
@@ -83,7 +83,7 @@ P0.00/P0.01 are the 32 kHz crystal pins, used here as GPIO, so the firmware must
 | Ref | Part | LCSC | Notes |
 |---|---|---|---|
 | U101 | Ebyte E73-2G4M08S1C (nRF52840) | C356849 | 77 in stock at JLC (Nov 12). Standard PCBA, X-ray |
-| U102 | BMI270 IMU, LGA-14 | C2836813 | |
+| U102 | ST LSM6DSV16X IMU, LGA-14L 2.5 × 3 | C5267406 | 8,099 in stock (Nov 13). Lower noise than the BMI270, on-chip sensor fusion (SFLP) and machine-learning core. SDx/SCx tied to GND, aux SPI pins open |
 | U107 | W25Q16JVUXIQ 2 MB flash, USON-8 2 × 3 | C2843335 | |
 | U103 | MCP73831-2-OT charger | C424093 | R103 47k → ~21 mA |
 | U104 | XC6206P332MR 3.3 V LDO | C5446 | ~1 µA quiescent |
@@ -110,7 +110,7 @@ P0.00/P0.01 are the 32 kHz crystal pins, used here as GPIO, so the firmware must
 
 ## Firmware changes for v2
 
-- Board file with the pins above; BMI270 driver instead of the LSM6DS3TR-C (`read_imu()` and the overlay change; storage, BLE and the app don't).
+- Board file with the pins above; Zephyr's `st,lsm6dsv16x` driver instead of the LSM6DS3TR-C one (`read_imu()` and the overlay change; storage, BLE and the app don't). Later: use the chip's sensor fusion (game rotation vector) and machine-learning core for low-power wake and taps.
 - One SPI bus, two chip selects (IMU, flash). Set both CS high first thing at boot (the 100k pull-ups hold them high until then).
 - LFRC clock (P0.00/P0.01 are GPIO); DC/DC off until the E73's inductor is confirmed.
 - Charger detection from CHG_STAT (GPIO sense) instead of VBUS.
@@ -137,3 +137,4 @@ P0.00/P0.01 are the 32 kHz crystal pins, used here as GPIO, so the firmware must
 - Spec locked with our own magnetic pogo dock; dock design parked in `unused/`.
 - Switched to the Fitbit Air charger: board flipped to the bottom, bridge rectifier, steel target, 3-pad SWD, case rebuilt as a one-piece shell.
 - Raytac MDBT50Q out of stock: switched to the Ebyte E73 (in stock), USON flash, one shared SPI bus, board 34 → 41 mm.
+- IMU: BMI270 → ST LSM6DSV16X (lower noise, on-chip fusion). Same LGA-14 pad positions, so the routing stayed; MISO's via moved to make room for the GND ties on pins 2/3 (`pcb/swap_imu.py`, `pcb/tie_gnd.py`).

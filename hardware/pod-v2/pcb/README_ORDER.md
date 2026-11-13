@@ -5,6 +5,8 @@ Checks: see `checks/drc.json` (DRC, with schematic parity) and `checks/erc.json`
 
 **nRF module:** Ebyte E73-2G4M08S1C (C356849), in stock at JLC (77 on Nov 12). JLC lists it as "Standard PCBA only, X-ray inspection required".
 
+**IMU:** ST LSM6DSV16X (C5267406), in stock at JLC (8,099 on Nov 13). Also Standard PCBA + X-ray.
+
 ## 1. PCB (JLCPCB)
 
 Upload `fabrication/liftpod_v2_revA_JLCPCB_Gerbers.zip`.
@@ -33,7 +35,7 @@ Upload `assembly/liftpod_v2_BOM_JLCPCB.csv` and `assembly/liftpod_v2_CPL_JLCPCB.
 - Top side only. Not assembled: charger contacts, cell/motor/SWD pads, the steel-disc marking.
 - Quantity: 2 (or all 5).
 - JLC adds edge rails for Standard PCBA on small boards; snap them off (or tick "Depanel boards & edge rail before delivery").
-- In the placement preview, check each part's rotation, mainly the E73 (antenna at the board's left edge), SOT-23s, SOD-323 diodes, the LEDs, the BMI270 and the USON flash (pin 1 dots).
+- In the placement preview, check each part's rotation, mainly the E73 (antenna at the board's left edge), SOT-23s, SOD-323 diodes, the LEDs, the LSM6DSV16X IMU and the USON flash (pin 1 dots).
 
 ## 3. Case (JLC3DP)
 

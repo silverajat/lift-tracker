@@ -47,7 +47,7 @@ PLACE = {
     "R13": (25.9, 5.5, 0),         # flash CS pull-up
 
     # below the steel disc: IMU, its caps, motor wire pads, battery sense
-    "U2": (23.2, 13.6, 0),         # BMI270: MOSI/SCK/CS along the top, MISO/INT1 on the left
+    "U2": (23.2, 13.6, 0),         # LSM6DSV16X: MOSI/SCK/CS along the top, MISO/INT1 on the left
     "C4": (25.6, 12.8, 90),        # IMU VDD
     "C5": (26.7, 12.8, 90),        # IMU VDDIO
     "R14": (26.7, 14.75, 90),      # IMU CS pull-up
