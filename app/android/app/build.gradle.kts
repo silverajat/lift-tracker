@@ -48,13 +48,14 @@ android {
                 it.systemProperties["roborazzi.test.record"] = "true"
                 it.systemProperties["robolectric.pixelCopyRenderMode"] = "hardware"
                 it.maxHeapSize = "3g"
+                it.testLogging { exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL; events("failed") }
             }
         }
     }
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val composeBom = platform("androidx.compose:compose-bom:2025.10.00")
     implementation(composeBom)
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.9.3")
