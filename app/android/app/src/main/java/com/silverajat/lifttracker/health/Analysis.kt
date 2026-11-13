@@ -101,6 +101,8 @@ object Analysis {
         val nutrition: NutritionResult?,
         val weight: WeightResult,
         val effects: List<Effect>,
+        val energy: Energy.Result,           // net calories, checked against the scale
+        val goalKgPerWeek: Double,
         val headline: List<String>,          // short plain-language summary for today
     )
 
@@ -309,7 +311,7 @@ object Analysis {
 
     fun run(
         health: List<HealthDay>, sessions: List<Session>, meals: Map<LocalDate, List<MealEntry>>,
-        weights: List<WeightEntry>, today: LocalDate, zone: ZoneId,
+        weights: List<WeightEntry>, today: LocalDate, zone: ZoneId, goalKgPerWeek: Double = 0.25,
     ): Result {
         val vol = volumeByDay(sessions, zone)
         val gymDays = vol.filterKeys { it >= today.minusDays(28) && it < today }.values.filter { it.second > 0 }
@@ -350,17 +352,14 @@ object Analysis {
             val m = dates.mapNotNull { d -> f(d)?.let { d to it } }.toMap()
             if (m.isNotEmpty()) habits[name] = m
         }
-        habit("Hit protein (120 g+)") { d -> meals[d]?.takeIf { it.isNotEmpty() }?.let { MealStore.totals(it).protein >= Targets.protein.start } }
         habit("Last food before 9:30 PM") { d ->
             meals[d]?.takeIf { it.isNotEmpty() }?.maxOf { it.timeMs }?.let {
                 Instant.ofEpochMilli(it).atZone(zone).toLocalTime() <= LocalTime.of(21, 30)
             }
         }
-        habit("Ate at least what you burned") { d ->
-            val f = meals[d]?.takeIf { it.isNotEmpty() }?.let { MealStore.totals(it).kcal }
-            val b = healthMap[d]?.kcalTotal
-            if (f != null && b != null) f >= b else null
-        }
+        val energy = Energy.estimate(meals, weights, healthMap, today)
+        val netByDay = energy.days.associate { it.date to it.net }
+        habit("Net calories in surplus") { d -> netByDay[d]?.let { it >= 0 } }
         habit("Gym session") { d -> (vol[d]?.second ?: 0) > 0 }
         habit("10,000+ steps") { d -> healthMap[d]?.steps?.let { it >= 10_000 } }
         habit("Strain 14+") { d -> healthMap[d]?.load?.let { strainOf(it.trimp) >= 14 } }
@@ -383,10 +382,10 @@ object Analysis {
             head += "Slept ${s.asleepMin / 60}h${s.asleepMin % 60}m of a ${s.needMin / 60}h${s.needMin % 60}m need (${s.performance}%)" +
                 (if (s.debtMin >= 30) ", carrying ${s.debtMin} min of debt" else "") + "."
         }
-        val todayFood = meals[today]?.let { MealStore.totals(it) }
-        if (todayFood != null && todayFood.protein > 0) {
-            val left = (Targets.protein.start - todayFood.protein).roundToInt()
-            head += if (left > 0) "Protein so far ${todayFood.protein.roundToInt()} g: $left g to go." else "Protein target hit (${todayFood.protein.roundToInt()} g)."
+        energy.avgNet?.let { n ->
+            val goal = energy.netFor(goalKgPerWeek)
+            head += "Net calories, last 2 weeks: ${if (n >= 0) "+" else ""}$n a day (goal ${if (goal >= 0) "+" else ""}$goal)" +
+                (energy.trendKgPerWeek?.let { " · scale trend ${"%+.2f".format(it)} kg/week" } ?: "") + "."
         }
         if (today == Targets.reviewDate || weight.changePctPerWeek != null) head += "Weight: ${weight.verdict}."
         effects.firstOrNull { it.clear }?.let { e ->
@@ -394,6 +393,6 @@ object Analysis {
         }
 
         return Result(out, todayDay, exerciseTrends(sessions, today, zone).sortedByDescending { it.changePct ?: -999.0 },
-            groupSets, nutrition, weight, effects, head)
+            groupSets, nutrition, weight, effects, energy, goalKgPerWeek, head)
     }
 }

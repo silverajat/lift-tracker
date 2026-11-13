@@ -68,7 +68,7 @@ fun zoneColor(z: Analysis.Zone?) = when (z) {
 
 /** Google Health-style home: your two devices, then WHOOP-style rings and what they mean today. */
 @Composable
-fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Unit, onConnectPod: () -> Unit, onOpenGym: () -> Unit) {
+fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Unit, onConnectPod: () -> Unit, onOpenGym: () -> Unit, onOpenNet: () -> Unit) {
     val state by hub.healthState.collectAsStateWithLifecycle()
     val a by hub.analysis.collectAsStateWithLifecycle()
     val days by hub.days.collectAsStateWithLifecycle()
@@ -233,25 +233,32 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
                             (m.vsAvgPct?.let { " ($it% of your usual)" } ?: ""), style = MaterialTheme.typography.bodyLarge)
                     }
                     todayHealth?.let { h ->
-                        Text(listOfNotNull(h.steps?.let { "${"%,d".format(it)} steps" },
-                            h.kcalTotal?.let { "${it.roundToInt()} of ${Targets.burnKcal} kcal burned" }).joinToString(" · "),
-                            color = C.Muted)
+                        h.steps?.let { Text("${"%,d".format(it)} steps", color = C.Muted) }
                     }
                     TextButton(onClick = onOpenGym) { Text("Open gym", color = C.Accent) }
                 }
             }
         }
 
-        // ---- food today ----
-        item {
-            val t = MealStore.totals(food)
-            Card(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionLabel("Food today (estimated)")
-                    Text("${t.kcal.roundToInt()} kcal", style = MaterialTheme.typography.titleLarge)
-                    MacroBar("Protein", t.protein, Targets.protein.start, Targets.protein.endInclusive, Recover)
-                    MacroBar("Fat", t.fat, Targets.fat.start, Targets.fat.endInclusive, Yellow)
-                    Text("Carbs ${t.carbs.roundToInt()} g · fibre ${t.fibre.roundToInt()} g", color = C.Muted)
+        // ---- net calories ----
+        a?.energy?.let { e ->
+            item {
+                val goal by hub.goal.collectAsStateWithLifecycle()
+                val g = e.netFor(goal)
+                val t = todayNet(e, food, java.time.LocalDate.now(), java.time.LocalTime.now())
+                Card(Modifier.fillMaxWidth(), onClick = onOpenNet) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SectionLabel("Net calories")
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(signedKcal(t.endOfDay), style = MaterialTheme.typography.headlineLarge.merge(Tnum), color = netColor(t.endOfDay, g))
+                            Text("  today · goal ${signedKcal(g)}", color = C.Muted, modifier = Modifier.padding(bottom = 6.dp))
+                        }
+                        e.avgNet?.let { Text("2-week average ${signedKcal(it)} a day" +
+                            (e.trendKgPerWeek?.let { k -> " · scale ${"%+.2f".format(k)} kg/week" } ?: ""), style = MaterialTheme.typography.bodyMedium) }
+                        Text(if (e.confidence >= 30) "Burn checked against your weight (Fitbit runs ~${kotlin.math.abs(e.fitbitOffPct)}% ${if (e.fitbitOffPct >= 0) "high" else "low"})"
+                            else "Checked against your weight once there's ~2 weeks of weigh-ins",
+                            style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    }
                 }
             }
         }
@@ -291,20 +298,12 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionLabel("Body & nutrition")
+                        SectionLabel("Body weight")
                         an.weight.lastWeekAvg?.let { w ->
                             Text("Last week ${"%.2f".format(w)} kg" + (an.weight.changeKg?.let { " (${if (it >= 0) "+" else ""}${"%.2f".format(it)} kg)" } ?: ""),
                                 style = MaterialTheme.typography.titleMedium)
                         }
                         Text(an.weight.verdict, color = C.Muted)
-                        an.nutrition?.let { n ->
-                            Text("Last ${n.days} days: ${n.avgKcal} kcal, ${n.avgProtein} g protein (hit ${n.proteinDaysHit}/${n.days})" +
-                                (n.proteinPerKg?.let { ", ${"%.1f".format(it)} g/kg" } ?: ""), style = MaterialTheme.typography.bodyLarge)
-                            n.avgBalance?.let { b ->
-                                Text("Eating ${if (b >= 0) "+" else ""}$b kcal/day vs burned → about ${"%.2f".format(n.predictedKgPerWeek)} kg/week",
-                                    color = C.Muted)
-                            }
-                        }
                     }
                 }
             }

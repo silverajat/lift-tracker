@@ -12,8 +12,8 @@ android {
         applicationId = "com.silverajat.lifttracker"
         minSdk = 33          // Android 13+: the newer Bluetooth APIs only
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.7"
+        versionCode = 8
+        versionName = "0.8"
     }
 
     // One fixed debug key (committed), so every CI build installs over the

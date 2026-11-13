@@ -1,6 +1,9 @@
 package com.silverajat.lifttracker.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -56,9 +59,17 @@ private val dateFmt = DateTimeFormatter.ofPattern("EEE d MMM")
 /** About 15 minutes of walking. */
 private const val WALK_STEPS = 1200
 
-/** The meal plan for a day: tap a planned item to log it (now), tap a logged one to change time/portion. */
+/**
+ * Food: Net (eaten − burned, checked against your weight) and Log (the plan
+ * for a day: tap a planned item to log it now, tap a logged one to change
+ * its time or portion). Calories are only used for the net number.
+ */
 @Composable
 fun MealsScreen(hub: HubViewModel) {
+    var view by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }   // 0 Net, 1 Log
+    val analysis by hub.analysis.collectAsStateWithLifecycle()
+    val todayEntries by hub.todayEntries.collectAsStateWithLifecycle()
+    val goal by hub.goal.collectAsStateWithLifecycle()
     val date by hub.date.collectAsStateWithLifecycle()
     val entries by hub.entries.collectAsStateWithLifecycle()
     val weights by hub.weights.collectAsStateWithLifecycle()
@@ -66,8 +77,6 @@ fun MealsScreen(hub: HubViewModel) {
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
     val plan = remember(date) { MealPlan.day(date) }
-    val total = MealStore.totals(entries)
-    val planned = remember(date) { MealPlan.plannedTotal(date) }
 
     var editing by remember { mutableStateOf<MealEntry?>(null) }
     var customSlot by remember { mutableStateOf<Slot?>(null) }
@@ -82,6 +91,22 @@ fun MealsScreen(hub: HubViewModel) {
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("Net", "Log").forEachIndexed { i, label ->
+                    Text(label, style = MaterialTheme.typography.titleMedium,
+                        color = if (view == i) C.Text else C.Muted,
+                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
+                            .background(if (view == i) C.Raised else C.Surface)
+                            .clickable { view = i }.padding(vertical = 10.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
+            }
+        }
+        if (view == 0) {
+            netItems(analysis, todayEntries, goal, hub::setGoal)
+            return@LazyColumn
+        }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { hub.setDate(date.minusDays(1)) }) {
@@ -104,23 +129,6 @@ fun MealsScreen(hub: HubViewModel) {
             }
         }
 
-        // ---- totals ----
-        item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text("${total.kcal.roundToInt()}", style = MaterialTheme.typography.headlineLarge.merge(Tnum))
-                        Text("  kcal eaten (est.)", color = C.Muted, modifier = Modifier.padding(bottom = 6.dp))
-                    }
-                    MacroBar("Protein", total.protein, Targets.protein.start, Targets.protein.endInclusive, Recover)
-                    MacroBar("Fat", total.fat, Targets.fat.start, Targets.fat.endInclusive, Yellow)
-                    Text("Carbs ${total.carbs.roundToInt()} g · fibre ${total.fibre.roundToInt()} g", color = C.Muted)
-                    Text("Full plan today ≈ ${planned.kcal.roundToInt()} kcal, P ${planned.protein.roundToInt()} g, F ${planned.fat.roundToInt()} g",
-                        style = MaterialTheme.typography.labelMedium, color = C.Muted)
-                }
-            }
-        }
-
         // ---- slots ----
         Slot.entries.forEach { slot ->
             val plannedHere = plan.filter { it.slot == slot }
@@ -131,9 +139,7 @@ fun MealsScreen(hub: HubViewModel) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(slot.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                            val m = MealStore.totals(logged)
-                            if (logged.isNotEmpty()) Text("${m.kcal.roundToInt()} kcal · P ${m.protein.roundToInt()}",
-                                style = MaterialTheme.typography.labelLarge.merge(Tnum), color = C.Muted)
+                            if (logged.isNotEmpty()) Text("✓", style = MaterialTheme.typography.titleMedium, color = C.Done)
                         }
                         if (slot.hint.isNotEmpty()) Text(slot.hint, style = MaterialTheme.typography.labelMedium, color = C.Muted)
 
@@ -219,8 +225,6 @@ private fun LoggedRow(e: MealEntry, zone: ZoneId, walk: Long?, onClick: () -> Un
             color = C.Done, modifier = Modifier.width(44.dp))
         Column(Modifier.weight(1f)) {
             Text(e.name + if (e.portion != 1.0) "  ×${fmtPortion(e.portion)}" else "", style = MaterialTheme.typography.bodyMedium, maxLines = 2)
-            Text("${e.macros.kcal.roundToInt()} kcal · P ${e.macros.protein.roundToInt()} · C ${e.macros.carbs.roundToInt()} · F ${e.macros.fat.roundToInt()}",
-                style = MaterialTheme.typography.labelMedium.merge(Tnum), color = C.Muted)
         }
         walk?.let {
             Spacer(Modifier.width(6.dp))
@@ -262,8 +266,6 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
                         Tag("×${fmtPortion(p)}", color = if (p == portion) C.Accent else C.Text, modifier = Modifier.clickable { portion = p })
                     }
                 }
-                val m = e.macros * (portion / e.portion)
-                Text("${m.kcal.roundToInt()} kcal, P ${m.protein.roundToInt()} g, C ${m.carbs.roundToInt()} g, F ${m.fat.roundToInt()} g", color = C.Muted)
             }
         },
         confirmButton = {
@@ -290,9 +292,6 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
 private fun CustomDialog(slot: Slot, onDismiss: () -> Unit, onSave: (String, Macros) -> Unit) {
     var name by remember { mutableStateOf("") }
     var kcal by remember { mutableStateOf("") }
-    var p by remember { mutableStateOf("") }
-    var c by remember { mutableStateOf("") }
-    var f by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Surface,
@@ -300,20 +299,13 @@ private fun CustomDialog(slot: Slot, onDismiss: () -> Unit, onSave: (String, Mac
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, label = { Text("What (e.g. kaya toast)") }, singleLine = true, colors = fieldColors())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumField("kcal", kcal, { kcal = it }, Modifier.weight(1f))
-                    NumField("protein g", p, { p = it }, Modifier.weight(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumField("carbs g", c, { c = it }, Modifier.weight(1f))
-                    NumField("fat g", f, { f = it }, Modifier.weight(1f))
-                }
-                Text("Don't know the numbers? Log a rough kcal, or ask Claude in Insights → Brainstorm to estimate.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                NumField("Rough kcal", kcal, { kcal = it })
+                Text("Only used for net calories. A rough guess is fine: the scale corrects it over time.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
             }
         },
         confirmButton = {
             TextButton(enabled = name.isNotBlank(), onClick = {
-                onSave(name.trim(), Macros(kcal.toDoubleOrNull() ?: 0.0, p.toDoubleOrNull() ?: 0.0, c.toDoubleOrNull() ?: 0.0, f.toDoubleOrNull() ?: 0.0))
+                onSave(name.trim(), Macros(kcal.toDoubleOrNull() ?: 0.0, 0.0, 0.0, 0.0))
             }) { Text("Add", color = C.Accent, fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) } },

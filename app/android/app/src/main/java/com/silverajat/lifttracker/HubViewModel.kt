@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.silverajat.lifttracker.chat.ChatContext
 import com.silverajat.lifttracker.chat.ChatMessage
 import com.silverajat.lifttracker.chat.ChatStore
-import com.silverajat.lifttracker.chat.Claude
+import com.silverajat.lifttracker.chat.Gpt
 import com.silverajat.lifttracker.data.SessionStore
 import com.silverajat.lifttracker.health.HealthDay
 import com.silverajat.lifttracker.health.HealthRepo
@@ -37,7 +37,7 @@ import java.time.ZoneId
 
 enum class HealthState { UNAVAILABLE, NEEDS_PERMISSION, LOADING, OK }
 
-/** Today, Meals and Chat: Fitbit data, the food log, weights and Claude. */
+/** Today, Meals, Insights and the brainstorm chat: Fitbit data, the food log, weights and GPT. */
 class HubViewModel(app: Application) : AndroidViewModel(app) {
     private val zone: ZoneId get() = ZoneId.systemDefault()
     val health = HealthRepo(app)
@@ -47,15 +47,34 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("hub", Context.MODE_PRIVATE)
 
     // ---- settings ---------------------------------------------------------------
-    private val _apiKey = MutableStateFlow(prefs.getString("anthropic_key", "") ?: "")
+    private val _apiKey = MutableStateFlow(prefs.getString("openai_key", "") ?: "")
     val apiKey: StateFlow<String> = _apiKey
-    private val _model = MutableStateFlow(prefs.getString("model", Claude.MODELS.first().first) ?: Claude.MODELS.first().first)
+    private val _model = MutableStateFlow(prefs.getString("openai_model", Gpt.DEFAULT_MODEL) ?: Gpt.DEFAULT_MODEL)
     val model: StateFlow<String> = _model
     private val _hrMax = MutableStateFlow(prefs.getInt("hr_max", Scores.DEFAULT_HR_MAX))
     val hrMax: StateFlow<Int> = _hrMax
 
-    fun setApiKey(k: String) { _apiKey.value = k.trim(); prefs.edit().putString("anthropic_key", k.trim()).apply() }
-    fun setModel(m: String) { _model.value = m; prefs.edit().putString("model", m).apply() }
+    fun setApiKey(k: String) { _apiKey.value = k.trim(); prefs.edit().putString("openai_key", k.trim()).apply() }
+    fun setModel(m: String) { _model.value = m; prefs.edit().putString("openai_model", m).apply() }
+
+    /** Models your key can use (filled when you open brainstorm settings). */
+    private val _models = MutableStateFlow<List<String>>(emptyList())
+    val models: StateFlow<List<String>> = _models
+    private val _modelsError = MutableStateFlow<String?>(null)
+    val modelsError: StateFlow<String?> = _modelsError
+
+    fun loadModels(key: String = _apiKey.value) {
+        if (key.isBlank()) return
+        viewModelScope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { Gpt.models(key) } }
+            r.onSuccess { _models.value = it; _modelsError.value = null }.onFailure { _modelsError.value = it.message }
+        }
+    }
+    /** Weekly weight goal (kg/week): sets the net-calorie goal. */
+    private val _goal = MutableStateFlow(prefs.getFloat("goal_kg_week", 0.25f).toDouble())
+    val goal: StateFlow<Double> = _goal
+    fun setGoal(kgPerWeek: Double) { _goal.value = kgPerWeek; prefs.edit().putFloat("goal_kg_week", kgPerWeek.toFloat()).apply(); refreshAnalysis() }
+
     fun setHrMax(v: Int) { _hrMax.value = v.coerceIn(150, 230); prefs.edit().putInt("hr_max", _hrMax.value).apply(); refreshHealth() }
 
     // ---- Health Connect -----------------------------------------------------------
@@ -144,7 +163,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             val today = LocalDate.now(zone)
             _analysis.value = withContext(Dispatchers.Default) {
                 runCatching {
-                    Analysis.run(_days.value, sessions.all(), meals.days(today.minusDays(30), today), meals.weights(), today, zone)
+                    Analysis.run(_days.value, sessions.all(), meals.days(today.minusDays(60), today), meals.weights(), today, zone, _goal.value)
                 }.getOrNull()
             }
         }
@@ -215,7 +234,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearChat() { chatStore.clear(); _chat.value = emptyList(); _chatError.value = null }
 
-    /** The text Claude gets about you (also viewable in Chat settings). */
+    /** The text GPT gets about you (also viewable in Chat settings). */
     suspend fun contextText(): String = withContext(Dispatchers.IO) {
         val today = LocalDate.now(zone)
         val modelFile = File(getApplication<Application>().filesDir, "rep_model.json")
@@ -240,7 +259,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     fun send(text: String) {
         val key = _apiKey.value
         if (text.isBlank() || _sending.value) return
-        if (key.isEmpty()) { _chatError.value = "Add your Anthropic API key in Chat settings first."; return }
+        if (key.isEmpty()) { _chatError.value = "Add your OpenAI API key in brainstorm settings first (gear icon)."; return }
         val history = _chat.value + ChatMessage("user", text.trim(), System.currentTimeMillis())
         _chat.value = history
         chatStore.save(history)
@@ -249,13 +268,13 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = runCatching {
                 val system = contextText()
-                withContext(Dispatchers.IO) { Claude.send(key, _model.value, system, history.takeLast(30)) }
+                withContext(Dispatchers.IO) { Gpt.send(key, _model.value, system, history.takeLast(30)) }
             }
             result.onSuccess { reply ->
                 val updated = _chat.value + ChatMessage("assistant", reply, System.currentTimeMillis())
                 _chat.value = updated
                 chatStore.save(updated)
-            }.onFailure { _chatError.value = it.message ?: "Couldn't reach Claude" }
+            }.onFailure { _chatError.value = it.message ?: "Couldn't reach OpenAI" }
             _sending.value = false
         }
     }

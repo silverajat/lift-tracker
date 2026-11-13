@@ -46,6 +46,12 @@ private fun kindColor(k: Kind): Color = when (k) {
     Kind.FOOD -> C.Warm
     Kind.WEATHER -> C.Pod
     Kind.WEEKLY -> C.Violet
+    Kind.NIGHT -> SleepPurple
+}
+
+private fun kindLabel(k: Kind) = when (k) {
+    Kind.WORKOUT -> "Workout"; Kind.MORNING -> "Morning"; Kind.ACTIVITY -> "Activity"; Kind.FOOD -> "Net"
+    Kind.NIGHT -> "Wrap-up"; Kind.WEATHER -> "Weather"; Kind.WEEKLY -> "Week"
 }
 
 /** Every summary the app has sent (Fitbit-style), plus the meal-plan brainstorm. */
@@ -70,7 +76,7 @@ fun InsightsScreen(hub: HubViewModel) {
     ) {
         item {
             Text("Insights", style = MaterialTheme.typography.headlineMedium)
-            Text("Summaries after workouts and walks, a morning brief with the weather, an evening food check and a Monday review.",
+            Text("Summaries after workouts and walks, a morning brief with the weather, an evening net-calorie check, a 9:45 PM wrap-up of your day and a Monday review.",
                 color = C.Muted, style = MaterialTheme.typography.bodyMedium)
         }
         item {
@@ -91,7 +97,7 @@ fun InsightsScreen(hub: HubViewModel) {
             Card(Modifier.fillMaxWidth(), onClick = { chat = true }) {
                 Column {
                     Text("Brainstorm your meal plan", style = MaterialTheme.typography.titleMedium)
-                    Text("Chat with Claude about changing the plan. It sees your food log, weight trend, training and Fitbit data.",
+                    Text("Chat with GPT about changing the plan. It sees your food log, weight trend, training and Fitbit data.",
                         color = C.Muted, style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -104,7 +110,7 @@ fun InsightsScreen(hub: HubViewModel) {
             Card(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Tag(i.kind.title.substringBefore(" ").replaceFirstChar { it.uppercase() }, color = kindColor(i.kind))
+                        Tag(kindLabel(i.kind), color = kindColor(i.kind))
                         Spacer(Modifier.width(8.dp))
                         Text(if (t.toLocalDate() == today) "Today " + t.format(timeFmt) else t.format(whenFmt),
                             style = MaterialTheme.typography.labelMedium, color = C.Muted)

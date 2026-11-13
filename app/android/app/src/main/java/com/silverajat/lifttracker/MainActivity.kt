@@ -44,7 +44,7 @@ import com.silverajat.lifttracker.ui.MealsScreen
 import com.silverajat.lifttracker.ui.TodayScreen
 import com.silverajat.lifttracker.ui.WorkoutScreen
 
-enum class Tab(val title: String) { TODAY("Today"), GYM("Gym"), MEALS("Meals"), INSIGHTS("Insights") }
+enum class Tab(val title: String) { TODAY("Today"), GYM("Gym"), MEALS("Food"), INSIGHTS("Insights") }
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -137,7 +137,7 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         when (shown) {
                             Tab.TODAY -> TodayScreen(hub, vm, onConnectHealth = ::connectHealth, onConnectPod = ::connectPod,
-                                onOpenGym = { tab = Tab.GYM })
+                                onOpenGym = { tab = Tab.GYM }, onOpenNet = { tab = Tab.MEALS })
                             Tab.GYM -> when (val s = screen) {
                                 Screen.Home -> HomeScreen(vm, onConnect = ::connectPod, onExport = ::share)
                                 is Screen.Workout -> WorkoutScreen(vm, s.day, onShare = ::share)

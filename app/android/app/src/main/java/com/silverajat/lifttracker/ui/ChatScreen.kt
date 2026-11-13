@@ -53,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.silverajat.lifttracker.HubViewModel
-import com.silverajat.lifttracker.chat.Claude
 import kotlinx.coroutines.launch
 
 private val suggestions = listOf(
@@ -64,7 +63,7 @@ private val suggestions = listOf(
     "Rewrite my whole plan with ~2,900 kcal and 125 g protein.",
 )
 
-/** Chat with Claude, with everything the app knows attached to every message. */
+/** Brainstorm with GPT, with everything the app knows attached to every message. */
 @Composable
 fun ChatScreen(hub: HubViewModel, onBack: () -> Unit) {
     val chat by hub.chat.collectAsStateWithLifecycle()
@@ -83,7 +82,7 @@ fun ChatScreen(hub: HubViewModel, onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = C.Text) }
             Column(Modifier.weight(1f)) {
                 Text("Meal plan brainstorm", style = MaterialTheme.typography.titleLarge)
-                Text("Claude, with your food, weight, gym and Fitbit data", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                Text("GPT, with your food, weight, gym and Fitbit data", style = MaterialTheme.typography.labelMedium, color = C.Muted)
             }
             if (chat.isNotEmpty()) TextButton(onClick = { hub.clearChat() }) { Text("New chat", color = C.Muted) }
             IconButton(onClick = { settings = true }) { Icon(Icons.Filled.Settings, "Chat settings", tint = C.Muted) }
@@ -100,8 +99,8 @@ fun ChatScreen(hub: HubViewModel, onBack: () -> Unit) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (key.isEmpty()) Card(Modifier.fillMaxWidth(), onClick = { settings = true }, border = C.Accent.copy(alpha = 0.5f)) {
                             Column {
-                                Text("Add your Anthropic API key", style = MaterialTheme.typography.titleMedium)
-                                Text("Get one at console.anthropic.com → API keys. It's stored only on this phone and sent only to Anthropic.",
+                                Text("Add your OpenAI API key", style = MaterialTheme.typography.titleMedium)
+                                Text("From platform.openai.com → API keys. It's stored only on this phone and sent only to OpenAI.",
                                     color = C.Muted)
                             }
                         }
@@ -127,7 +126,7 @@ fun ChatScreen(hub: HubViewModel, onBack: () -> Unit) {
             OutlinedTextField(
                 input, { input = it },
                 modifier = Modifier.weight(1f).heightIn(max = 160.dp),
-                placeholder = { Text("Ask about training, food, sleep…", color = C.Muted) },
+                placeholder = { Text("Ideas for the meal plan…", color = C.Muted) },
                 shape = RoundedCornerShape(22.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = C.Accent, unfocusedBorderColor = C.Line, focusedTextColor = C.Text,
@@ -160,6 +159,10 @@ private fun SettingsDialog(hub: HubViewModel, onDismiss: () -> Unit) {
     val key by hub.apiKey.collectAsStateWithLifecycle()
     val model by hub.model.collectAsStateWithLifecycle()
     val hrMax by hub.hrMax.collectAsStateWithLifecycle()
+    val models by hub.models.collectAsStateWithLifecycle()
+    val modelsError by hub.modelsError.collectAsStateWithLifecycle()
+    LaunchedEffect(key) { hub.loadModels() }
+    var showAll by remember { mutableStateOf(false) }
     var k by remember { mutableStateOf(key) }
     var hr by remember { mutableStateOf(hrMax.toString()) }
     var context by remember { mutableStateOf<String?>(null) }
@@ -169,7 +172,7 @@ private fun SettingsDialog(hub: HubViewModel, onDismiss: () -> Unit) {
         AlertDialog(
             onDismissRequest = { context = null },
             containerColor = C.Surface,
-            title = { Text("What Claude sees (${text.length / 4} tokens approx.)") },
+            title = { Text("What GPT sees (${text.length / 4} tokens approx.)") },
             text = {
                 SelectionContainer {
                     Text(text, fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = C.Text,
@@ -187,28 +190,42 @@ private fun SettingsDialog(hub: HubViewModel, onDismiss: () -> Unit) {
         title = { Text("Brainstorm settings") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(k, { k = it }, label = { Text("Anthropic API key") }, singleLine = true,
+                OutlinedTextField(k, { k = it }, label = { Text("OpenAI API key") }, singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = C.Accent, unfocusedBorderColor = C.Line,
                         focusedTextColor = C.Text, unfocusedTextColor = C.Text))
-                Text("Model", color = C.Muted)
-                Claude.MODELS.forEach { (id, label) ->
-                    Text((if (id == model) "● " else "○ ") + label, color = if (id == model) C.Accent else C.Text,
-                        modifier = Modifier.fillMaxWidth().clickable { hub.setModel(id) }.padding(vertical = 4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Model: ", color = C.Muted)
+                    Text(model, color = C.Accent, fontWeight = FontWeight.Bold)
                 }
+                when {
+                    key.isEmpty() -> Text("Save your key, then open settings again to pick from your models.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    modelsError != null -> Text(modelsError ?: "", style = MaterialTheme.typography.labelMedium, color = C.Stop)
+                    models.isEmpty() -> Text("Loading your models…", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    else -> {
+                        (if (showAll) models else models.take(8)).forEach { id ->
+                            Text((if (id == model) "● " else "○ ") + id, color = if (id == model) C.Accent else C.Text,
+                                modifier = Modifier.fillMaxWidth().clickable { hub.setModel(id) }.padding(vertical = 3.dp))
+                        }
+                        if (models.size > 8 && !showAll) Text("Show all ${models.size}", color = C.Muted,
+                            modifier = Modifier.clickable { showAll = true }.padding(vertical = 3.dp))
+                    }
+                }
+                Text("Newest first. A mid-size model is plenty for meal planning; the big ones cost more per message.",
+                    style = MaterialTheme.typography.labelMedium, color = C.Muted)
                 OutlinedTextField(hr, { hr = it }, label = { Text("Max heart rate (for strain)") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = C.Accent, unfocusedBorderColor = C.Line,
                         focusedTextColor = C.Text, unfocusedTextColor = C.Text))
                 Text("200 is a default. If you've seen a higher number on your Fitbit during a hard effort, use that.",
                     style = MaterialTheme.typography.labelMedium, color = C.Muted)
-                Text("View what Claude sees", color = C.Accent, fontWeight = FontWeight.Bold,
+                Text("View what GPT sees", color = C.Accent, fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { scope.launch { context = hub.contextText() } }.padding(vertical = 6.dp))
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                hub.setApiKey(k)
+                if (k != key) { hub.setApiKey(k); hub.loadModels(k) }
                 hr.toIntOrNull()?.let { if (it != hrMax) hub.setHrMax(it) }
                 onDismiss()
             }) { Text("Save", color = C.Accent, fontWeight = FontWeight.Bold) }

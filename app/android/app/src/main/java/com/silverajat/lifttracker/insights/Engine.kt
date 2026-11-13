@@ -164,13 +164,19 @@ object InsightEngine {
         val weatherDue = now.hour in 6..21
         val weather = if (weatherDue) WeatherApi.today(zone) else null
 
+        // the full analysis (31 days of Fitbit data) only when something needs it
+        var daysCache: List<com.silverajat.lifttracker.health.HealthDay>? = null
+        suspend fun days() = daysCache ?: (if (canHealth) runCatching { health.days(31, hrMax) }.getOrDefault(emptyList()) else emptyList())
+            .also { daysCache = it }
+        val goalKg = prefs.getFloat("goal_kg_week", 0.25f).toDouble()
+        suspend fun analysis() = Analysis.run(days(), sessions, meals.days(today.minusDays(60), today), meals.weights(), today, zone, goalKg)
+
         // morning summary: after you wake (sleep synced) or by 10 AM at the latest
         val mKey = "morning-$today"
         if (force || (mKey !in sent && now.hour >= 6)) {
-            val days = if (canHealth) runCatching { health.days(31, hrMax) }.getOrDefault(emptyList()) else emptyList()
-            val woke = days.lastOrNull()?.sleep != null
+            val woke = days().lastOrNull()?.sleep != null
             if (force || woke || now.hour >= 10) {
-                val a = Analysis.run(days, sessions, meals.days(today.minusDays(30), today), meals.weights(), today, zone)
+                val a = analysis()
                 Insights.morning(a, weather, today, nowMs)?.let {
                     post(ctx, if (force) it.copy(key = "$mKey-$nowMs") else it)
                 }
@@ -202,9 +208,14 @@ object InsightEngine {
             }
         }
 
-        // evening food check at 8:30 PM
-        if (now.toLocalTime() >= LocalTime.of(20, 30) && "food-$today" !in sent) {
-            post(ctx, Insights.evening(meals.day(today), today, nowMs))
+        // evening net check at 8:30 PM, day wrap-up at 9:45 PM
+        val t = now.toLocalTime()
+        if (t >= LocalTime.of(20, 30) && t < LocalTime.of(21, 45) && "food-$today" !in sent) {
+            post(ctx, Insights.evening(analysis().energy, meals.day(today), goalKg, today, t, nowMs))
+        }
+        if (t >= LocalTime.of(21, 45) && "night-$today" !in sent) {
+            val a = analysis()
+            post(ctx, Insights.night(a, days().lastOrNull { it.date == today }, sessions, meals.day(today), today, zone, t, nowMs))
         }
     }
 }

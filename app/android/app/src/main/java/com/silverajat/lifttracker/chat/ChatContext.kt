@@ -18,7 +18,7 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 /**
- * Everything the app knows, as text for Claude's system prompt: the meal
+ * Everything the app knows, as text for GPT's instructions: the meal
  * plan, what was eaten (with times and estimated macros), Fitbit data from
  * Health Connect, our load and recovery scores, morning weights, and the
  * gym log from the pod (sets, reps, rep quality, ROM, what the counter
@@ -131,6 +131,13 @@ object ChatContext {
                     (n.avgBalance?.let { ", intake minus burned ${it} kcal/day (predicts ${"%.2f".format(n.predictedKgPerWeek)} kg/week)" } ?: ""))
             }
             appendLine("Weight: ${analysis.weight.verdict}")
+            analysis.energy.let { e ->
+                appendLine("Net calories (eaten minus burned; burn = Fitbit x ${"%.2f".format(e.k)}, calibrated against his weight trend with a Kalman filter, confidence ${e.confidence}%): " +
+                    (e.avgNet?.let { "last 2 weeks average ${it} kcal/day" } ?: "not enough logged days yet") +
+                    (e.scaleNet?.let { ", the scale trend alone implies ${it} kcal/day" } ?: "") +
+                    (e.trendKgPerWeek?.let { ", trend ${"%.2f".format(it)} kg/week" } ?: "") +
+                    ". His goal: ${"%+.2f".format(analysis.goalKgPerWeek)} kg/week = net ${e.netFor(analysis.goalKgPerWeek)} kcal/day. He tracks net calories, not protein or carbs.")
+            }
             if (analysis.effects.isNotEmpty()) {
                 appendLine("What affects his next-day recovery (with vs without, n days):")
                 analysis.effects.forEach { e -> appendLine("  ${e.habit}: ${r(e.with)} vs ${r(e.without)} (${e.nWith}/${e.nWithout} days, ${if (e.clear) "clear" else "early signal"})") }
