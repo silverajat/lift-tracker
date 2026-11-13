@@ -75,13 +75,9 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
     /** Weekly weight goal (kg/week): sets the net-calorie goal. */
-    private val _goal = MutableStateFlow(run {
-        // goal is maintain; the old default (+0.25) is moved over once
-        if (!prefs.getBoolean("goal_v2", false)) prefs.edit().putFloat("goal_kg_week", 0f).putBoolean("goal_v2", true).apply()
-        prefs.getFloat("goal_kg_week", 0f).toDouble()
-    })
+    // maintenance for a muscle recomp: net 0 is the target
+    private val _goal = MutableStateFlow(0.0)
     val goal: StateFlow<Double> = _goal
-    fun setGoal(kgPerWeek: Double) { _goal.value = kgPerWeek; prefs.edit().putFloat("goal_kg_week", kgPerWeek.toFloat()).apply(); refreshAnalysis() }
 
     fun setHrMax(v: Int) { _hrMax.value = v.coerceIn(150, 230); prefs.edit().putInt("hr_max", _hrMax.value).apply(); refreshHealth(full = true) }
 

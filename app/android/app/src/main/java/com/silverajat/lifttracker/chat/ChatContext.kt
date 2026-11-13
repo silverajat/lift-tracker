@@ -136,7 +136,7 @@ object ChatContext {
                     (e.avgNet?.let { "last 2 weeks average ${it} kcal/day" } ?: "not enough logged days yet") +
                     (e.scaleNet?.let { ", the scale trend alone implies ${it} kcal/day" } ?: "") +
                     (e.trendKgPerWeek?.let { ", trend ${"%.2f".format(it)} kg/week" } ?: "") +
-                    ". His goal: ${"%+.2f".format(analysis.goalKgPerWeek)} kg/week = net ${e.netFor(analysis.goalKgPerWeek)} kcal/day. He tracks net calories, not protein or carbs.")
+                    ". His goal: maintenance (net ~0 kcal/day) for a muscle recomp, for the foreseeable future. He tracks net calories, not protein or carbs.")
             }
             if (analysis.effects.isNotEmpty()) {
                 appendLine("What affects his next-day recovery (with vs without, n days):")

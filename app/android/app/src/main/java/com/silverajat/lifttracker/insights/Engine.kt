@@ -192,7 +192,7 @@ object InsightEngine {
             daysCache = d
             return d
         }
-        val goalKg = prefs.getFloat("goal_kg_week", 0f).toDouble()
+        val goalKg = 0.0 // maintenance (recomp)
         suspend fun weights(): List<com.silverajat.lifttracker.meals.WeightEntry> {
             val mine = meals.weights()
             val have = mine.map { it.date }.toSet()

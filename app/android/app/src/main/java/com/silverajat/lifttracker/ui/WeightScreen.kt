@@ -139,7 +139,7 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                 }
             }
             item {
-                val goalWord = when { goalKgPerWeek > 0 -> "gain %.2f".format(goalKgPerWeek); goalKgPerWeek < 0 -> "lose %.2f".format(-goalKgPerWeek); else -> "hold steady" }
+                val goalWord = when { goalKgPerWeek > 0 -> "gain %.2f".format(goalKgPerWeek); goalKgPerWeek < 0 -> "lose %.2f".format(-goalKgPerWeek); else -> "maintain (recomp)" }
                 Column {
                     Text("Rate", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
                     Card(Modifier.fillMaxWidth()) {
@@ -149,9 +149,9 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                             HorizontalDivider(color = C.Line)
                             Row {
                                 Column(Modifier.weight(1f)) {
-                                    Text("Your goal", style = MaterialTheme.typography.titleSmall)
+                                    Text("Goal", style = MaterialTheme.typography.titleSmall)
                                 }
-                                Text("$goalWord kg/week", style = MaterialTheme.typography.titleMedium)
+                                Text(if (goalKgPerWeek == 0.0) "Maintain (recomp)" else "$goalWord kg/week", style = MaterialTheme.typography.titleMedium)
                             }
                             (r28 ?: r14)?.let { r ->
                                 Text("At this rate: %.1f kg in 4 weeks, %.1f kg in 8 weeks.".format(now.trend + r * 4, now.trend + r * 8),

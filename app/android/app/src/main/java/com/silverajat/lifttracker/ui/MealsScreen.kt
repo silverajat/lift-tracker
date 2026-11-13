@@ -115,7 +115,7 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
             }
         }
         if (view == 0) {
-            netItems(analysis, todayEntries, goal, onWeight = { weightOpen = true }, onGoal = hub::setGoal)
+            netItems(analysis, todayEntries, goal, onWeight = { weightOpen = true })
             return@LazyColumn
         }
         item {

@@ -37,9 +37,6 @@ private val shortDate = DateTimeFormatter.ofPattern("d MMM")
 
 fun signedKcal(n: Int) = (if (n > 0) "+" else if (n < 0) "−" else "") + "%,d".format(abs(n))
 
-/** Goals offered (kg/week) and their labels. */
-val goals = listOf(-0.5 to "Lose 0.5", -0.25 to "Lose 0.25", 0.0 to "Maintain", 0.25 to "Gain 0.25", 0.5 to "Gain 0.5")
-
 fun todayNet(e: Energy.Result, entries: List<MealEntry>, today: LocalDate, now: LocalTime) = Energy.today(e, entries, today, now)
 
 /** Colour for a net number against the goal (±150 kcal counts as on target). */
@@ -50,7 +47,7 @@ fun netColor(net: Int, goal: Int): Color = when {
 }
 
 /** The Net view (top of the Food tab). */
-fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, goalKg: Double, onWeight: () -> Unit = {}, onGoal: (Double) -> Unit) {
+fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, goalKg: Double, onWeight: () -> Unit = {}) {
     val e = a?.energy
     if (e == null) {
         item { Text("Working it out…", color = C.Muted) }
@@ -72,13 +69,12 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
                     else if (todayEntries.isEmpty()) "nothing logged yet: this is just what you've burned"
                     else "by the end of the day (${signedKcal(t.soFar)} so far)",
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted)
-                Text("Goal ${signedKcal(goal)} a day (${goals.firstOrNull { it.first == goalKg }?.second?.lowercase() ?: "%+.2f".format(goalKg)} kg/week)",
-                    style = MaterialTheme.typography.bodyLarge)
-                FlowRowCompat(spacing = 6.dp) {
-                    goals.forEach { (g, label) ->
-                        Tag(label, color = if (g == goalKg) C.Accent else C.Muted, modifier = Modifier.clickable { onGoal(g) })
-                    }
-                }
+                val off = t.endOfDay - goal
+                Text(when {
+                    abs(off) <= 150 -> "On maintenance ✓"
+                    off < 0 -> "${"%,d".format(-off)} under maintenance. Eat a bit more: the recomp needs fuel."
+                    else -> "${"%,d".format(off)} over maintenance."
+                }, style = MaterialTheme.typography.bodyLarge, color = netColor(t.endOfDay, goal))
             }
         }
     }
@@ -88,10 +84,14 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
         Card(Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionLabel("Last two weeks")
-                NetBars(days.map { it.net }, goal)
-                Row {
-                    Text(days.firstOrNull()?.date?.format(shortDate) ?: "", style = MaterialTheme.typography.labelMedium, color = C.Muted, modifier = Modifier.weight(1f))
-                    Text("Dashed line is your goal. Grey: not logged.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                if (days.none { it.net != null }) {
+                    Text("No food logged in the last two weeks.", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                } else {
+                    NetBars(days.map { it.net }, goal)
+                    Row {
+                        Text(days.firstOrNull()?.date?.format(shortDate) ?: "", style = MaterialTheme.typography.labelMedium, color = C.Muted, modifier = Modifier.weight(1f))
+                        Text("Yesterday", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    }
                 }
                 e.avgNet?.let { n ->
                     Text("Average ${signedKcal(n)} a day", style = MaterialTheme.typography.titleMedium, color = netColor(n, goal))
@@ -173,7 +173,7 @@ private fun NetBars(values: List<Int?>, goal: Int) {
         values.forEachIndexed { i, v ->
             val x = i * (w + gap)
             if (v == null) {
-                drawRoundRect(C.Raised, Offset(x, mid - 3.dp.toPx()), Size(w, 6.dp.toPx()), CornerRadius(2.dp.toPx()))
+                drawRoundRect(C.Line, Offset(x, mid - 3.dp.toPx()), Size(w, 6.dp.toPx()), CornerRadius(2.dp.toPx()))
             } else {
                 val top = minOf(y(v.toFloat()), mid)
                 val h = abs(y(v.toFloat()) - mid).coerceAtLeast(2.dp.toPx())
