@@ -102,9 +102,9 @@ class ScreenshotTest {
 
     private val weights = (0 until 21).map { i -> WeightEntry(today.minusDays(i.toLong()), 71.2 - i * 0.03 + rnd.nextGaussian() * 0.3, 0) }
 
-    private val analysis = Analysis.run(days, sessions, meals, weights, today, zone, 0.25)
+    private val analysis = Analysis.run(days, sessions, meals, weights, today, zone, 0.0)
     /** Same, with today's Fitbit burn as it would be at 2:30 PM. */
-    private val analysisPartial = Analysis.run(days.dropLast(1) + days.last().copy(kcalTotal = 1750.0), sessions, meals, weights, today, zone, 0.25)
+    private val analysisPartial = Analysis.run(days.dropLast(1) + days.last().copy(kcalTotal = 1750.0), sessions, meals, weights, today, zone, 0.0)
 
     private fun shoot(name: String, content: @androidx.compose.runtime.Composable () -> Unit) =
         captureRoboImage("build/outputs/roborazzi/$name.png") {
@@ -114,7 +114,7 @@ class ScreenshotTest {
     @Test fun today() = shoot("today") {
         TodayContent(TodayUi(
             health = HealthState.OK, analysis = analysisPartial, todayHealth = days.last().copy(kcalTotal = 1750.0), syncedAt = System.currentTimeMillis(),
-            podReady = false, podSub = "for the gym", food = meals[today].orEmpty(), goalKg = 0.25,
+            podReady = false, podSub = "for the gym", food = meals[today].orEmpty(), goalKg = 0.0,
             take = Coach.Take(today, "- Recovery is up to 74% after your best sleep in a week: HRV is back above normal.\n" +
                 "- Net calories averaged +190 against a +275 goal, and the scale agrees: you're gaining slowly.\n" +
                 "- Incline bench has gone up three sessions running.\nToday:\n- Lower day: push the top sets, you're recovered.\n" +
@@ -124,12 +124,12 @@ class ScreenshotTest {
     }
 
     @Test fun todayEmpty() = shoot("today_new_user") {
-        TodayContent(TodayUi(HealthState.NEEDS_PERMISSION, null, null, null, false, "for the gym", emptyList(), 0.25, null, false, null, false))
+        TodayContent(TodayUi(HealthState.NEEDS_PERMISSION, null, null, null, false, "for the gym", emptyList(), 0.0, null, false, null, false))
     }
 
     @Test fun net() = shoot("net") {
         LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            netItems(analysisPartial, meals[today].orEmpty(), 0.25) {}
+            netItems(analysisPartial, meals[today].orEmpty(), 0.0) {}
         }
     }
 
@@ -213,7 +213,7 @@ class ScreenshotTest {
     private val items = com.silverajat.lifttracker.activity.ActivityLog.merge(days, acts, hrFor, sessions)
 
     @Test fun recoveryDetail() = shoot("detail_recovery") { com.silverajat.lifttracker.ui.RecoveryDetail(analysis, days) {} }
-    @Test fun strainDetail() = shoot("detail_strain") { com.silverajat.lifttracker.ui.StrainDetail(analysis, days, items, 0.25, {}, {}, {}) }
+    @Test fun strainDetail() = shoot("detail_strain") { com.silverajat.lifttracker.ui.StrainDetail(analysis, days, items, 0.0, {}, {}, {}) }
     @Test fun sleepDetail() = shoot("detail_sleep") { com.silverajat.lifttracker.ui.SleepDetail(analysis, days) {} }
     @Test fun runDetail() = shoot("run_detail") { com.silverajat.lifttracker.ui.RunDetail(acts[0], items.first { it.manualId == "r1" }, {}, {}) }
     @Test fun liveRun() = shoot("run_live") {
@@ -227,7 +227,7 @@ class ScreenshotTest {
             val d = today.minusDays(i.toLong())
             WeightEntry(d, 70.2 + (69 - i) * 0.022 + rnd.nextGaussian() * 0.35 + (if (d.dayOfWeek == java.time.DayOfWeek.MONDAY) 0.4 else 0.0), 0)
         }.sortedBy { it.date }
-        com.silverajat.lifttracker.ui.WeightDetail(ws, 0.25, {}, {})
+        com.silverajat.lifttracker.ui.WeightDetail(ws, 0.0, {}, {})
     }
 
     @Suppress("unused") private val keepFoods = Foods.all.size
