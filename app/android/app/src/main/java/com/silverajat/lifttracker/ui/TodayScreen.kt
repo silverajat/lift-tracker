@@ -194,9 +194,10 @@ fun TodayContent(
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         TrendRow("Recovery", ds.map { (it.recovery?.score ?: 0) / 100f }, ds.map { zoneColor(it.recovery?.zone) },
                             ds.lastOrNull()?.recovery?.let { "${it.score}%" })
-                        TrendRow("Strain", ds.map { ((it.strain?.strain ?: 0.0) / 21.0).toFloat() }, ds.map { StrainBlue },
+                        TrendRow("Strain", ds.map { ((it.strain?.strain ?: 0.0) / 18.0).toFloat() }, ds.map { StrainBlue },
                             ds.lastOrNull()?.strain?.let { "%.1f".format(it.strain) })
-                        TrendRow("Sleep", ds.map { ((it.sleep?.asleepMin ?: 0) / 600f).coerceAtMost(1f) }, ds.map { SleepPurple },
+                        // 5 h at the bottom, 9 h at the top, so a short night stands out
+                        TrendRow("Sleep", ds.map { s -> s.sleep?.let { ((it.asleepMin - 300) / 240f).coerceIn(0.08f, 1f) } ?: 0f }, ds.map { SleepPurple.copy(alpha = 0.85f) },
                             ds.lastOrNull()?.sleep?.let { hmin(it.asleepMin) })
                         Text("${ds.first().date.format(shortDay)} to today", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                     }
@@ -363,10 +364,10 @@ private fun Scoreboard(d: Analysis.Day?) {
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1.25f)) {
             Text("Recovery", style = MaterialTheme.typography.titleSmall, color = C.Muted)
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(r?.score?.toString() ?: "–", style = MaterialTheme.typography.displayLarge.merge(Tnum), color = if (r == null) C.Muted else color)
-                if (r != null) Text("%", style = MaterialTheme.typography.displaySmall, color = color, modifier = Modifier.padding(bottom = 14.dp))
-            }
+            if (r != null) Row(verticalAlignment = Alignment.Bottom) {
+                Text(r.score.toString(), style = MaterialTheme.typography.displayLarge.merge(Tnum), color = color)
+                Text("%", style = MaterialTheme.typography.displaySmall, color = color, modifier = Modifier.padding(bottom = 14.dp))
+            } else Text("No score yet", style = MaterialTheme.typography.headlineMedium, color = C.Muted, modifier = Modifier.padding(vertical = 18.dp))
             PlateBar(r?.score, color)
             Text(r?.zone?.label ?: "Needs 5 nights of Fitbit data", style = MaterialTheme.typography.titleSmall,
                 color = if (r == null) C.Muted else color, modifier = Modifier.padding(top = 8.dp))
@@ -375,15 +376,15 @@ private fun Scoreboard(d: Analysis.Day?) {
         Column(Modifier.weight(1f).padding(start = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Column {
                 Text("Strain", style = MaterialTheme.typography.titleSmall, color = C.Muted)
-                Text(d?.strain?.let { "%.1f".format(it.strain) } ?: "–", style = MaterialTheme.typography.displayMedium.merge(Tnum),
-                    color = if (d?.strain == null) C.Muted else StrainBlue)
+                Text(d?.strain?.let { "%.1f".format(it.strain) } ?: "Not yet", style = if (d?.strain == null) MaterialTheme.typography.headlineSmall
+                    else MaterialTheme.typography.displayMedium.merge(Tnum), color = if (d?.strain == null) C.Muted else StrainBlue)
                 Text(d?.strain?.target?.let { "aim ${it.start.toInt()} to ${it.endInclusive.toInt()}" } ?: "out of 21",
                     style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
             Column {
                 Text("Sleep", style = MaterialTheme.typography.titleSmall, color = C.Muted)
-                Text(d?.sleep?.let { hmin(it.asleepMin) } ?: "–", style = MaterialTheme.typography.displaySmall.merge(Tnum),
-                    color = if (d?.sleep == null) C.Muted else SleepPurple)
+                Text(d?.sleep?.let { hmin(it.asleepMin) } ?: "Not yet", style = if (d?.sleep == null) MaterialTheme.typography.headlineSmall
+                    else MaterialTheme.typography.displaySmall.merge(Tnum), color = if (d?.sleep == null) C.Muted else SleepPurple)
                 Text(d?.sleep?.let { "${it.performance}% of what you needed" } ?: "from your Fitbit", style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
@@ -415,7 +416,7 @@ private fun CoachTake(u: TodayUi, a: Analysis.Result?, onRefresh: () -> Unit) {
                     color = if (u.taking) C.Muted else C.Accent, modifier = Modifier.clickable(enabled = !u.taking, onClick = onRefresh).padding(4.dp))
             }
             val take = u.take?.takeIf { it.date == u.date }
-            if (take != null) Text(take.text, style = MaterialTheme.typography.bodyLarge)
+            if (take != null) TakeText(take.text)
             else {
                 val lines = a?.headline.orEmpty()
                 if (lines.isEmpty()) Text("Log a few days of food, weight and workouts and this fills in.",
@@ -425,6 +426,25 @@ private fun CoachTake(u: TodayUi, a: Analysis.Result?, onRefresh: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
             u.takeError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = RedZ) }
+        }
+    }
+}
+
+/** GPT's take: "- " lines become bullets, a line ending in ":" becomes a small heading. */
+@Composable
+private fun TakeText(text: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        text.lines().map { it.trim() }.filter { it.isNotEmpty() }.forEach { line ->
+            val bullet = line.startsWith("- ") || line.startsWith("• ") || line.startsWith("* ")
+            when {
+                bullet -> Row {
+                    Box(Modifier.padding(top = 9.dp, end = 10.dp).size(5.dp).clip(CircleShape).background(C.Accent))
+                    Text(line.drop(2).replace("**", ""), style = MaterialTheme.typography.bodyLarge)
+                }
+                line.endsWith(":") -> Text(line.removeSuffix(":"), style = MaterialTheme.typography.titleSmall, color = C.Accent,
+                    modifier = Modifier.padding(top = 4.dp))
+                else -> Text(line.replace("**", ""), style = MaterialTheme.typography.bodyLarge)
+            }
         }
     }
 }

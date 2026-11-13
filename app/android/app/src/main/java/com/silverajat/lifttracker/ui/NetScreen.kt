@@ -68,9 +68,9 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
                     Text(signedKcal(t.endOfDay), style = MaterialTheme.typography.displayMedium.merge(Tnum), color = netColor(t.endOfDay, goal))
                     Text("  kcal", color = C.Muted, modifier = Modifier.padding(bottom = 10.dp))
                 }
-                Text(if (t.restOfPlan) "by tonight if you eat the rest of the plan · ${signedKcal(t.soFar)} right now"
+                Text(if (t.restOfPlan) "by tonight if you eat the rest of the plan (${signedKcal(t.soFar)} so far)"
                     else if (todayEntries.isEmpty()) "nothing logged yet: this is just what you've burned"
-                    else "by the end of the day · ${signedKcal(t.soFar)} right now",
+                    else "by the end of the day (${signedKcal(t.soFar)} so far)",
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                 Text("Goal ${signedKcal(goal)} a day (${goals.firstOrNull { it.first == goalKg }?.second?.lowercase() ?: "%+.2f".format(goalKg)} kg/week)",
                     style = MaterialTheme.typography.bodyLarge)
@@ -87,11 +87,11 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
         val days = e.days.takeLast(14)
         Card(Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Last 2 weeks")
+                SectionLabel("Last two weeks")
                 NetBars(days.map { it.net }, goal)
                 Row {
                     Text(days.firstOrNull()?.date?.format(shortDate) ?: "", style = MaterialTheme.typography.labelMedium, color = C.Muted, modifier = Modifier.weight(1f))
-                    Text("dashed = goal · grey = not logged", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    Text("Dashed line is your goal. Grey: not logged.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
                 }
                 e.avgNet?.let { n ->
                     Text("Average ${signedKcal(n)} a day", style = MaterialTheme.typography.titleMedium, color = netColor(n, goal))
@@ -139,8 +139,8 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
 
 @Composable
 private fun NetBars(values: List<Int?>, goal: Int) {
-    val lim = 1200f
-    Canvas(Modifier.fillMaxWidth().height(110.dp)) {
+    val lim = 700f
+    Canvas(Modifier.fillMaxWidth().height(130.dp)) {
         val n = values.size
         if (n == 0) return@Canvas
         val gap = 4.dp.toPx()

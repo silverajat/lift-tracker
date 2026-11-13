@@ -71,6 +71,7 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.1.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
     testImplementation("io.github.takahirom.roborazzi:roborazzi:1.78.0")
     testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.78.0")
     testImplementation("androidx.compose.ui:ui-test-junit4")

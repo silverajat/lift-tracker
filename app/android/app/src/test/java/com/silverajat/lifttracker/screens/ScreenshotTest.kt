@@ -43,7 +43,7 @@ import java.util.Random
 /** Renders the main screens with three weeks of made-up data, for design review (build/outputs/roborazzi). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34], qualifiers = "w400dp-h1900dp-xxhdpi")
+@Config(sdk = [34], qualifiers = "w400dp-h2900dp-xxhdpi")
 class ScreenshotTest {
     private val zone = ZoneId.systemDefault()
     private val today = LocalDate.now()
@@ -86,6 +86,8 @@ class ScreenshotTest {
     private val weights = (0 until 21).map { i -> WeightEntry(today.minusDays(i.toLong()), 71.2 - i * 0.03 + rnd.nextGaussian() * 0.3, 0) }
 
     private val analysis = Analysis.run(days, sessions, meals, weights, today, zone, 0.25)
+    /** Same, with today's Fitbit burn as it would be at 2:30 PM. */
+    private val analysisPartial = Analysis.run(days.dropLast(1) + days.last().copy(kcalTotal = 1750.0), sessions, meals, weights, today, zone, 0.25)
 
     private fun shoot(name: String, content: @androidx.compose.runtime.Composable () -> Unit) =
         captureRoboImage("build/outputs/roborazzi/$name.png") {
@@ -94,7 +96,7 @@ class ScreenshotTest {
 
     @Test fun today() = shoot("today") {
         TodayContent(TodayUi(
-            health = HealthState.OK, analysis = analysis, todayHealth = days.last(), syncedAt = System.currentTimeMillis(),
+            health = HealthState.OK, analysis = analysisPartial, todayHealth = days.last().copy(kcalTotal = 1750.0), syncedAt = System.currentTimeMillis(),
             podReady = false, podSub = "for the gym", food = meals[today].orEmpty(), goalKg = 0.25,
             take = Coach.Take(today, "- Recovery is up to 74% after your best sleep in a week: HRV is back above normal.\n" +
                 "- Net calories averaged +190 against a +275 goal, and the scale agrees: you're gaining slowly.\n" +
@@ -110,7 +112,7 @@ class ScreenshotTest {
 
     @Test fun net() = shoot("net") {
         LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            netItems(analysis, meals[today].orEmpty(), 0.25) {}
+            netItems(analysisPartial, meals[today].orEmpty(), 0.25) {}
         }
     }
 
@@ -122,6 +124,35 @@ class ScreenshotTest {
         )
         LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(list.size) { InsightCard(list[it], today) }
+        }
+    }
+
+    /** Screens that need the real view models: best effort, never fails the build. */
+    private fun tryShoot(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
+        runCatching { shoot(name, content) }.onFailure { System.err.println("screenshot $name skipped: $it") }
+    }
+
+    @Test fun gymHome() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+        val store = com.silverajat.lifttracker.data.SessionStore(app)
+        sessions.forEach { store.save(it) }
+        tryShoot("gym_home") {
+            val vm = androidx.lifecycle.viewmodel.compose.viewModel<com.silverajat.lifttracker.AppViewModel>()
+            com.silverajat.lifttracker.ui.HomeScreen(vm, onConnect = {}, onExport = {})
+        }
+        tryShoot("workout") {
+            val vm = androidx.lifecycle.viewmodel.compose.viewModel<com.silverajat.lifttracker.AppViewModel>()
+            com.silverajat.lifttracker.ui.WorkoutScreen(vm, Day.UPPER, onShare = {})
+        }
+    }
+
+    @Test fun foodLog() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+        val store = com.silverajat.lifttracker.meals.MealStore(app.filesDir)
+        meals[today].orEmpty().forEach { store.add(it) }
+        tryShoot("food_log") {
+            val hub = androidx.lifecycle.viewmodel.compose.viewModel<com.silverajat.lifttracker.HubViewModel>()
+            com.silverajat.lifttracker.ui.MealsScreen(hub, startOnLog = true)
         }
     }
 

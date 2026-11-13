@@ -65,8 +65,8 @@ private const val WALK_STEPS = 1200
  * its time or portion). Calories are only used for the net number.
  */
 @Composable
-fun MealsScreen(hub: HubViewModel) {
-    var view by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }   // 0 Net, 1 Log
+fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
+    var view by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(if (startOnLog) 1 else 0) }   // 0 Net, 1 Log
     val analysis by hub.analysis.collectAsStateWithLifecycle()
     val todayEntries by hub.todayEntries.collectAsStateWithLifecycle()
     val goal by hub.goal.collectAsStateWithLifecycle()
