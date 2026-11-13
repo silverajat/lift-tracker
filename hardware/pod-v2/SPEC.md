@@ -1,6 +1,6 @@
 # Pod v2: the final, Fitbit-sized lift tracker
 
-**Status (Nov 13):** IMU is now the ST LSM6DSV16X (same footprint position as the BMI270 it replaced). **Earlier (Nov 12, late):** rev A uses the **Ebyte E73-2G4M08S1C** nRF52840 module, which JLC has in stock. The Raytac MDBT50Q we started with is out of stock. Board: 41 × 18 mm, 4 layers, 0.8 mm. Case: 43.6 × 20.6 × 7.75 mm. Release files are in `release/liftpod_v2_revA/`.
+**Status (Nov 13):** IMU is now the ST LSM6DSV16X (same footprint position as the BMI270 it replaced). **Earlier (Nov 12, late):** rev A uses the **Ebyte E73-2G4M08S1C** nRF52840 module, which JLC has in stock. The Raytac MDBT50Q we started with is out of stock. Board: 41 × 18 mm, 4 layers, 0.8 mm. Case: 45.6 × 20.6 × 7.75 mm (2 mm cell pocket past the board end, Nov 13). Release files are in `release/liftpod_v2_revA/`.
 
 **Goal:** close to a Google Fitbit Air pebble (34.9 × 17 × 8.3 mm), with no USB port, no button, charging on the Fitbit Air charger, and everything over Bluetooth. Result: **0.55 mm thinner** than the Fitbit Air and about 9 mm longer. The E73 is bigger and taller than the Raytac module (13 × 18 × 3 mm vs 10 × 15.5 × 2.2), and we picked thin over short.
 
