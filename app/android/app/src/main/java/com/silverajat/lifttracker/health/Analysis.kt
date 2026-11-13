@@ -204,7 +204,7 @@ object Analysis {
         if (parts.isEmpty()) return null
         val z = parts.sumOf { it.first * it.second } / parts.sumOf { it.second }
         val score = (50 + 20 * z).roundToInt().coerceIn(1, 99)
-        return RecoveryResult(score, zoneOf(score), contrib, minOf(hrvBase?.n ?: 0, 30))
+        return RecoveryResult(score, zoneOf(score), contrib, minOf(maxOf(hrvBase?.n ?: 0, rhrBase?.n ?: 0), 30))
     }
 
     // ---- gym -------------------------------------------------------------------------------

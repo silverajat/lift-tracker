@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -109,6 +110,8 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
     LaunchedEffect(Unit) { hub.refreshHealth() }
     var keyDialog by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     if (keyDialog) SettingsDialog(hub) { keyDialog = false }
+    var dataDialog by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    if (dataDialog) FitbitDataDialog(hub) { dataDialog = false }
     val ready = conn == PodConn.READY
     TodayContent(
         TodayUi(
@@ -117,7 +120,7 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
             podSub = if (ready) (status?.let { "${it.batteryPct}%" + if (it.charging) ", charging" else "" } ?: "connected") else "for the gym",
             food = food, goalKg = goal, take = take, taking = taking, takeError = takeError, hasKey = key.isNotEmpty(),
         ),
-        onFitbit = if (state == HealthState.OK) ({ hub.refreshHealth() }) else onConnectHealth,
+        onFitbit = if (state == HealthState.OK) ({ dataDialog = true }) else onConnectHealth,
         onPod = onConnectPod, onOpenGym = onOpenGym, onOpenNet = onOpenNet,
         onRefreshTake = { hub.refreshTake(force = true) },
         onAddKey = { keyDialog = true },
@@ -503,4 +506,57 @@ private fun Bars(values: List<Float>, colors: List<Color>) {
             drawRoundRect(if (empty) C.Raised else colors[i], Offset(i * (w + gap), size.height - h), Size(w, h), CornerRadius(2.dp.toPx()))
         }
     }
+}
+
+/** What's actually arriving from the Fitbit through Health Connect, and how to fix what isn't. */
+@Composable
+fun FitbitDataDialog(hub: HubViewModel, onDismiss: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var checks by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<List<com.silverajat.lifttracker.health.HealthRepo.DataCheck>?>(null) }
+    var round by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(round) {
+        checks = null
+        checks = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { hub.health.check() }.getOrDefault(emptyList()) }
+    }
+    val zone = ZoneId.systemDefault()
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = C.Surface,
+        title = { Text("Fitbit data, last 3 days") },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val list = checks
+                if (list == null) Text("Checking…", color = C.Muted)
+                else list.forEach { c ->
+                    Row(verticalAlignment = Alignment.Top) {
+                        Box(Modifier.padding(top = 6.dp).size(8.dp).clip(CircleShape).background(when {
+                            !c.allowed -> RedZ; c.count == 0 -> Yellow; else -> Recover }))
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(c.name, style = MaterialTheme.typography.titleSmall)
+                            Text(when {
+                                !c.allowed -> "Not allowed: tap Health Connect below and allow it for Spotter"
+                                c.count == 0 -> "Nothing in 3 days"
+                                else -> "${c.count}${if (c.more) "+" else ""} readings, latest " +
+                                    (c.latest?.atZone(zone)?.let { t -> (if (t.toLocalDate() == LocalDate.now()) "" else t.format(shortDay) + " ") + t.format(hm) } ?: "?") +
+                                    ", from " + c.sources.joinToString(", ")
+                            }, style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                        }
+                    }
+                }
+                Text("If something says nothing: open the Google Health app, go to your profile, then Settings, then Health Connect, " +
+                    "and turn sharing on for everything. Then open Google Health once so the watch syncs, and tap Check again.",
+                    style = MaterialTheme.typography.bodySmall, color = C.Muted)
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { round++; hub.refreshHealth() }) { Text("Check again", color = C.Accent) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                runCatching { ctx.startActivity(android.content.Intent("androidx.health.ACTION_HEALTH_CONNECT_SETTINGS")) }
+                    .onFailure { runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS)) } }
+            }) { Text("Health Connect", color = C.Muted) }
+        },
+    )
 }

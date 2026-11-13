@@ -145,11 +145,67 @@ class HealthRepo(private val context: Context) {
         return generateSequence(first) { it.plusDays(1) }.takeWhile { !it.isAfter(today) }.map { d ->
             HealthDay(
                 date = d, steps = steps[d], kcalTotal = kcalTotal[d], kcalActive = kcalActive[d],
-                restingHr = rhr[d], hrvMs = hrv[d], spo2 = spo2[d], respRate = resp[d], sleep = sleep[d],
+                // if the Fitbit doesn't share resting HR, work it out from last night's heart rate
+                restingHr = rhr[d] ?: restingFromHr(hr[d].orEmpty() + hr[d.minusDays(1)].orEmpty(), sleep[d]), hrvMs = hrv[d], spo2 = spo2[d], respRate = resp[d], sleep = sleep[d],
                 workouts = workouts[d] ?: emptyList(),
                 load = hr[d]?.let { Scores.load(it, rhr[d], hrMax) },
             )
         }.toList()
+    }
+
+    /** Lowest 10-minute average heart rate while asleep (or all day, without sleep data). */
+    private fun restingFromHr(samples: List<HrSample>, s: SleepSummary?): Int? {
+        val inWindow = if (s != null) samples.filter { it.time >= s.start && it.time <= s.end } else emptyList()
+        val use = (inWindow.takeIf { it.size >= 20 } ?: samples).sortedBy { it.time }
+        if (use.size < 20) return null
+        var best = Double.MAX_VALUE
+        var j = 0
+        var sum = 0.0
+        for (i in use.indices) {
+            sum += use[i].bpm
+            while (use[i].time.epochSecond - use[j].time.epochSecond > 600) { sum -= use[j].bpm; j++ }
+            if (i - j + 1 >= 5) best = minOf(best, sum / (i - j + 1))
+        }
+        return if (best == Double.MAX_VALUE) null else best.toInt()
+    }
+
+    /** What's actually arriving from the Fitbit, per kind of data (last 3 days). */
+    data class DataCheck(val name: String, val allowed: Boolean, val count: Int, val latest: Instant?, val sources: Set<String>, val more: Boolean)
+
+    suspend fun check(): List<DataCheck> {
+        val g = granted()
+        val end = Instant.now()
+        val start = end.minus(Duration.ofDays(3))
+        val types: List<Pair<String, KClass<out Record>>> = listOf(
+            "Heart rate" to HeartRateRecord::class, "HRV" to HeartRateVariabilityRmssdRecord::class,
+            "Resting heart rate" to RestingHeartRateRecord::class, "Sleep" to SleepSessionRecord::class,
+            "Steps" to StepsRecord::class, "Calories burned" to TotalCaloriesBurnedRecord::class,
+            "Workouts" to ExerciseSessionRecord::class, "Breathing rate" to RespiratoryRateRecord::class,
+            "Blood oxygen" to OxygenSaturationRecord::class, "Weight" to WeightRecord::class,
+        )
+        return types.map { (name, t) ->
+            if (HealthPermission.getReadPermission(t) !in g) return@map DataCheck(name, false, 0, null, emptySet(), false)
+            @Suppress("UNCHECKED_CAST") val kc = t as KClass<Record>
+            val r = runCatching { client.readRecords(ReadRecordsRequest(kc, TimeRangeFilter.between(start, end), pageSize = 1000)) }.getOrNull()
+            val recs = r?.records.orEmpty()
+            val latest = recs.mapNotNull { rec ->
+                when (rec) {
+                    is androidx.health.connect.client.records.InstantaneousRecord -> rec.time
+                    is androidx.health.connect.client.records.IntervalRecord -> rec.endTime
+                    else -> null
+                }
+            }.maxOrNull()
+            DataCheck(name, true, recs.size, latest, recs.map { sourceName(it.metadata.dataOrigin.packageName) }.toSet(), !r?.pageToken.isNullOrEmpty())
+        }
+    }
+
+    private fun sourceName(pkg: String) = when {
+        pkg.startsWith("com.fitbit") -> "Fitbit"
+        pkg.startsWith("com.google.android.apps.fitness") -> "Google Fit"
+        pkg.contains("healthdata") || pkg.contains("google.android.apps.health") -> "Google Health"
+        pkg.startsWith("com.sec.android.app.shealth") -> "Samsung Health"
+        pkg == "android" || pkg.startsWith("com.android") -> "your phone"
+        else -> pkg
     }
 
     /** Steps in a window (e.g. the 45 min after a meal), or null without permission. */
