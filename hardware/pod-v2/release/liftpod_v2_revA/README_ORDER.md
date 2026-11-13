@@ -39,7 +39,7 @@ Upload `assembly/liftpod_v2_BOM_JLCPCB.csv` and `assembly/liftpod_v2_CPL_JLCPCB.
 
 ## 3. Case (JLC3DP)
 
-Upload `../lift_pod_v2_shell.stl` (one piece, 53.2 × 23.8 × 7.75 mm with the band lugs; body 43.6 × 20.6. Fits cells up to ~20.5 mm long incl. the protection board; `lift_pod_v2_shell_long.stl` is a 2 mm longer variant for 22 mm cells).
+Upload `../lift_pod_v2_shell.stl` (one piece, 55.6 × 23.8 × 7.75 mm with the band lugs; body 43.6 × 20.6. Fits cells up to ~20.5 mm long incl. the protection board; `lift_pod_v2_shell_long.stl` is a 2 mm longer variant for 22 mm cells).
 
 - Material: **JLC Black Resin** (toughest of the black resins, 65 °C heat deflection), general sanding. For a silkier feel, wipe with a drop of mineral oil.
 - Product description: Plastic Enclosure. Quantity: 2 (one spare).

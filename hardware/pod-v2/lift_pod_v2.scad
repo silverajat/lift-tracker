@@ -46,6 +46,7 @@ slot_w  = band_t + 0.6;
 bar_t   = 1.8;
 lug_h   = 4.2;
 lug_side = 1.6;   // lug wall beside the strap slot
+lug_gap = 1.5;    // solid bridge between the body end and the slot (JLC flagged 0.73 mm here on rev 1)
 
 // ---------- Shape ----------
 clr = 0.1;        // board in the rim: snug, glued
@@ -65,7 +66,8 @@ body_l = cav_l + 2*wall + cell_ext;  W = cav_w + 2*wall;
 body_off = cell_ext/2;          // the body grows at the right (+X) end only
 plan_r = pcb_r + clr + wall;
 H = pcb_t + in_h + top_t;
-lug_l = slot_w + bar_t + 0.6;
+lug_l = lug_gap + slot_w + bar_t + 0.3;
+lug_w = strap_w + 0.6 + 2*lug_side;
 L = body_l + 2*lug_l;
 
 function pod(p) = [p[0] - pcb_l/2, pcb_w/2 - p[1]];   // board mm -> pod XY
@@ -101,13 +103,16 @@ module r_logo(h = 9) {
 module lugs() {
     translate([body_off, 0, 0]) for (s = [-1, 1]) difference() {
         hull() {
-            translate([s*(body_l/2 - 2), 0, 0]) linear_extrude(lug_h) rr(4, W - 1.0, 1.5);
+            // root inside the body end, then a full-width block so the lug's
+            // side walls run straight (>= 1.6 mm) from the body to the bar
+            translate([s*(body_l/2 - 1.0), 0, 0]) linear_extrude(lug_h) rr(2.0, W - 1.0, 0.8);
+            translate([s*(body_l/2 + lug_gap/2), 0, 0]) linear_extrude(lug_h) rr(lug_gap, lug_w, 0.6);
             translate([s*(L/2 - bar_t/2), 0, bar_t/2 + 0.3]) rotate([90, 0, 0])
-                cylinder(d = bar_t + 0.6, h = strap_w + 0.6 + 2*lug_side, center = true);
+                cylinder(d = bar_t + 0.6, h = lug_w, center = true);
             translate([s*(L/2 - bar_t/2), 0, lug_h - bar_t/2 - 0.3]) rotate([90, 0, 0])
-                cylinder(d = bar_t + 0.6, h = strap_w + 0.6 + 2*lug_side, center = true);
+                cylinder(d = bar_t + 0.6, h = lug_w, center = true);
         }
-        translate([s*(body_l/2 + slot_w/2 + 0.3), 0, lug_h/2])
+        translate([s*(body_l/2 + lug_gap + slot_w/2), 0, lug_h/2])
             cube([slot_w, strap_w + 0.6, lug_h + 2], center = true);
     }
 }
