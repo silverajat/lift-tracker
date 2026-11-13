@@ -7,9 +7,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,46 +20,51 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.silverajat.lifttracker.AppViewModel
 import com.silverajat.lifttracker.HealthState
 import com.silverajat.lifttracker.HubViewModel
 import com.silverajat.lifttracker.ble.PodConn
+import com.silverajat.lifttracker.chat.Coach
 import com.silverajat.lifttracker.health.Analysis
-import com.silverajat.lifttracker.meals.MealStore
-import com.silverajat.lifttracker.meals.Targets
+import com.silverajat.lifttracker.health.Energy
+import com.silverajat.lifttracker.health.HealthDay
+import com.silverajat.lifttracker.meals.MealEntry
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private val hm = DateTimeFormatter.ofPattern("H:mm")
 private val dayHead = DateTimeFormatter.ofPattern("EEEE d MMMM")
+private val shortDay = DateTimeFormatter.ofPattern("d MMM")
 
-val Recover = Color(0xFF16EC06)
-val Yellow = Color(0xFFFFDE00)
-val RedZ = Color(0xFFFF0026)
-val StrainBlue = Color(0xFF0093E7)
-val SleepPurple = Color(0xFF7BA1FF)
+// Metric colours: the plate colours, each with one meaning.
+val Recover = Plate.Green
+val Yellow = Plate.Yellow
+val RedZ = Plate.Red
+val StrainBlue = Plate.Blue
+val SleepPurple = Plate.Chalk
 
 fun zoneColor(z: Analysis.Zone?) = when (z) {
     Analysis.Zone.GREEN -> Recover
@@ -66,7 +73,24 @@ fun zoneColor(z: Analysis.Zone?) = when (z) {
     null -> C.Muted
 }
 
-/** Google Health-style home: your two devices, then WHOOP-style rings and what they mean today. */
+/** Everything the Today tab shows (plain data, so it can be previewed and screenshot-tested). */
+data class TodayUi(
+    val health: HealthState,
+    val analysis: Analysis.Result?,
+    val todayHealth: HealthDay?,
+    val syncedAt: Long?,
+    val podReady: Boolean,
+    val podSub: String,
+    val food: List<MealEntry>,
+    val goalKg: Double,
+    val take: Coach.Take?,
+    val taking: Boolean,
+    val takeError: String?,
+    val hasKey: Boolean,
+    val date: LocalDate = LocalDate.now(),
+    val now: LocalTime = LocalTime.now(),
+)
+
 @Composable
 fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Unit, onConnectPod: () -> Unit, onOpenGym: () -> Unit, onOpenNet: () -> Unit) {
     val state by hub.healthState.collectAsStateWithLifecycle()
@@ -76,260 +100,351 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
     val conn by gym.pod.conn.collectAsStateWithLifecycle()
     val status by gym.pod.status.collectAsStateWithLifecycle()
     val food by hub.todayEntries.collectAsStateWithLifecycle()
+    val goal by hub.goal.collectAsStateWithLifecycle()
+    val take by hub.take.collectAsStateWithLifecycle()
+    val taking by hub.taking.collectAsStateWithLifecycle()
+    val takeError by hub.takeError.collectAsStateWithLifecycle()
+    val key by hub.apiKey.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { hub.refreshHealth() }
-    val zone = ZoneId.systemDefault()
-    val today = a?.today
-    val todayHealth = days.lastOrNull()
+    val ready = conn == PodConn.READY
+    TodayContent(
+        TodayUi(
+            health = state, analysis = a, todayHealth = days.lastOrNull { it.date == LocalDate.now() }, syncedAt = synced,
+            podReady = ready,
+            podSub = if (ready) (status?.let { "${it.batteryPct}%" + if (it.charging) ", charging" else "" } ?: "connected") else "for the gym",
+            food = food, goalKg = goal, take = take, taking = taking, takeError = takeError, hasKey = key.isNotEmpty(),
+        ),
+        onFitbit = if (state == HealthState.OK) ({ hub.refreshHealth() }) else onConnectHealth,
+        onPod = onConnectPod, onOpenGym = onOpenGym, onOpenNet = onOpenNet,
+        onRefreshTake = { hub.refreshTake(force = true) },
+    )
+}
 
+@Composable
+fun TodayContent(
+    u: TodayUi,
+    onFitbit: () -> Unit = {}, onPod: () -> Unit = {}, onOpenGym: () -> Unit = {}, onOpenNet: () -> Unit = {}, onRefreshTake: () -> Unit = {},
+) {
+    val zone = ZoneId.systemDefault()
+    val a = u.analysis
+    val today = a?.today
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp),
     ) {
-        // ---- devices (top left), date ----
+        // ---- devices + date ----
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DeviceChip(
-                    name = "Fitbit Air",
-                    ok = state == HealthState.OK,
-                    sub = when (state) {
-                        HealthState.OK -> synced?.let { "synced " + java.time.Instant.ofEpochMilli(it).atZone(zone).format(hm) } ?: "synced"
-                        HealthState.LOADING -> "syncing…"
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DeviceChip("Fitbit Air", u.health == HealthState.OK, when (u.health) {
+                        HealthState.OK -> u.syncedAt?.let { "synced " + Instant.ofEpochMilli(it).atZone(zone).format(hm) } ?: "synced"
+                        HealthState.LOADING -> "syncing"
                         HealthState.NEEDS_PERMISSION -> "tap to connect"
                         HealthState.UNAVAILABLE -> "needs Health Connect"
-                    },
-                    onClick = if (state == HealthState.OK) ({ hub.refreshHealth() }) else onConnectHealth,
-                )
-                DeviceChip(
-                    name = "Pod",
-                    ok = conn == PodConn.READY,
-                    sub = if (conn == PodConn.READY) (status?.let { "${it.batteryPct}%" + if (it.charging) " · charging" else "" } ?: "connected")
-                        else "for the gym",
-                    onClick = onConnectPod,
-                )
+                    }, onFitbit)
+                    DeviceChip("Pod", u.podReady, u.podSub, onPod)
+                }
+                Text(u.date.format(dayHead), style = MaterialTheme.typography.titleMedium, color = C.Muted)
             }
-            Text(java.time.LocalDate.now().format(dayHead), style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(top = 14.dp))
         }
 
-        if (state == HealthState.NEEDS_PERMISSION || state == HealthState.UNAVAILABLE) {
-            item {
-                Card(Modifier.fillMaxWidth(), onClick = onConnectHealth) {
-                    Column {
-                        Text("Connect your Fitbit data", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            if (state == HealthState.UNAVAILABLE) "Health Connect isn't available on this phone. Install or update it from the Play Store, then come back."
-                            else "The Google Health app already copies your Fitbit's data into Health Connect. Allow this app to read it (heart rate, HRV, sleep, steps, calories, workouts). Nothing leaves your phone.",
-                            style = MaterialTheme.typography.bodyMedium, color = C.Muted,
-                        )
-                        Text("Connect", color = C.Accent, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-                    }
+        if (u.health == HealthState.NEEDS_PERMISSION || u.health == HealthState.UNAVAILABLE) item {
+            Card(Modifier.fillMaxWidth(), onClick = onFitbit, border = C.Accent.copy(alpha = 0.6f)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Connect your Fitbit", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        if (u.health == HealthState.UNAVAILABLE) "Health Connect isn't on this phone yet. Install it from the Play Store, then come back."
+                        else "The Google Health app already copies your Fitbit's data into Health Connect. Allow this app to read it: heart rate, HRV, sleep, steps and workouts. It stays on your phone.",
+                        style = MaterialTheme.typography.bodyMedium, color = C.Muted,
+                    )
+                    Text("Connect", color = C.Accent, style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
 
-        // ---- the three rings ----
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Ring("RECOVERY", today?.recovery?.let { "${it.score}%" } ?: "–",
-                    (today?.recovery?.score ?: 0) / 100f, zoneColor(today?.recovery?.zone))
-                Ring("STRAIN", today?.strain?.let { "%.1f".format(it.strain) } ?: "–",
-                    ((today?.strain?.strain ?: 0.0) / 21.0).toFloat(), StrainBlue)
-                Ring("SLEEP", today?.sleep?.let { "${it.performance}%" } ?: "–",
-                    (today?.sleep?.performance ?: 0) / 100f, SleepPurple)
-            }
-        }
+        item { Scoreboard(today) }
 
-        // ---- today in plain words ----
-        a?.headline?.takeIf { it.isNotEmpty() }?.let { lines ->
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionLabel("Today")
-                        lines.forEach { Text("• $it", style = MaterialTheme.typography.bodyLarge) }
-                    }
-                }
-            }
-        }
+        item { CoachTake(u, a, onRefreshTake) }
 
-        // ---- recovery ----
         today?.recovery?.let { r ->
-            item {
-                Card(Modifier.fillMaxWidth(), border = zoneColor(r.zone).copy(alpha = 0.5f)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            SectionLabel("Recovery", Modifier.weight(1f))
-                            Tag(r.zone.label, color = zoneColor(r.zone))
-                        }
-                        r.contributors.forEach { c ->
-                            Row {
-                                Text(c.name, style = MaterialTheme.typography.bodyLarge, color = C.Muted, modifier = Modifier.weight(1f))
-                                Text(c.value, style = MaterialTheme.typography.titleMedium.merge(Tnum),
+            section("Why ${r.score}%") {
+                Card(Modifier.fillMaxWidth()) {
+                    Column {
+                        r.contributors.forEachIndexed { i, c ->
+                            if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(c.name, style = MaterialTheme.typography.titleSmall)
+                                    Text(c.vsNormal, style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                                }
+                                Text(c.value, style = MaterialTheme.typography.headlineSmall.merge(Tnum),
                                     color = when (c.good) { true -> Recover; false -> RedZ; null -> C.Text })
-                                Text("  ${c.vsNormal}", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                             }
                         }
-                        val t = Analysis.strainTarget(r.zone)
-                        Text("Strain target today: ${t.start.toInt()}–${t.endInclusive.toInt()}", color = StrainBlue,
-                            style = MaterialTheme.typography.titleMedium)
-                        Text("Against your last ${r.baselineDays} days. HRV counts most.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
                     }
                 }
+                Note("Compared with your last ${r.baselineDays} days. HRV counts for half.")
             }
         }
 
-        // ---- 14-day trends ----
-        a?.days?.takeLast(14)?.takeIf { it.isNotEmpty() }?.let { ds ->
-            item {
+        a?.days?.takeLast(14)?.takeIf { ds -> ds.any { it.recovery != null || it.strain != null || it.sleep != null } }?.let { ds ->
+            section("Two weeks") {
                 Card(Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SectionLabel("Last 14 days")
-                        Text("Recovery", style = MaterialTheme.typography.labelMedium, color = C.Muted)
-                        Bars(ds.map { (it.recovery?.score ?: 0) / 100f }, ds.map { zoneColor(it.recovery?.zone) })
-                        Text("Strain", style = MaterialTheme.typography.labelMedium, color = C.Muted)
-                        Bars(ds.map { ((it.strain?.strain ?: 0.0) / 21.0).toFloat() }, ds.map { StrainBlue })
-                        Text("Sleep (hours)", style = MaterialTheme.typography.labelMedium, color = C.Muted)
-                        Bars(ds.map { ((it.sleep?.asleepMin ?: 0) / 600f).coerceAtMost(1f) }, ds.map { SleepPurple })
-                        Text("${ds.first().date.format(DateTimeFormatter.ofPattern("d MMM"))} → today",
-                            style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        TrendRow("Recovery", ds.map { (it.recovery?.score ?: 0) / 100f }, ds.map { zoneColor(it.recovery?.zone) },
+                            ds.lastOrNull()?.recovery?.let { "${it.score}%" })
+                        TrendRow("Strain", ds.map { ((it.strain?.strain ?: 0.0) / 21.0).toFloat() }, ds.map { StrainBlue },
+                            ds.lastOrNull()?.strain?.let { "%.1f".format(it.strain) })
+                        TrendRow("Sleep", ds.map { ((it.sleep?.asleepMin ?: 0) / 600f).coerceAtMost(1f) }, ds.map { SleepPurple },
+                            ds.lastOrNull()?.sleep?.let { hmin(it.asleepMin) })
+                        Text("${ds.first().date.format(shortDay)} to today", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                     }
                 }
             }
         }
 
-        // ---- sleep ----
         today?.sleep?.let { s ->
-            item {
+            section("Last night") {
                 Card(Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionLabel("Sleep")
-                        Text("${hmin(s.asleepMin)} of ${hmin(s.needMin)} needed · ${s.performance}%", style = MaterialTheme.typography.titleLarge)
-                        Text("${s.bed.atZone(zone).format(hm)} – ${s.wake.atZone(zone).format(hm)}", color = C.Muted)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            s.deepPct?.let { Tag("Deep $it%", color = SleepPurple) }
-                            s.remPct?.let { Tag("REM $it%", color = SleepPurple) }
-                            s.efficiency?.let { Tag("Efficiency $it%") }
-                            s.consistency?.let { Tag("Consistency $it%") }
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(hmin(s.asleepMin), style = MaterialTheme.typography.displaySmall.merge(Tnum))
+                            Text("  of ${hmin(s.needMin)} needed", style = MaterialTheme.typography.bodyMedium, color = C.Muted,
+                                modifier = Modifier.padding(bottom = 6.dp))
                         }
-                        if (s.debtMin >= 15) Text("Sleep debt ${s.debtMin} min from the last 3 nights (half of it is added to tonight's need).",
+                        Text("${s.bed.atZone(zone).format(hm)} to ${s.wake.atZone(zone).format(hm)}", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                            s.deepPct?.let { Stat("Deep", "$it%") }
+                            s.remPct?.let { Stat("REM", "$it%") }
+                            s.efficiency?.let { Stat("Efficiency", "$it%") }
+                            s.consistency?.let { Stat("Regularity", "$it%") }
+                        }
+                        if (s.debtMin >= 15) Text("${s.debtMin} min of sleep debt from the last 3 nights. Half of it is added to tonight's need.",
                             style = MaterialTheme.typography.bodyMedium, color = Yellow)
                     }
                 }
             }
         }
 
-        // ---- strain & gym ----
-        item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SectionLabel("Strain & training")
-                    today?.strain?.let { st ->
-                        Text("Strain %.1f".format(st.strain) + (st.target?.let { " · target ${it.start.toInt()}–${it.endInclusive.toInt()}" } ?: ""),
-                            style = MaterialTheme.typography.titleLarge, color = StrainBlue)
-                        Text("${st.moderateMin} min moderate, ${st.vigorousMin} min vigorous heart rate", color = C.Muted)
-                    } ?: Text("No heart-rate data yet today", color = C.Muted)
+        section("Training") {
+            Card(Modifier.fillMaxWidth(), onClick = onOpenGym) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        today?.strain?.let { st ->
+                            Stat("Strain", "%.1f".format(st.strain), StrainBlue)
+                            Stat("Hard minutes", "${st.moderateMin + st.vigorousMin}")
+                        }
+                        u.todayHealth?.steps?.let { Stat("Steps", "%,d".format(it)) }
+                    }
                     today?.muscular?.let { m ->
                         Text("Gym: ${m.sets} working sets, ${"%,d".format(m.volumeKg.roundToInt())} kg moved" +
-                            (m.vsAvgPct?.let { " ($it% of your usual)" } ?: ""), style = MaterialTheme.typography.bodyLarge)
-                    }
-                    todayHealth?.let { h ->
-                        h.steps?.let { Text("${"%,d".format(it)} steps", color = C.Muted) }
-                    }
-                    TextButton(onClick = onOpenGym) { Text("Open gym", color = C.Accent) }
+                            (m.vsAvgPct?.let { " ($it% of your usual)" } ?: "") + ".", style = MaterialTheme.typography.bodyLarge)
+                    } ?: Text(if (today?.strain == null) "No heart-rate data yet today." else "No gym session today.",
+                        style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                    Text("Open the gym", style = MaterialTheme.typography.titleSmall, color = C.Accent)
                 }
             }
         }
 
-        // ---- net calories ----
         a?.energy?.let { e ->
-            item {
-                val goal by hub.goal.collectAsStateWithLifecycle()
-                val g = e.netFor(goal)
-                val t = todayNet(e, food, java.time.LocalDate.now(), java.time.LocalTime.now())
+            section("Net calories") {
+                val g = e.netFor(u.goalKg)
+                val t = Energy.today(e, u.food, u.date, u.now)
                 Card(Modifier.fillMaxWidth(), onClick = onOpenNet) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SectionLabel("Net calories")
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(verticalAlignment = Alignment.Bottom) {
-                            Text(signedKcal(t.endOfDay), style = MaterialTheme.typography.headlineLarge.merge(Tnum), color = netColor(t.endOfDay, g))
-                            Text("  today · goal ${signedKcal(g)}", color = C.Muted, modifier = Modifier.padding(bottom = 6.dp))
+                            Text(signedKcal(t.endOfDay), style = MaterialTheme.typography.displaySmall.merge(Tnum), color = netColor(t.endOfDay, g))
+                            Text("  today, goal ${signedKcal(g)}", style = MaterialTheme.typography.bodyMedium, color = C.Muted,
+                                modifier = Modifier.padding(bottom = 6.dp))
                         }
-                        e.avgNet?.let { Text("2-week average ${signedKcal(it)} a day" +
-                            (e.trendKgPerWeek?.let { k -> " · scale ${"%+.2f".format(k)} kg/week" } ?: ""), style = MaterialTheme.typography.bodyMedium) }
-                        Text(if (e.confidence >= 30) "Burn checked against your weight (Fitbit runs ~${kotlin.math.abs(e.fitbitOffPct)}% ${if (e.fitbitOffPct >= 0) "high" else "low"})"
-                            else "Checked against your weight once there's ~2 weeks of weigh-ins",
-                            style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                        e.avgNet?.let { n ->
+                            Text("Two-week average ${signedKcal(n)} a day" + (e.trendKgPerWeek?.let { k -> ", scale ${"%+.2f".format(k)} kg a week" } ?: "") + ".",
+                                style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Text(if (e.confidence >= 30) "Burn checked against your weight: the Fitbit runs about ${abs(e.fitbitOffPct)}% ${if (e.fitbitOffPct >= 0) "high" else "low"}."
+                            else "Burn gets checked against your weight after about 2 weeks of weigh-ins.",
+                            style = MaterialTheme.typography.bodySmall, color = C.Muted)
                     }
                 }
             }
         }
 
-        // ---- strength ----
         a?.exercises?.takeIf { it.isNotEmpty() }?.let { ex ->
-            item {
+            section("Strength") {
                 Card(Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        SectionLabel("Strength (est. 1RM) and next session")
-                        ex.take(8).forEach { e ->
-                            Column {
-                                Row {
-                                    Text(e.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                                    Text("${e.e1rmNow.roundToInt()} kg", style = MaterialTheme.typography.titleMedium.merge(Tnum))
+                    Column {
+                        ex.take(8).forEachIndexed { i, e ->
+                            if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 12.dp))
+                            Row(verticalAlignment = Alignment.Top) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(e.name, style = MaterialTheme.typography.titleSmall)
+                                    Text(e.suggestion, style = MaterialTheme.typography.bodyMedium, color = C.Accent)
+                                    Text("Last: ${e.lastSets.substringBefore(" (")}", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("${e.e1rmNow.roundToInt()} kg", style = MaterialTheme.typography.headlineSmall.merge(Tnum))
                                     e.changePct?.let {
-                                        Text("  ${if (it >= 0) "+" else ""}${"%.1f".format(it)}%", color = if (it >= 0) Recover else RedZ,
-                                            style = MaterialTheme.typography.titleMedium.merge(Tnum))
+                                        Text("${if (it >= 0) "+" else ""}${"%.1f".format(it)}%", style = MaterialTheme.typography.labelLarge.merge(Tnum),
+                                            color = if (it >= 0) Recover else RedZ)
                                     }
                                 }
-                                Text(e.suggestion, style = MaterialTheme.typography.bodyMedium, color = C.Accent)
-                                Text(listOfNotNull("last ${e.lastSets}", e.qualityAvg?.let { "Q $it" }, e.romAvg?.let { "ROM $it%" }).joinToString(" · "),
-                                    style = MaterialTheme.typography.labelMedium, color = C.Muted)
                             }
-                        }
-                        a?.groupSets7d?.takeIf { it.isNotEmpty() }?.let { g ->
-                            Text("Sets this week: " + g.entries.sortedByDescending { it.value }.joinToString(", ") { "${it.key.label} ${it.value}" },
-                                style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                         }
                     }
                 }
+                Note("Estimated one-rep max, and what to do next session.")
             }
         }
 
-        // ---- body & food trends ----
         a?.let { an ->
-            item {
+            section("Body weight") {
                 Card(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionLabel("Body weight")
                         an.weight.lastWeekAvg?.let { w ->
-                            Text("Last week ${"%.2f".format(w)} kg" + (an.weight.changeKg?.let { " (${if (it >= 0) "+" else ""}${"%.2f".format(it)} kg)" } ?: ""),
-                                style = MaterialTheme.typography.titleMedium)
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text("%.1f kg".format(w), style = MaterialTheme.typography.displaySmall.merge(Tnum))
+                                an.weight.changeKg?.let {
+                                    Text("  ${"%+.2f".format(it)} kg on the week before", style = MaterialTheme.typography.bodyMedium, color = C.Muted,
+                                        modifier = Modifier.padding(bottom = 6.dp))
+                                }
+                            }
                         }
-                        Text(an.weight.verdict, color = C.Muted)
+                        Text(an.weight.verdict + ".", style = MaterialTheme.typography.bodyMedium, color = if (an.weight.lastWeekAvg == null) C.Muted else C.Text)
                     }
                 }
             }
         }
 
-        // ---- what affects your recovery ----
         a?.effects?.takeIf { it.isNotEmpty() }?.let { effects ->
-            item {
+            section("What moves your recovery") {
                 Card(Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SectionLabel("What affects your recovery")
-                        effects.take(6).forEach { e ->
+                    Column {
+                        effects.take(6).forEachIndexed { i, e ->
+                            if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(e.habit, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                                Text("${if (e.delta >= 0) "+" else ""}${e.delta.roundToInt()}", color = if (e.delta >= 0) Recover else RedZ,
-                                    style = MaterialTheme.typography.titleMedium.merge(Tnum))
-                                Spacer(Modifier.width(8.dp))
-                                Tag(if (e.clear) "clear" else "early", color = if (e.clear) C.Text else C.Muted)
+                                Column(Modifier.weight(1f)) {
+                                    Text(e.habit, style = MaterialTheme.typography.titleSmall)
+                                    Text(if (e.clear) "Clear pattern over ${e.nWith + e.nWithout} days" else "Early signal, ${e.nWith + e.nWithout} days",
+                                        style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                                }
+                                Text("${if (e.delta >= 0) "+" else ""}${e.delta.roundToInt()}", style = MaterialTheme.typography.headlineSmall.merge(Tnum),
+                                    color = if (!e.clear) C.Muted else if (e.delta >= 0) Recover else RedZ)
                             }
                         }
-                        Text("Next-morning recovery on days with vs without. Fills in as days pass.",
-                            style = MaterialTheme.typography.labelMedium, color = C.Muted)
                     }
                 }
+                Note("Next-morning recovery on days with it versus without.")
             }
         }
+    }
+}
+
+/** A titled block in the Today list. */
+private fun LazyListScope.section(title: String, content: @Composable () -> Unit) {
+    item {
+        Column {
+            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun Note(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(top = 8.dp, start = 4.dp))
+}
+
+/** Recovery as a huge scoreboard number, strain and sleep beside it. */
+@Composable
+private fun Scoreboard(d: Analysis.Day?) {
+    val r = d?.recovery
+    val color = zoneColor(r?.zone)
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.Bottom) {
+        Column(Modifier.weight(1.25f)) {
+            Text("Recovery", style = MaterialTheme.typography.titleSmall, color = C.Muted)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(r?.score?.toString() ?: "–", style = MaterialTheme.typography.displayLarge.merge(Tnum), color = if (r == null) C.Muted else color)
+                if (r != null) Text("%", style = MaterialTheme.typography.displaySmall, color = color, modifier = Modifier.padding(bottom = 14.dp))
+            }
+            PlateBar(r?.score, color)
+            Text(r?.zone?.label ?: "Needs 5 nights of Fitbit data", style = MaterialTheme.typography.titleSmall,
+                color = if (r == null) C.Muted else color, modifier = Modifier.padding(top = 8.dp))
+        }
+        Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 8.dp).background(C.Line))
+        Column(Modifier.weight(1f).padding(start = 18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Column {
+                Text("Strain", style = MaterialTheme.typography.titleSmall, color = C.Muted)
+                Text(d?.strain?.let { "%.1f".format(it.strain) } ?: "–", style = MaterialTheme.typography.displayMedium.merge(Tnum),
+                    color = if (d?.strain == null) C.Muted else StrainBlue)
+                Text(d?.strain?.target?.let { "aim ${it.start.toInt()} to ${it.endInclusive.toInt()}" } ?: "out of 21",
+                    style = MaterialTheme.typography.bodySmall, color = C.Muted)
+            }
+            Column {
+                Text("Sleep", style = MaterialTheme.typography.titleSmall, color = C.Muted)
+                Text(d?.sleep?.let { hmin(it.asleepMin) } ?: "–", style = MaterialTheme.typography.displaySmall.merge(Tnum),
+                    color = if (d?.sleep == null) C.Muted else SleepPurple)
+                Text(d?.sleep?.let { "${it.performance}% of what you needed" } ?: "from your Fitbit", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+            }
+        }
+    }
+}
+
+/** Five plate-like segments, filled up to the score (20 points each). */
+@Composable
+private fun PlateBar(score: Int?, color: Color) {
+    Row(Modifier.padding(top = 4.dp, end = 18.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(5) { i ->
+            val fill = ((score ?: 0) - i * 20).coerceIn(0, 20) / 20f
+            Canvas(Modifier.weight(1f).height(10.dp)) {
+                drawRoundRect(C.Raised, cornerRadius = CornerRadius(3.dp.toPx()))
+                if (fill > 0) drawRoundRect(color, size = Size(size.width * fill, size.height), cornerRadius = CornerRadius(3.dp.toPx()))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoachTake(u: TodayUi, a: Analysis.Result?, onRefresh: () -> Unit) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(C.Accent))
+        Column(Modifier.padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Coach's take", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                if (u.hasKey) Text(if (u.taking) "Thinking" else "Refresh", style = MaterialTheme.typography.labelLarge,
+                    color = if (u.taking) C.Muted else C.Accent, modifier = Modifier.clickable(enabled = !u.taking, onClick = onRefresh).padding(4.dp))
+            }
+            val take = u.take?.takeIf { it.date == u.date }
+            if (take != null) Text(take.text, style = MaterialTheme.typography.bodyLarge)
+            else {
+                val lines = a?.headline.orEmpty()
+                if (lines.isEmpty()) Text("Log a few days of food, weight and workouts and this fills in.",
+                    style = MaterialTheme.typography.bodyLarge, color = C.Muted)
+                lines.forEach { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                if (!u.hasKey) Text("Add a GPT key in Insights, then Brainstorm, for a written analysis every morning.",
+                    style = MaterialTheme.typography.bodySmall, color = C.Muted)
+            }
+            u.takeError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = RedZ) }
+        }
+    }
+}
+
+@Composable
+private fun Stat(label: String, value: String, color: Color = C.Text) {
+    Column {
+        Text(value, style = MaterialTheme.typography.headlineSmall.merge(Tnum), color = color)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = C.Muted)
+    }
+}
+
+@Composable
+private fun TrendRow(label: String, values: List<Float>, colors: List<Color>, now: String?) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row {
+            Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            now?.let { Text(it, style = MaterialTheme.typography.titleSmall.merge(Tnum), color = C.Muted) }
+        }
+        Bars(values, colors)
     }
 }
 
@@ -338,65 +453,31 @@ fun hmin(m: Int) = "${m / 60}h ${m % 60}m"
 @Composable
 private fun DeviceChip(name: String, ok: Boolean, sub: String, onClick: () -> Unit) {
     Row(
-        Modifier.clip(RoundedCornerShape(50)).background(C.Surface).border(1.dp, if (ok) C.Pod.copy(alpha = 0.4f) else C.Line, RoundedCornerShape(50))
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier.clip(RoundedCornerShape(50)).background(C.Surface)
+            .border(1.dp, if (ok) Recover.copy(alpha = 0.45f) else C.Line, RoundedCornerShape(50))
+            .clickable(onClick = onClick).padding(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(if (ok) C.Done else C.Muted))
-        Spacer(Modifier.width(8.dp))
+        Box(Modifier.size(8.dp).clip(CircleShape).background(if (ok) Recover else C.Muted))
+        Spacer(Modifier.width(10.dp))
         Column {
             Text(name, style = MaterialTheme.typography.labelLarge)
-            Text(sub, style = MaterialTheme.typography.labelMedium, color = C.Muted)
+            Text(sub, style = MaterialTheme.typography.labelSmall, color = C.Muted)
         }
-    }
-}
-
-@Composable
-private fun Ring(label: String, value: String, fraction: Float, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(104.dp), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.size(104.dp)) {
-                val sw = 10.dp.toPx()
-                val inset = sw / 2
-                val sz = Size(size.width - sw, size.height - sw)
-                drawArc(C.Raised, -90f, 360f, false, Offset(inset, inset), sz, style = Stroke(sw))
-                drawArc(color, -90f, 360f * fraction.coerceIn(0f, 1f), false, Offset(inset, inset), sz,
-                    style = Stroke(sw, cap = StrokeCap.Round))
-            }
-            Text(value, style = MaterialTheme.typography.titleLarge.merge(Tnum), color = if (value == "–") C.Muted else color)
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(label, style = MaterialTheme.typography.labelMedium, color = C.Muted, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 private fun Bars(values: List<Float>, colors: List<Color>) {
-    Canvas(Modifier.fillMaxWidth().height(44.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(36.dp)) {
         val n = values.size
         if (n == 0) return@Canvas
         val gap = 4.dp.toPx()
         val w = (size.width - gap * (n - 1)) / n
         values.forEachIndexed { i, v ->
-            val h = (size.height * v.coerceIn(0f, 1f)).coerceAtLeast(2.dp.toPx())
-            drawRoundRect(colors[i].copy(alpha = if (v <= 0f) 0.25f else 1f), Offset(i * (w + gap), size.height - h), Size(w, h),
-                androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+            val empty = v <= 0f
+            val h = if (empty) 3.dp.toPx() else (size.height * v.coerceIn(0f, 1f)).coerceAtLeast(3.dp.toPx())
+            drawRoundRect(if (empty) C.Raised else colors[i], Offset(i * (w + gap), size.height - h), Size(w, h), CornerRadius(2.dp.toPx()))
         }
-    }
-}
-
-@Composable
-fun MacroBar(name: String, value: Double, lo: Double, hi: Double, color: Color) {
-    Column {
-        Row {
-            Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Text("${value.roundToInt()} / ${lo.roundToInt()}–${hi.roundToInt()} g", style = MaterialTheme.typography.bodyLarge.merge(Tnum),
-                color = if (value in lo..hi) Recover else if (value > hi) Yellow else C.Text)
-        }
-        LinearProgressIndicator(
-            progress = { (value / hi).toFloat().coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-            color = color, trackColor = C.Raised, gapSize = 0.dp, drawStopIndicator = {},
-        )
     }
 }

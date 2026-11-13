@@ -6,7 +6,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -105,20 +109,22 @@ fun InsightsScreen(hub: HubViewModel) {
         if (list.isEmpty()) item {
             Text("Nothing yet. Finish a workout, or tap \"Send me a summary now\".", color = C.Muted)
         }
-        items(list, key = { it.key }) { i ->
-            val t = Instant.ofEpochMilli(i.timeMs).atZone(zone)
-            Card(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Tag(kindLabel(i.kind), color = kindColor(i.kind))
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (t.toLocalDate() == today) "Today " + t.format(timeFmt) else t.format(whenFmt),
-                            style = MaterialTheme.typography.labelMedium, color = C.Muted)
-                    }
-                    Text(i.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp))
-                    Text(i.body, style = MaterialTheme.typography.bodyLarge)
-                }
-            }
+        items(list, key = { it.key }) { i -> InsightCard(i, today) }
+    }
+}
+
+/** One summary: a coloured edge for its kind, the title, the words. */
+@Composable
+fun InsightCard(i: com.silverajat.lifttracker.insights.Insight, today: LocalDate) {
+    val t = Instant.ofEpochMilli(i.timeMs).atZone(ZoneId.systemDefault())
+    Row(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).background(C.Surface)
+        .height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+        androidx.compose.foundation.layout.Box(Modifier.width(4.dp).fillMaxHeight().background(kindColor(i.kind)))
+        Column(Modifier.padding(start = 16.dp, end = 18.dp, top = 14.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(kindLabel(i.kind) + ", " + (if (t.toLocalDate() == today) "today " + t.format(timeFmt) else t.format(whenFmt)),
+                style = MaterialTheme.typography.labelMedium, color = C.Muted)
+            Text(i.title, style = MaterialTheme.typography.titleLarge)
+            Text(i.body, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }

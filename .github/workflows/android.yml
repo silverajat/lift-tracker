@@ -26,6 +26,13 @@ jobs:
           gradle-version: '8.11.1'
       - name: Unit tests (rep counter vs the Python reference)
         run: gradle testDebugUnitTest --no-daemon --stacktrace -i | grep -E "MISMATCH|exact|ROM|FAILED|PASSED|Tests" || true; gradle testDebugUnitTest --no-daemon
+      - name: Screenshots (sample data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: app/android/app/build/outputs/roborazzi/
+          if-no-files-found: ignore
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
       - name: Rename

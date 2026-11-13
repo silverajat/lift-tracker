@@ -71,7 +71,7 @@ fun elapsed(ms: Long): String {
 @Composable
 fun Card(
     modifier: Modifier = Modifier,
-    border: Color = C.Line,
+    border: Color = Color.Transparent,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
@@ -80,7 +80,7 @@ fun Card(
         modifier
             .clip(shape)
             .background(C.Surface)
-            .border(1.dp, border, shape)
+            .then(if (border != Color.Transparent) Modifier.border(1.dp, border, shape) else Modifier)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(18.dp)
     ) { content() }
@@ -136,7 +136,7 @@ fun FlowRowCompat(spacing: androidx.compose.ui.unit.Dp, content: @Composable () 
 
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(), style = MaterialTheme.typography.labelMedium, color = C.Muted, modifier = modifier)
+    Text(text, style = MaterialTheme.typography.titleSmall, color = C.Muted, modifier = modifier)
 }
 
 // ---- pod status ---------------------------------------------------------------------

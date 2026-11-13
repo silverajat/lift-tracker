@@ -102,7 +102,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         item {
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(dayFmt.format(Date()).uppercase(), style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                    Text(dayFmt.format(Date()), style = MaterialTheme.typography.titleSmall, color = C.Muted)
                     Text(greeting(), style = MaterialTheme.typography.headlineLarge)
                 }
                 Box(
@@ -137,7 +137,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         // Every past workout (unfinished ones too), newest first, each with delete.
         val past = history.filter { it.id != session?.id && (it.sets.isNotEmpty() || it.endMs == null) }
         if (past.isNotEmpty()) {
-            item { SectionLabel("History · ${past.size} workout${if (past.size > 1) "s" else ""}", Modifier.padding(top = 6.dp)) }
+            item { SectionLabel("History, ${past.size} workout${if (past.size > 1) "s" else ""}", Modifier.padding(top = 6.dp)) }
             items(if (showAll) past else past.take(8), key = { it.id }) { s ->
                 RecentRow(s, onExport = { onExport(s) }, onDelete = { toDelete = s })
             }

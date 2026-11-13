@@ -166,6 +166,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
                     Analysis.run(_days.value, sessions.all(), meals.days(today.minusDays(60), today), meals.weights(), today, zone, _goal.value)
                 }.getOrNull()
             }
+            if (_analysis.value != null && _healthState.value != HealthState.LOADING) refreshTake()
             // keep the home-screen widget in step (only once Fitbit data has loaded, so it never shows blanks)
             _analysis.value?.takeIf { _healthState.value == HealthState.OK || _days.value.isNotEmpty() }?.let { a ->
                 withContext(Dispatchers.IO) {
@@ -228,6 +229,37 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
                 out[e.id] = s
             }
             _walks.value = out
+        }
+    }
+
+    // ---- GPT's daily take ------------------------------------------------------------------
+    private val _take = MutableStateFlow(com.silverajat.lifttracker.chat.Coach.load(app.filesDir))
+    val take: StateFlow<com.silverajat.lifttracker.chat.Coach.Take?> = _take
+    private val _taking = MutableStateFlow(false)
+    val taking: StateFlow<Boolean> = _taking
+    private val _takeError = MutableStateFlow<String?>(null)
+    val takeError: StateFlow<String?> = _takeError
+
+    /** Ask GPT for today's analysis: once a day by itself, or now with [force]. */
+    fun refreshTake(force: Boolean = false) {
+        val key = _apiKey.value
+        if (key.isEmpty() || _taking.value) return
+        val today = LocalDate.now(zone)
+        if (!force && _take.value?.date == today) return
+        if (!force && _healthState.value == HealthState.LOADING) return
+        _taking.value = true
+        _takeError.value = null
+        viewModelScope.launch {
+            val r = runCatching {
+                val ctx = contextText()
+                withContext(Dispatchers.IO) { com.silverajat.lifttracker.chat.Coach.ask(key, _model.value, ctx, com.silverajat.lifttracker.chat.Coach.DAILY) }
+            }
+            r.onSuccess { text ->
+                val t = com.silverajat.lifttracker.chat.Coach.Take(today, text, System.currentTimeMillis())
+                com.silverajat.lifttracker.chat.Coach.save(getApplication<Application>().filesDir, t)
+                _take.value = t
+            }.onFailure { _takeError.value = it.message }
+            _taking.value = false
         }
     }
 

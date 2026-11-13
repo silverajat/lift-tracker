@@ -32,6 +32,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.unit.dp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.silverajat.lifttracker.ui.C
@@ -147,7 +149,8 @@ class MainActivity : ComponentActivity() {
                             Tab.INSIGHTS -> InsightsScreen(hub)
                         }
                     }
-                    if (!fullScreen) NavigationBar(containerColor = C.Surface) {
+                    if (!fullScreen) NavigationBar(containerColor = C.Bg, tonalElevation = 0.dp,
+                        modifier = Modifier.drawBehind { drawLine(C.Line, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }) {
                         Tab.entries.forEach { t ->
                             NavigationBarItem(
                                 selected = tab == t,
@@ -162,7 +165,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 label = { Text(t.title) },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = C.Accent, selectedTextColor = C.Accent, indicatorColor = C.Raised,
+                                    selectedIconColor = C.Text, selectedTextColor = C.Text, indicatorColor = C.Raised,
                                     unselectedIconColor = C.Muted, unselectedTextColor = C.Muted,
                                 ),
                             )
