@@ -39,7 +39,7 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:label="Lift Tracker"
+        android:label="Spotter"
         android:theme="@style/Theme.LiftTracker">
         <activity
             android:name=".MainActivity"
@@ -60,7 +60,7 @@
         <receiver
             android:name=".widget.HubWidgetReceiver"
             android:exported="true"
-            android:label="Lift Tracker">
+            android:label="Spotter">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

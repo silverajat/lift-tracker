@@ -23,9 +23,9 @@ Native Android app (Kotlin + Jetpack Compose) that runs the workout and controls
 
 Every push to `main` builds the APK on GitHub Actions and publishes it as the **app-latest** release.
 
-1. On the phone, open the repo's **Releases** → *Lift Tracker app (latest build)* → tap **lift-tracker.apk**.
+1. On the phone, open the repo's **Releases** → *Spotter app (latest build)* → tap **spotter.apk**.
 2. Open the download. Android asks to allow installs from this source (Chrome or Files): allow it, go back, tap **Install**.
-3. Open **Lift Tracker** → allow **Nearby devices** (that's Bluetooth). The pod connects by itself; shake it if it's asleep.
+3. Open **Spotter** → allow **Nearby devices** (that's Bluetooth). The pod connects by itself; shake it if it's asleep.
 
 Later builds install over the old one and keep your history, because every build is signed with the same key (`debug.keystore`, debug-only).
 

@@ -70,6 +70,9 @@ fun InsightsScreen(hub: HubViewModel) {
     val list by hub.insights.collectAsStateWithLifecycle()
     val on by hub.notifyOn.collectAsStateWithLifecycle()
     val checking by hub.checking.collectAsStateWithLifecycle()
+    val key by hub.apiKey.collectAsStateWithLifecycle()
+    var keyDialog by rememberSaveable { mutableStateOf(false) }
+    if (keyDialog) SettingsDialog(hub) { keyDialog = false }
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now(zone)
 
@@ -94,6 +97,19 @@ fun InsightsScreen(hub: HubViewModel) {
                     TextButton(onClick = { hub.checkInsights(force = true) }, enabled = !checking) {
                         Text(if (checking) "Checking…" else "Send me a summary now", color = C.Accent, fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), onClick = { keyDialog = true }, border = if (key.isEmpty()) C.Accent.copy(alpha = 0.6f) else androidx.compose.ui.graphics.Color.Transparent) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("GPT key", style = MaterialTheme.typography.titleMedium)
+                        Text(if (key.isEmpty()) "Not added. Paste your OpenAI key to turn on Brainstorm, the daily coach's take and the Monday review."
+                            else "Added (ends ${key.takeLast(4)}). Tap to change it or pick a model.",
+                            color = C.Muted, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Text(if (key.isEmpty()) "Add" else "Edit", color = C.Accent, style = MaterialTheme.typography.titleSmall)
                 }
             }
         }

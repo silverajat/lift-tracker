@@ -155,7 +155,7 @@ private fun Bubble(user: Boolean, text: String) {
 }
 
 @Composable
-private fun SettingsDialog(hub: HubViewModel, onDismiss: () -> Unit) {
+fun SettingsDialog(hub: HubViewModel, onDismiss: () -> Unit) {
     val key by hub.apiKey.collectAsStateWithLifecycle()
     val model by hub.model.collectAsStateWithLifecycle()
     val hrMax by hub.hrMax.collectAsStateWithLifecycle()
@@ -225,7 +225,7 @@ private fun SettingsDialog(hub: HubViewModel, onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = {
-                if (k != key) { hub.setApiKey(k); hub.loadModels(k) }
+                if (k != key) { hub.setApiKey(k); hub.loadModels(k); if (k.isNotBlank()) hub.refreshTake(force = true) }
                 hr.toIntOrNull()?.let { if (it != hrMax) hub.setHrMax(it) }
                 onDismiss()
             }) { Text("Save", color = C.Accent, fontWeight = FontWeight.Bold) }

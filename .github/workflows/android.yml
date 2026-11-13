@@ -45,17 +45,17 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
       - name: Rename
-        run: cp app/build/outputs/apk/debug/app-debug.apk lift-tracker.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk spotter.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: lift-tracker-apk
-          path: app/android/lift-tracker.apk
+          name: spotter-apk
+          path: app/android/spotter.apk
       - name: Publish as the "app-latest" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete app-latest --yes --cleanup-tag || true
-          gh release create app-latest lift-tracker.apk \
-            --title "Lift Tracker app (latest build)" \
-            --notes "Built from ${GITHUB_SHA::7}. On your phone: download lift-tracker.apk, open it, allow installing from this source." \
+          gh release create app-latest spotter.apk \
+            --title "Spotter app (latest build)" \
+            --notes "Built from ${GITHUB_SHA::7}. On your phone: download spotter.apk, open it, allow installing from this source." \
             --prerelease

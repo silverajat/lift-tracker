@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -106,6 +107,8 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
     val takeError by hub.takeError.collectAsStateWithLifecycle()
     val key by hub.apiKey.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { hub.refreshHealth() }
+    var keyDialog by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    if (keyDialog) SettingsDialog(hub) { keyDialog = false }
     val ready = conn == PodConn.READY
     TodayContent(
         TodayUi(
@@ -117,6 +120,7 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
         onFitbit = if (state == HealthState.OK) ({ hub.refreshHealth() }) else onConnectHealth,
         onPod = onConnectPod, onOpenGym = onOpenGym, onOpenNet = onOpenNet,
         onRefreshTake = { hub.refreshTake(force = true) },
+        onAddKey = { keyDialog = true },
     )
 }
 
@@ -124,6 +128,7 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
 fun TodayContent(
     u: TodayUi,
     onFitbit: () -> Unit = {}, onPod: () -> Unit = {}, onOpenGym: () -> Unit = {}, onOpenNet: () -> Unit = {}, onRefreshTake: () -> Unit = {},
+    onAddKey: () -> Unit = {},
 ) {
     val zone = ZoneId.systemDefault()
     val a = u.analysis
@@ -165,7 +170,7 @@ fun TodayContent(
 
         item { Scoreboard(today) }
 
-        item { CoachTake(u, a, onRefreshTake) }
+        item { CoachTake(u, a, onRefreshTake, onAddKey) }
 
         today?.recovery?.let { r ->
             section("Why ${r.score}%") {
@@ -406,7 +411,7 @@ private fun PlateBar(score: Int?, color: Color) {
 }
 
 @Composable
-private fun CoachTake(u: TodayUi, a: Analysis.Result?, onRefresh: () -> Unit) {
+private fun CoachTake(u: TodayUi, a: Analysis.Result?, onRefresh: () -> Unit, onAddKey: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(C.Accent))
         Column(Modifier.padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -422,8 +427,8 @@ private fun CoachTake(u: TodayUi, a: Analysis.Result?, onRefresh: () -> Unit) {
                 if (lines.isEmpty()) Text("Log a few days of food, weight and workouts and this fills in.",
                     style = MaterialTheme.typography.bodyLarge, color = C.Muted)
                 lines.forEach { Text(it, style = MaterialTheme.typography.bodyLarge) }
-                if (!u.hasKey) Text("Add a GPT key in Insights, then Brainstorm, for a written analysis every morning.",
-                    style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                if (!u.hasKey) Text("Add your GPT key for a written analysis every morning",
+                    style = MaterialTheme.typography.titleSmall, color = C.Accent, modifier = Modifier.clickable(onClick = onAddKey))
             }
             u.takeError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = RedZ) }
         }
