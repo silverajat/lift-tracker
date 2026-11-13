@@ -204,7 +204,7 @@ object Analysis {
         if (d.respRate != null && rrBase != null) {
             val z = (rrBase.mean - d.respRate) / rrBase.sd
             parts += z to 0.1
-            contrib += Contributor("Breathing rate", "%.1f /min".format(d.respRate), "normal %.1f".format(rrBase.mean), if (abs(z) < 0.5) null else z > 0)
+            contrib += Contributor("Breathing rate", "%.1f /min".format(d.respRate), "normal %.1f".format(rrBase.mean), if (abs(z) < 1.0 || abs(d.respRate - rrBase.mean) < 0.5) null else z > 0)
         }
         // needs HRV or resting HR against a baseline: sleep alone isn't a recovery score
         if (hrvBase == null && rhrBase == null) return null
