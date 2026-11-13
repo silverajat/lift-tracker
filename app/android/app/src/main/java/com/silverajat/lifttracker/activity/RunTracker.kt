@@ -28,7 +28,7 @@ object RunTracker {
         val gpsOk: Boolean = false,
     ) {
         fun movingMs(now: Long): Long = if (!active) 0 else now - startMs - pausedTotalMs - (pausedAt?.let { now - it } ?: 0L)
-        val usesGps get() = sport == Sport.RUN
+        val usesGps get() = sport == Sport.RUN || sport == Sport.WALK
     }
 
     private val _state = MutableStateFlow(State())
@@ -50,7 +50,7 @@ object RunTracker {
         splitStartMoving = 0
         _state.value = State(sport = sport, active = true, startMs = System.currentTimeMillis())
         // a run needs GPS with the screen off (a foreground service); a timed game only needs its start time
-        if (sport == Sport.RUN) ctx.startForegroundService(Intent(ctx, RunService::class.java)) else persist(ctx)
+        if (sport == Sport.RUN || sport == Sport.WALK) ctx.startForegroundService(Intent(ctx, RunService::class.java)) else persist(ctx)
     }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("live", Context.MODE_PRIVATE)

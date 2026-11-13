@@ -68,7 +68,7 @@ private val SportOrange = Color(0xFFF08A3C)
 
 /** Runs (with GPS), football and badminton; everything else your Fitbit picks up. */
 @Composable
-fun SportsScreen(hub: HubViewModel, onStartRun: () -> Unit, onOpenGym: (Long) -> Unit) {
+fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Long) -> Unit) {
     val items by hub.items.collectAsStateWithLifecycle()
     val acts by hub.activities.collectAsStateWithLifecycle()
     val live by RunTracker.state.collectAsStateWithLifecycle()
@@ -105,7 +105,8 @@ fun SportsScreen(hub: HubViewModel, onStartRun: () -> Unit, onOpenGym: (Long) ->
     val runItems = items.filter { it.sport == Sport.RUN }
     val football = items.filter { it.sport == Sport.FOOTBALL }
     val badminton = items.filter { it.sport == Sport.BADMINTON }
-    val other = items.filter { it.sport !in setOf(Sport.RUN, Sport.FOOTBALL, Sport.BADMINTON, Sport.GYM) }
+    val walks = items.filter { it.sport == Sport.WALK }
+    val other = items.filter { it.sport !in setOf(Sport.RUN, Sport.WALK, Sport.FOOTBALL, Sport.BADMINTON, Sport.GYM) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
@@ -116,7 +117,10 @@ fun SportsScreen(hub: HubViewModel, onStartRun: () -> Unit, onOpenGym: (Long) ->
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("Sports", style = MaterialTheme.typography.headlineLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StartTile("Run", Sport.RUN.emoji, "GPS", Plate.Blue, Modifier.weight(1f), onClick = onStartRun)
+                    StartTile("Run", Sport.RUN.emoji, "GPS", Plate.Blue, Modifier.weight(1f)) { onStartGps(Sport.RUN) }
+                    StartTile("Walk", Sport.WALK.emoji, "GPS", Plate.Chalk, Modifier.weight(1f)) { onStartGps(Sport.WALK) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StartTile("Football", Sport.FOOTBALL.emoji, "timer", Plate.Green, Modifier.weight(1f)) { RunTracker.start(ctx, Sport.FOOTBALL) }
                     StartTile("Badminton", Sport.BADMINTON.emoji, "timer", Plate.Yellow, Modifier.weight(1f)) { RunTracker.start(ctx, Sport.BADMINTON) }
                 }
@@ -154,6 +158,7 @@ fun SportsScreen(hub: HubViewModel, onStartRun: () -> Unit, onOpenGym: (Long) ->
 
         sportSection("Football", Sport.FOOTBALL, football, { logSport = Sport.FOOTBALL }, ::open)
         sportSection("Badminton", Sport.BADMINTON, badminton, { logSport = Sport.BADMINTON }, ::open)
+        sportSection("Walks", Sport.WALK, walks, { logSport = Sport.WALK }, ::open, action = "Log a walk", showKm = true)
 
         if (other.isNotEmpty()) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -168,20 +173,23 @@ fun SportsScreen(hub: HubViewModel, onStartRun: () -> Unit, onOpenGym: (Long) ->
 
 private fun androidx.compose.foundation.lazy.LazyListScope.sportSection(
     title: String, sport: Sport, list: List<ActivityItem>, onLog: () -> Unit, onOpen: (ActivityItem) -> Unit,
+    action: String = "Log a game", showKm: Boolean = false,
 ) {
     item {
         val zone = ZoneId.systemDefault()
         val month = list.filter { it.start.atZone(zone).toLocalDate() >= LocalDate.now().withDayOfMonth(1) }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionHead(title, "Log a game", onLog)
+            SectionHead(title, action, onLog)
             Card(Modifier.fillMaxWidth()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     BigStat("${month.size}", "this month")
-                    BigStat("${month.sumOf { it.minutes }}", "minutes")
+                    if (showKm) BigStat("%.1f".format(month.sumOf { it.distanceKm ?: 0.0 }), "km")
+                    else BigStat("${month.sumOf { it.minutes }}", "minutes")
                     BigStat(list.mapNotNull { it.strain }.takeIf { it.isNotEmpty() }?.let { "%.1f".format(it.average()) } ?: "–", "average strain", StrainBlue)
                 }
             }
-            if (list.isEmpty()) Text("No ${title.lowercase()} yet. Start one above when you play, or log it after.",
+            if (list.isEmpty()) Text("No ${title.lowercase()} yet. Start one above, or log it after." +
+                (if (sport == Sport.WALK) " Walks your Fitbit detects show up here by themselves." else ""),
                 style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(start = 4.dp))
             list.take(6).forEach { ActivityRow(it, onOpen, showDate = true) }
         }
@@ -240,7 +248,7 @@ fun LiveSession(s: RunTracker.State, onFinish: (String) -> Unit) {
     var confirm by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
     val moving = (s.movingMs(now) / 1000).toInt()
-    val color = when (s.sport) { Sport.RUN -> Plate.Blue; Sport.FOOTBALL -> Plate.Green; Sport.BADMINTON -> Plate.Yellow; else -> SportOrange }
+    val color = when (s.sport) { Sport.RUN -> Plate.Blue; Sport.WALK -> Plate.Chalk; Sport.FOOTBALL -> Plate.Green; Sport.BADMINTON -> Plate.Yellow; else -> SportOrange }
 
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false }, containerColor = C.Surface,
@@ -325,7 +333,7 @@ fun RunDetail(r: Activity, item: ActivityItem?, onBack: () -> Unit, onDelete: ()
         confirmButton = { TextButton(onClick = onDelete) { Text("Delete", color = C.Stop) } },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel", color = C.Muted) } })
     Column(Modifier.fillMaxSize()) {
-        TopBar("Run, %.2f km".format(r.distanceKm ?: 0.0), start.format(sDay) + ", " + start.format(sTime), onBack) {
+        TopBar("${r.sport.label}, %.2f km".format(r.distanceKm ?: 0.0), start.format(sDay) + ", " + start.format(sTime), onBack) {
             TextButton(onClick = { confirm = true }) { Text("Delete", color = C.Muted) }
         }
         LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {

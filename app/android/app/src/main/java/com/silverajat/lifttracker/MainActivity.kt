@@ -82,15 +82,17 @@ class MainActivity : ComponentActivity() {
         if (granted.values.all { it }) vm.pod.connect()
     }
 
-    /** GPS for a run (and notifications for the live run). */
+    /** GPS for a run or walk (and notifications for the live session). */
+    private var gpsSport = com.silverajat.lifttracker.activity.Sport.RUN
     private val askLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
         if (granted[Manifest.permission.ACCESS_FINE_LOCATION] == true)
-            com.silverajat.lifttracker.activity.RunTracker.start(this, com.silverajat.lifttracker.activity.Sport.RUN)
+            com.silverajat.lifttracker.activity.RunTracker.start(this, gpsSport)
     }
 
-    private fun startRun() {
+    private fun startGps(sport: com.silverajat.lifttracker.activity.Sport) {
+        gpsSport = sport
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED)
-            com.silverajat.lifttracker.activity.RunTracker.start(this, com.silverajat.lifttracker.activity.Sport.RUN)
+            com.silverajat.lifttracker.activity.RunTracker.start(this, sport)
         else askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
 
@@ -163,7 +165,7 @@ class MainActivity : ComponentActivity() {
                                 is Screen.ExerciseInfo -> ExerciseScreen(vm, s.exerciseId)
                                 is Screen.Past -> com.silverajat.lifttracker.ui.SessionScreen(vm, s.sessionId, onShare = ::share)
                             }
-                            Tab.SPORTS -> com.silverajat.lifttracker.ui.SportsScreen(hub, onStartRun = ::startRun,
+                            Tab.SPORTS -> com.silverajat.lifttracker.ui.SportsScreen(hub, onStartGps = ::startGps,
                                 onOpenGym = { id -> vm.open(Screen.Past(id)); tab = Tab.GYM })
                             Tab.MEALS -> MealsScreen(hub)
                             Tab.INSIGHTS -> InsightsScreen(hub)
