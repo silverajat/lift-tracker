@@ -101,12 +101,18 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
     }
 
     val zone = ZoneId.systemDefault()
+    // one month at a time (this month to start); best 5K/10K stay all-time
+    var monthKey by rememberSaveable { mutableStateOf(java.time.YearMonth.now().toString()) }
+    val month = java.time.YearMonth.parse(monthKey)
+    val monthName = month.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+    fun inMonth(i: Instant) = java.time.YearMonth.from(i.atZone(zone)) == month
+    val shown = items.filter { inMonth(it.start) }
     val runs = acts.filter { it.sport == Sport.RUN }.sortedByDescending { it.startMs }
-    val runItems = items.filter { it.sport == Sport.RUN }
-    val football = items.filter { it.sport == Sport.FOOTBALL }
-    val badminton = items.filter { it.sport == Sport.BADMINTON }
-    val walks = items.filter { it.sport == Sport.WALK }
-    val other = items.filter { it.sport !in setOf(Sport.RUN, Sport.WALK, Sport.FOOTBALL, Sport.BADMINTON, Sport.GYM) }
+    val runItems = shown.filter { it.sport == Sport.RUN }
+    val football = shown.filter { it.sport == Sport.FOOTBALL }
+    val badminton = shown.filter { it.sport == Sport.BADMINTON }
+    val walks = shown.filter { it.sport == Sport.WALK }
+    val other = shown.filter { it.sport !in setOf(Sport.RUN, Sport.WALK, Sport.FOOTBALL, Sport.BADMINTON, Sport.GYM) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
@@ -115,7 +121,15 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("Sports", style = MaterialTheme.typography.headlineLarge)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sports", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+                    Text("‹", style = MaterialTheme.typography.headlineMedium, color = C.Text,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { monthKey = month.minusMonths(1).toString() }.padding(horizontal = 12.dp))
+                    Text(if (month.year == LocalDate.now().year) monthName else "$monthName ${month.year}", style = MaterialTheme.typography.titleMedium)
+                    val canNext = month < java.time.YearMonth.now()
+                    Text("›", style = MaterialTheme.typography.headlineMedium, color = if (canNext) C.Text else C.Line,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(enabled = canNext) { monthKey = month.plusMonths(1).toString() }.padding(horizontal = 12.dp))
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StartTile("Run", Sport.RUN.emoji, "GPS", Plate.Blue, Modifier.weight(1f)) { onStartGps(Sport.RUN) }
                     StartTile("Walk", Sport.WALK.emoji, "GPS", Plate.Chalk, Modifier.weight(1f)) { onStartGps(Sport.WALK) }
@@ -139,8 +153,7 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
                         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                             BigStat(b5?.let { ActivityLog.clock(it.second) } ?: "–", "best 5K")
                             BigStat(b10?.let { ActivityLog.clock(it.second) } ?: "–", "best 10K")
-                            BigStat("%.1f".format(runs.filter { Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate() >= LocalDate.now().withDayOfMonth(1) }
-                                .sumOf { it.distanceKm ?: 0.0 }), "km this month")
+                            BigStat("%.1f".format(runItems.sumOf { it.distanceKm ?: 0.0 }), "km in ${monthName.take(3)}")
                         }
                         val tens = runs.filter { (it.distanceKm ?: 0.0) >= 9.5 }.sortedBy { it.startMs }.takeLast(12)
                         if (tens.size >= 2) {
@@ -152,48 +165,55 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
                         }
                     }
                 }
-                runItems.take(8).forEach { ActivityRow(it, ::open, showDate = true) }
+                ShortList(runItems, ::open, "No runs in $monthName.")
             }
         }
 
-        sportSection("Football", Sport.FOOTBALL, football, { logSport = Sport.FOOTBALL }, ::open)
-        sportSection("Badminton", Sport.BADMINTON, badminton, { logSport = Sport.BADMINTON }, ::open)
-        sportSection("Walks", Sport.WALK, walks, { logSport = Sport.WALK }, ::open, action = "Log a walk", showKm = true)
+        sportSection("Football", Sport.FOOTBALL, football, monthName, { logSport = Sport.FOOTBALL }, ::open)
+        sportSection("Badminton", Sport.BADMINTON, badminton, monthName, { logSport = Sport.BADMINTON }, ::open)
+        sportSection("Walks", Sport.WALK, walks, monthName, { logSport = Sport.WALK }, ::open, action = "Log a walk", showKm = true)
 
         if (other.isNotEmpty()) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Other, from your Fitbit", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
                 Text("Walks, swims, rides and anything else the Fitbit detects by itself.", style = MaterialTheme.typography.bodySmall,
                     color = C.Muted, modifier = Modifier.padding(start = 4.dp))
-                other.take(10).forEach { ActivityRow(it, ::open, showDate = true) }
+                ShortList(other, ::open, "")
             }
         }
     }
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.sportSection(
-    title: String, sport: Sport, list: List<ActivityItem>, onLog: () -> Unit, onOpen: (ActivityItem) -> Unit,
+    title: String, sport: Sport, list: List<ActivityItem>, monthName: String, onLog: () -> Unit, onOpen: (ActivityItem) -> Unit,
     action: String = "Log a game", showKm: Boolean = false,
 ) {
     item {
-        val zone = ZoneId.systemDefault()
-        val month = list.filter { it.start.atZone(zone).toLocalDate() >= LocalDate.now().withDayOfMonth(1) }
+        val month = list          // already just the chosen month
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHead(title, action, onLog)
             Card(Modifier.fillMaxWidth()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    BigStat("${month.size}", "this month")
+                    BigStat("${month.size}", if (sport == Sport.WALK) "walks" else "games")
                     if (showKm) BigStat("%.1f".format(month.sumOf { it.distanceKm ?: 0.0 }), "km")
                     else BigStat("${month.sumOf { it.minutes }}", "minutes")
                     BigStat(list.mapNotNull { it.strain }.takeIf { it.isNotEmpty() }?.let { "%.1f".format(it.average()) } ?: "–", "average strain", StrainBlue)
                 }
             }
-            if (list.isEmpty()) Text("No ${title.lowercase()} yet. Start one above, or log it after." +
-                (if (sport == Sport.WALK) " Walks your Fitbit detects show up here by themselves." else ""),
-                style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(start = 4.dp))
-            list.take(6).forEach { ActivityRow(it, onOpen, showDate = true) }
+            ShortList(list, onOpen, "No ${title.lowercase()} in $monthName." +
+                (if (sport == Sport.WALK) " Walks your Fitbit detects show up here by themselves." else ""))
         }
     }
+}
+
+/** The 3 newest, with "Show all" for the rest of the month. */
+@Composable
+private fun ShortList(list: List<ActivityItem>, onOpen: (ActivityItem) -> Unit, empty: String) {
+    var all by remember(list.size) { mutableStateOf(false) }
+    if (list.isEmpty() && empty.isNotEmpty()) Text(empty, style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(start = 4.dp))
+    (if (all) list else list.take(3)).forEach { ActivityRow(it, onOpen, showDate = true) }
+    if (list.size > 3) Text(if (all) "Show less" else "Show all ${list.size}", style = MaterialTheme.typography.titleSmall, color = C.Accent,
+        modifier = Modifier.clickable { all = !all }.padding(start = 4.dp, top = 2.dp))
 }
 
 @Composable
