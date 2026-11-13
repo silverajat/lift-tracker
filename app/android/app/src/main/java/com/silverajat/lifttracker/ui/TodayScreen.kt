@@ -484,7 +484,7 @@ fun FitbitDataDialog(hub: HubViewModel, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = { round++; hub.refreshHealth() }) { Text("Check again", color = C.Accent) }
+            androidx.compose.material3.TextButton(onClick = { round++; hub.refreshHealth(force = true) }) { Text("Check again", color = C.Accent) }
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = {

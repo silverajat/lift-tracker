@@ -37,6 +37,10 @@ import java.time.ZoneId
 
 enum class HealthState { UNAVAILABLE, NEEDS_PERMISSION, LOADING, OK }
 
+/** Fitbit sync: everything the first time, then the last few days every 30 minutes (background and on open). */
+const val FIRST_DAYS = 90
+const val SYNC_EVERY_MS = 30 * 60_000L
+
 /** Today, Meals, Insights and the brainstorm chat: Fitbit data, the food log, weights and GPT. */
 class HubViewModel(app: Application) : AndroidViewModel(app) {
     private val zone: ZoneId get() = ZoneId.systemDefault()
@@ -75,16 +79,20 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     val goal: StateFlow<Double> = _goal
     fun setGoal(kgPerWeek: Double) { _goal.value = kgPerWeek; prefs.edit().putFloat("goal_kg_week", kgPerWeek.toFloat()).apply(); refreshAnalysis() }
 
-    fun setHrMax(v: Int) { _hrMax.value = v.coerceIn(150, 230); prefs.edit().putInt("hr_max", _hrMax.value).apply(); refreshHealth() }
+    fun setHrMax(v: Int) { _hrMax.value = v.coerceIn(150, 230); prefs.edit().putInt("hr_max", _hrMax.value).apply(); refreshHealth(full = true) }
 
     // ---- Health Connect -----------------------------------------------------------
-    private val _healthState = MutableStateFlow(if (health.available()) HealthState.LOADING else HealthState.UNAVAILABLE)
+    /** Last Fitbit days, saved on the phone so the app opens with data instead of an empty screen. */
+    private val cache = com.silverajat.lifttracker.health.HealthCache(app.filesDir)
+    private val cached = cache.load()
+    private val _healthState = MutableStateFlow(
+        if (!health.available()) HealthState.UNAVAILABLE else if (cached != null) HealthState.OK else HealthState.LOADING)
     val healthState: StateFlow<HealthState> = _healthState
-    private val _days = MutableStateFlow<List<HealthDay>>(emptyList())
+    private val _days = MutableStateFlow(cached?.days.orEmpty())
     val days: StateFlow<List<HealthDay>> = _days
     private val _analysis = MutableStateFlow<Analysis.Result?>(null)
     val analysis: StateFlow<Analysis.Result?> = _analysis
-    private val _syncedAt = MutableStateFlow<Long?>(null)
+    private val _syncedAt = MutableStateFlow<Long?>(cached?.savedMs)
     val syncedAt: StateFlow<Long?> = _syncedAt
     private var healthJob: Job? = null
     private var scaleWeights: List<WeightEntry> = emptyList()
@@ -96,15 +104,34 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         return (mine + scaleWeights.filter { it.date !in have }).sortedBy { it.date }
     }
 
-    fun refreshHealth() {
+    /**
+     * Sync from Health Connect. The first time ever: a full read (90 days).
+     * After that: nothing if the saved copy is under 30 minutes old, otherwise
+     * just the last 3 days on top of it. [force] skips the 3-hour wait;
+     * [full] re-reads everything (after changing max heart rate).
+     */
+    fun refreshHealth(force: Boolean = false, full: Boolean = false) {
         if (!health.available()) { _healthState.value = HealthState.UNAVAILABLE; return }
+        val savedNow = cache.load()
+        if (!force && !full && savedNow != null && savedNow.days.size >= 20 && System.currentTimeMillis() - savedNow.savedMs < SYNC_EVERY_MS) {
+            if (_healthState.value == HealthState.LOADING) _healthState.value = HealthState.OK
+            return
+        }
+        if (healthJob?.isActive == true && !force && !full) return
         healthJob?.cancel()
         healthJob = viewModelScope.launch {
             val granted = health.granted()
             if (granted.isEmpty()) { _healthState.value = HealthState.NEEDS_PERMISSION; return@launch }
             if (_days.value.isEmpty()) _healthState.value = HealthState.LOADING
-            val d = withContext(Dispatchers.IO) { runCatching { health.days(31, _hrMax.value) }.getOrDefault(emptyList()) }
+            // quick: re-read only the last 3 days (late sleep and workouts sync in), keep older days from the saved copy.
+            // full 31 days at most once a day, or when there's no saved copy yet.
+            val saved = cache.load()
+            val all = full || saved == null || saved.days.size < 20
+            val fresh = withContext(Dispatchers.IO) { runCatching { health.days(if (all) FIRST_DAYS else 3, _hrMax.value) }.getOrDefault(emptyList()) }
+            if (fresh.isEmpty() && _days.value.isNotEmpty()) { _healthState.value = HealthState.OK; return@launch }
+            val d = if (all || saved == null) fresh else cache.merge(saved.days, fresh)
             _days.value = d
+            withContext(Dispatchers.IO) { cache.save(d, all) }
             // weigh-ins from a smart scale (via Google Health), one per day
             scaleWeights = withContext(Dispatchers.IO) { health.weights(70) }
                 .groupBy { it.first.atZone(zone).toLocalDate() }.map { (day, v) -> WeightEntry(day, v.minBy { it.first }.second, 0) }

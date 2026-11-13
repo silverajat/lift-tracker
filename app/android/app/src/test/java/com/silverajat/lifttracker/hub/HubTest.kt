@@ -100,4 +100,17 @@ class HubTest {
         assertEquals(10, r2.days.size)
         assertNotNull(r2.nutrition)
     }
+
+    @Test fun healthCacheRoundTrip() {
+        val dir = java.nio.file.Files.createTempDirectory("hc").toFile()
+        val c = com.silverajat.lifttracker.health.HealthCache(dir)
+        val d0 = day(LocalDate.now().minusDays(1), 61.5, 54).copy(
+            workouts = listOf(com.silverajat.lifttracker.health.Workout(java.time.Instant.ofEpochSecond(1000), java.time.Instant.ofEpochSecond(4000), "Run", null, 150, 180, 90, 10.1)),
+            load = com.silverajat.lifttracker.health.Load(120, 30, 12, 900, listOf(10, 20, 15, 8, 2)))
+        c.save(listOf(d0), full = true)
+        val back = c.load()!!
+        assertEquals(listOf(d0), back.days)
+        val merged = c.merge(back.days, listOf(day(LocalDate.now(), 70.0, 52)))
+        assertEquals(2, merged.size)
+    }
 }

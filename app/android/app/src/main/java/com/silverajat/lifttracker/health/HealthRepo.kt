@@ -52,7 +52,10 @@ class HealthRepo(private val context: Context) {
     val backgroundPermission = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
 
     /** What the "Connect" button asks for. */
-    val requested: Set<String> get() = permissions + backgroundPermission
+    /** Lets the first sync read further back than Health Connect's default 30 days. */
+    val historyPermission = "android.permission.health.READ_HEALTH_DATA_HISTORY"
+
+    val requested: Set<String> get() = permissions + backgroundPermission + historyPermission
 
     fun available(): Boolean = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 

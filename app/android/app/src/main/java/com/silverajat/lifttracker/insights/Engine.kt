@@ -117,8 +117,9 @@ object InsightEngine {
 
     fun schedule(ctx: Context) {
         WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
-            "insights", ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<InsightWorker>(1, TimeUnit.HOURS, 20, TimeUnit.MINUTES).build(),
+            "insights", ExistingPeriodicWorkPolicy.UPDATE,
+            // every 30 min: tops up the saved Fitbit data (last 3 days), the widget and any notifications due
+            PeriodicWorkRequestBuilder<InsightWorker>(30, TimeUnit.MINUTES, 10, TimeUnit.MINUTES).build(),
         )
     }
 
@@ -166,8 +167,23 @@ object InsightEngine {
 
         // the full analysis (31 days of Fitbit data) only when something needs it
         var daysCache: List<com.silverajat.lifttracker.health.HealthDay>? = null
-        suspend fun days() = daysCache ?: (if (canHealth) runCatching { health.days(31, hrMax) }.getOrDefault(emptyList()) else emptyList())
-            .also { daysCache = it }
+        // same saved copy as the app: quick 3-day read on top of it, full read at most once a day
+        val hcache = com.silverajat.lifttracker.health.HealthCache(ctx.filesDir)
+        suspend fun days(): List<com.silverajat.lifttracker.health.HealthDay> {
+            daysCache?.let { return it }
+            if (!canHealth) return emptyList()
+            val saved = hcache.load()
+            // same rule as the app: saved copy under 30 minutes old is used as is
+            if (saved != null && saved.days.size >= 20 && System.currentTimeMillis() - saved.savedMs < com.silverajat.lifttracker.SYNC_EVERY_MS) {
+                daysCache = saved.days; return saved.days
+            }
+            val full = saved == null || saved.days.size < 20
+            val fresh = runCatching { health.days(if (full) com.silverajat.lifttracker.FIRST_DAYS else 3, hrMax) }.getOrDefault(emptyList())
+            val d = if (fresh.isEmpty()) saved?.days.orEmpty() else if (full || saved == null) fresh else hcache.merge(saved.days, fresh)
+            if (fresh.isNotEmpty()) hcache.save(d, full)
+            daysCache = d
+            return d
+        }
         val goalKg = prefs.getFloat("goal_kg_week", 0.25f).toDouble()
         suspend fun weights(): List<com.silverajat.lifttracker.meals.WeightEntry> {
             val mine = meals.weights()
