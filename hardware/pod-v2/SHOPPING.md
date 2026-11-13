@@ -29,42 +29,21 @@ The old 302030 140 mAh cell is fine for bench testing (doesn't fit the case).
 - [ ] B-7000 glue
 - [ ] 30 AWG silicone wire (a few colours)
 
-### 2. Soldering bench (core)
-Skip the all-in-one "iron + multimeter + 20 tools" kits: the iron has no real
-temperature control and the meter is the weakest part. Buy these separately.
-- [ ] Pinecil V2 + a fine conical tip (TS-I / TS-ILS) + silicone stand. Needs a USB-C PD charger 45 W+ (65 W is best)
-- [ ] Hot air rework station (e.g. 858D, or a 2-in-1 "8786D"): reflows QFN/LGA chips like the IMU, removes parts
-- [ ] Solder 63/37, 0.5 mm and 0.8 mm
-- [ ] No-clean flux paste (syringe) + flux pen
-- [ ] Solder wick 1.5 mm and 2.5 mm
-- [ ] Desoldering pump
-- [ ] ESD tweezers set (straight + curved fine tips)
-- [ ] Brass tip cleaner (often with the stand)
-- [ ] Silicone soldering mat (heat-proof, with part trays)
-- [ ] PCB holder / helping hands (magnetic base)
-- [ ] Small fume extractor fan (carbon filter)
-- [ ] ESD wrist strap
-- [ ] Flush cutters (Engineer NN-46 or Hakko CHP-170) and a fine wire stripper (Engineer PA-14 or a 30-20 AWG stripper)
-- [ ] Precision screwdriver set
-- [ ] Heat-shrink tubing assortment
-- [ ] Isopropyl alcohol 99% + ESD brush + lint-free swabs (IPA: buy locally)
+### 2. Room soldering kit (lean)
+Skip the all-in-one "iron + multimeter + 20 tools" kits: weak iron, worse meter.
+- [ ] Pinecil V2 + its silicone stand (needs a USB-C PD charger 45-65 W; a laptop charger works)
+- [ ] Solder 63/37, 0.5 mm, small roll
+- [ ] No-clean flux pen
+- [ ] Solder wick 2 mm
+- [ ] ESD tweezers set
+- [ ] Flush cutters
+- [ ] Silicone soldering mat (protects the desk)
+- [ ] Multimeter: ANENG AN8008 (budget) or UNI-T UT61E+
+- [ ] Digital calipers (stainless, 150 mm)
+- [ ] Isopropyl alcohol 99% + cotton swabs (buy locally)
 
-### 3. Measuring and debugging
-- [ ] Multimeter: UNI-T UT61E+ (best value) or ANENG AN8008 (budget). Needs continuity, mA range, diode test
-- [ ] Digital calipers (measure batteries, parts, case fits)
-- [ ] USB microscope or magnifier lamp (inspect 0.5 mm-pitch joints)
-- [ ] Bench power supply with current limit (e.g. FNIRSI DPS-150 or Riden RD6006): first power-up of a new board at 50 mA
-- [ ] 8-channel 24 MHz logic analyzer (works with PulseView): watch SPI between the nRF and the IMU
-- [ ] USB-C power meter (FNIRSI FNB58): check charging current and power draw
-- [ ] Optional: small oscilloscope (school labs have proper ones)
-
-### 4. Stock to keep around
-- [ ] Breadboard + Dupont jumper wires (M-M, M-F, F-F)
-- [ ] Pin headers (2.54 and 1.27 mm)
-- [ ] 0402 and 0603 resistor + capacitor sample books (for fixes and mods)
-- [ ] Spare LEDs (0603), a few AO3400 MOSFETs, 1N4148 diodes
-- [ ] Pogo pins / test hook clips (for SWD pads)
-- [ ] LiPo-safe charging bag
+Later, only if needed: hot air station (chip rework), bench power supply with
+current limit, logic analyzer, USB microscope.
 
 ## Buy on AliExpress
 - 0820 coin vibration motor, 3 V, wire leads (8 x 2 mm), pack of 5-10
