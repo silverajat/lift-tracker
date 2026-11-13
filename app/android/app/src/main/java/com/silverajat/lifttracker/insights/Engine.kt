@@ -242,7 +242,7 @@ object InsightEngine {
         // refresh the home-screen widget every run (hourly)
         if (canHealth) runCatching {
             com.silverajat.lifttracker.widget.WidgetData.publish(ctx,
-                com.silverajat.lifttracker.widget.WidgetData.from(analysis(), meals.day(today), today, t))
+                com.silverajat.lifttracker.widget.WidgetData.from(analysis(), meals.day(today), today, t, days()))
         }
     }
 }

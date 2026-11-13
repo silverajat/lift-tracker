@@ -183,7 +183,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             _analysis.value?.takeIf { _healthState.value == HealthState.OK || _days.value.isNotEmpty() }?.let { a ->
                 withContext(Dispatchers.IO) {
                     com.silverajat.lifttracker.widget.WidgetData.publish(getApplication(),
-                        com.silverajat.lifttracker.widget.WidgetData.from(a, meals.day(today), today, java.time.LocalTime.now(zone)))
+                        com.silverajat.lifttracker.widget.WidgetData.from(a, meals.day(today), today, java.time.LocalTime.now(zone), _days.value))
                 }
             }
         }
