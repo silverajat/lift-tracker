@@ -98,6 +98,9 @@ object Routines {
     // Done one arm at a time, left arm first. The pod is on the right wrist,
     // so it counts the right arm's reps (you match them on the left).
     private val oneArm = setOf(5, 9, 12)
+    // the wrist hardly moves (legs or hips do the work): the pod can't count these
+    private val wristStill = setOf(24, 26, 27)   // reverse ab crunches, leg extension, leg curl
+    fun podCounts(exerciseId: Int) = exerciseId !in wristStill
 
     private val groups = mapOf(
         1 to Group.CHEST, 2 to Group.BACK, 3 to Group.SHOULDERS, 4 to Group.BACK,

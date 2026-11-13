@@ -566,7 +566,10 @@ private fun BottomPanel(
                                 "  ·  " + elapsed(now - (active?.startMs ?: now) - vm.pausedMs(now)),
                             style = MaterialTheme.typography.bodyLarge.merge(Tnum), color = C.Muted,
                         )
-                        if (podReady) {
+                        if (ex != null && !Routines.podCounts(ex.id)) {
+                            Text("Count yourself: your wrist stays still on this one", style = MaterialTheme.typography.bodyMedium,
+                                color = C.Muted, modifier = Modifier.padding(top = 8.dp))
+                        } else if (podReady) {
                             Row(verticalAlignment = Alignment.Bottom) {
                                 Text("$live", style = MaterialTheme.typography.displayLarge.merge(Tnum)
                                     .copy(fontSize = 92.sp, lineHeight = 92.sp), color = C.Text)

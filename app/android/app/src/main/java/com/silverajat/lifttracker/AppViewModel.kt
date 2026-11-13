@@ -462,8 +462,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 Pair(parts.sumOf { it.second }, mergeAnalyses(parts.mapNotNull { it.third }))
             }
-            if (data.isNotEmpty()) _liveReps.value = n
-            _analysis.value = a
+            if (!Routines.podCounts(set.exerciseId)) {
+                // wrist stays still on this one: no count or quality from the pod, start from the plan
+                _liveReps.value = Routines.byId(set.exerciseId).last.getOrNull(set.setNo - 1)?.reps ?: 0
+                _analysis.value = null
+            } else {
+                if (data.isNotEmpty()) _liveReps.value = n
+                _analysis.value = a
+            }
             _phase.value = Phase.CONFIRM
             sendStop(set)
         }
@@ -506,7 +512,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             exerciseId = set.exerciseId, setNo = set.setNo, weight = set.weight,
             addons = set.addons, reps = reps, warmup = set.warmup,
             startMs = set.startMs, endMs = set.endMs ?: System.currentTimeMillis(),
-            liveReps = if (set.podStarted || setData.isNotEmpty()) _liveReps.value else null, podRec = set.podRec,
+            liveReps = if (Routines.podCounts(set.exerciseId) && (set.podStarted || setData.isNotEmpty())) _liveReps.value else null, podRec = set.podRec,
             quality = _analysis.value?.overall,
             repScores = _analysis.value?.perRep?.map { it.score } ?: emptyList(),
             speedDrop = _analysis.value?.speedDropPct,
@@ -517,7 +523,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             counter = RepEngineVersion,
         )
         // Keep the set's data: with the count you confirmed, it's what the counter learns from.
-        if (setData.size >= PodProtocol.STREAM_HZ) {
+        if (setData.size >= PodProtocol.STREAM_HZ && Routines.podCounts(set.exerciseId)) {
             val d = setData
             viewModelScope.launch(Dispatchers.IO) { raw.save(session.id, log.exerciseId, log.setNo, d) }
         }
