@@ -190,8 +190,16 @@ class HealthRepo(private val context: Context) {
             val recs = r?.records.orEmpty()
             val latest = recs.mapNotNull { rec ->
                 when (rec) {
-                    is androidx.health.connect.client.records.InstantaneousRecord -> rec.time
-                    is androidx.health.connect.client.records.IntervalRecord -> rec.endTime
+                    is HeartRateRecord -> rec.endTime
+                    is HeartRateVariabilityRmssdRecord -> rec.time
+                    is RestingHeartRateRecord -> rec.time
+                    is SleepSessionRecord -> rec.endTime
+                    is StepsRecord -> rec.endTime
+                    is TotalCaloriesBurnedRecord -> rec.endTime
+                    is ExerciseSessionRecord -> rec.endTime
+                    is RespiratoryRateRecord -> rec.time
+                    is OxygenSaturationRecord -> rec.time
+                    is WeightRecord -> rec.time
                     else -> null
                 }
             }.maxOrNull()
