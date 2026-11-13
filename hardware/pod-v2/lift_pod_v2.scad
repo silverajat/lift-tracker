@@ -33,8 +33,9 @@ steel_at = [24.2, 9.0];                    // steel disc for the charger magnet
 leds     = [[27.0, 16.9], [34.9, 1.2]];    // D2 green (status), D3 red (charging)
 
 // ---------- On top of the board (datasheet maximums) ----------
-cell = [20.5, 11.0, 3.0];       // 301120 LiPo, L x W x T max
-cell_box = [19.9, 3.5, 40.4, 14.5];        // board coords of the cell outline
+cell = [22.0, 11.0, 3.0];       // 301120 LiPo, L x W x T max (some list 22 mm with the protection board)
+cell_box = [19.6, 3.5, 41.6, 14.5];        // board coords of the cell outline (runs 0.6 mm past the board end)
+cell_ext = 2.0;                 // pocket past the board's right end, for a 22 mm cell + its wire bend
 motor_d = 8.0;  motor_t = 2.5;  motor_at = [11.3, 9.0];
 module_h = 3.0;  flash_h = 1.1;  foam = 0.3;  gap = 0.15;   // E73 height (3D model); tallest part under the cell
 in_h = max(module_h + gap + motor_t, flash_h + gap + cell[2] + foam) + 0.1;
@@ -60,7 +61,8 @@ $fn = 48;
 
 // ---------- Derived ----------
 cav_l = pcb_l + 2*clr;  cav_w = pcb_w + 2*clr;
-body_l = cav_l + 2*wall;  W = cav_w + 2*wall;
+body_l = cav_l + 2*wall + cell_ext;  W = cav_w + 2*wall;
+body_off = cell_ext/2;          // the body grows at the right (+X) end only
 plan_r = pcb_r + clr + wall;
 H = pcb_t + in_h + top_t;
 lug_l = slot_w + bar_t + 0.6;
@@ -77,7 +79,7 @@ function inset(z) =
     z > H - top_r ? top_r - sqrt(max(top_r*top_r - (z - (H - top_r))*(z - (H - top_r)), 0)) : 0;
 module pebble() {
     zs = concat([0, chamfer], [for (i = [0:10]) H - top_r + i*top_r/10]);
-    hull() for (z = zs) translate([0, 0, z]) linear_extrude(0.001)
+    hull() for (z = zs) translate([body_off, 0, z]) linear_extrude(0.001)
         rr(body_l - 2*inset(z), W - 2*inset(z), plan_r - inset(z));
 }
 module r_logo(h = 9) {
@@ -97,7 +99,7 @@ module r_logo(h = 9) {
 // band lugs: a rounded bar at each end with a through-slot; their underside
 // is flush with the board, so the pod still sits flat on the charger
 module lugs() {
-    for (s = [-1, 1]) difference() {
+    translate([body_off, 0, 0]) for (s = [-1, 1]) difference() {
         hull() {
             translate([s*(body_l/2 - 2), 0, 0]) linear_extrude(lug_h) rr(4, W - 1.0, 1.5);
             translate([s*(L/2 - bar_t/2), 0, bar_t/2 + 0.3]) rotate([90, 0, 0])
@@ -136,6 +138,8 @@ module shell() {
         // parts space above the board (full board size; corner stops added below),
         // its top edge rounded so the shell stays >= 1 mm under the rounded outside
         cavity();
+        // cell pocket past the board's right end (middle only, clear of the corner stops)
+        translate([cav_l/2 - 1, -6.5, pcb_t - 0.01]) cube([1 + cell_ext, 13, in_h - in_r]);
         // LED windows (fill with clear UV resin for a sealed light pipe)
         for (p = leds) { q = pod(p); translate([q[0], q[1], H - top_t - 1]) cylinder(d = 1.2, h = top_t + 2); }
         translate([-4, 0, H - logo_depth]) linear_extrude(1) r_logo(logo_h);
