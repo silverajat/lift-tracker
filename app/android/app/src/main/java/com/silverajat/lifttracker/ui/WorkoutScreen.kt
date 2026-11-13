@@ -709,7 +709,7 @@ private fun QualityView(a: SetAnalysis, warmup: Boolean, calibration: Boolean) {
                 Text(if (calibration) "ROM calibration" else "Rep quality", style = MaterialTheme.typography.titleMedium)
                 val u = com.silverajat.lifttracker.reps.unitLabel(a.unit)
                 val romLine = when {
-                    calibration -> "Calibrated: this set is your 100% ROM (${a.setRom.toInt()}$u)"
+                    calibration -> "Calibration set: ROM ${a.setRom.toInt()}$u, now part of your usual range"
                     warmup -> "Warm-up ROM: ${a.setRom.toInt()}$u"
                     else -> "ROM ${a.avgRomPct}% of ${a.ref.source.label} (${a.ref.value.toInt()}$u)"
                 }

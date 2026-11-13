@@ -20,7 +20,7 @@ data class RepQuality(
 data class RomRef(val value: Float, val unit: String, val source: Source) {
     enum class Source(val label: String) {
         CALIBRATION("your calibration set"), WARMUP("today's warm-up"),
-        BEST("your best set"), SET("this set's best reps")
+        BEST("your best set"), SET("this set's best reps"), RECENT("your last sets")
     }
 }
 

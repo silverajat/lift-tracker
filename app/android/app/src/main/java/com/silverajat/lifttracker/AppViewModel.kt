@@ -229,23 +229,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * What 100% ROM is for an exercise (in degrees or cm, matching the set):
-     *  1. your latest calibration set (C): that set IS 100%;
-     *  2. otherwise today's warm-up, if you did one with the pod;
-     *  3. otherwise your best logged set (median of its 3 biggest reps);
-     *  4. otherwise null, and the set is scored against its own best reps.
-     * Only sets measured by the current counter count (older numbers used a
-     * different method).
+     * the median of your last 6 sets' ROM, so it recalibrates after every set.
+     * No sets yet: null, and the set is scored against its own best reps.
+     * Only sets measured by the current counter count.
      */
+    private val ROM_SETS = 6
+
     fun romRef(exerciseId: Int, unit: String): RomRef? {
-        val sets = allSets(exerciseId).filter { it.counter >= RepEngineVersion && it.romUnit == unit && it.rom.size >= 2 }
-        sets.filter { it.calibration }.maxByOrNull { it.startMs }?.let {
-            return RomRef(top3(it.rom), unit, RomRef.Source.CALIBRATION)
-        }
-        val today = _session.value?.sets ?: emptyList()
-        sets.filter { it.warmup && it in today }
-            .maxOfOrNull { top3(it.rom) }?.let { return RomRef(it, unit, RomRef.Source.WARMUP) }
-        sets.filter { !it.warmup }.maxOfOrNull { top3(it.rom) }?.let { return RomRef(it, unit, RomRef.Source.BEST) }
-        return null
+        // Recalibrates after every set: your usual full range is the median of your
+        // last 6 sets' ROM (each set's top 3 reps), so one odd set can't move it much
+        // and it follows you as your range changes.
+        val recent = allSets(exerciseId).filter { it.counter >= RepEngineVersion && it.romUnit == unit && it.rom.size >= 2 }
+            .sortedByDescending { it.startMs }.take(ROM_SETS)
+        if (recent.isEmpty()) return null
+        val v = recent.map { top3(it.rom) }.sorted().let { r -> if (r.size % 2 == 1) r[r.size / 2] else (r[r.size / 2 - 1] + r[r.size / 2]) / 2 }
+        return RomRef(v, unit, RomRef.Source.RECENT)
     }
 
     /** Every logged set of an exercise, this workout included. */
