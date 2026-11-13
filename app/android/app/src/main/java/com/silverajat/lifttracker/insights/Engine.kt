@@ -217,6 +217,12 @@ object InsightEngine {
             val a = analysis()
             post(ctx, Insights.night(a, days().lastOrNull { it.date == today }, sessions, meals.day(today), today, zone, t, nowMs))
         }
+
+        // refresh the home-screen widget every run (hourly)
+        if (canHealth) runCatching {
+            com.silverajat.lifttracker.widget.WidgetData.publish(ctx,
+                com.silverajat.lifttracker.widget.WidgetData.from(analysis(), meals.day(today), today, t))
+        }
     }
 }
 

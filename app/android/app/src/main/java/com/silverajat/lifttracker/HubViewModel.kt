@@ -166,6 +166,13 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
                     Analysis.run(_days.value, sessions.all(), meals.days(today.minusDays(60), today), meals.weights(), today, zone, _goal.value)
                 }.getOrNull()
             }
+            // keep the home-screen widget in step (only once Fitbit data has loaded, so it never shows blanks)
+            _analysis.value?.takeIf { _healthState.value == HealthState.OK || _days.value.isNotEmpty() }?.let { a ->
+                withContext(Dispatchers.IO) {
+                    com.silverajat.lifttracker.widget.WidgetData.publish(getApplication(),
+                        com.silverajat.lifttracker.widget.WidgetData.from(a, meals.day(today), today, java.time.LocalTime.now(zone)))
+                }
+            }
         }
     }
 

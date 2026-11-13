@@ -59,6 +59,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.health.connect:connect-client:1.1.0")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")   // android's org.json is a stub in unit tests
 }

@@ -56,6 +56,19 @@
             </intent-filter>
         </activity>
 
+        <!-- Home-screen widget (3 x 2) -->
+        <receiver
+            android:name=".widget.HubWidgetReceiver"
+            android:exported="true"
+            android:label="Lift Tracker">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hub_widget_info" />
+        </receiver>
+
         <!-- Android 14+: the same link from the system Health Connect settings -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"
