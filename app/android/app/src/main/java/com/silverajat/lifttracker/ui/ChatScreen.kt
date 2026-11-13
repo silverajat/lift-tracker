@@ -56,11 +56,11 @@ import com.silverajat.lifttracker.HubViewModel
 import kotlinx.coroutines.launch
 
 private val suggestions = listOf(
-    "My weight has been flat: how should I change the plan to gain ~0.25 kg a week?",
-    "Swap the mixed rice for something with less fat but the same protein.",
-    "Give me 3 cheaper hawker options that fit my lunch macros.",
-    "Should I move the shake or the yoghurt bowl on rest days?",
-    "Rewrite my whole plan with ~2,900 kcal and 125 g protein.",
+    "How's my week looking overall?",
+    "My weight has been flat: what should I change?",
+    "Which lifts are stalling, and why?",
+    "Give me 3 cheaper hawker options that fit my plan.",
+    "What's been hurting my recovery?",
 )
 
 /** Brainstorm with GPT, with everything the app knows attached to every message. */
@@ -81,7 +81,7 @@ fun ChatScreen(hub: HubViewModel, onBack: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = C.Text) }
             Column(Modifier.weight(1f)) {
-                Text("Meal plan brainstorm", style = MaterialTheme.typography.titleLarge)
+                Text("Brainstorm", style = MaterialTheme.typography.titleLarge)
                 Text("GPT, with your food, weight, gym and Fitbit data", style = MaterialTheme.typography.labelMedium, color = C.Muted)
             }
             if (chat.isNotEmpty()) TextButton(onClick = { hub.clearChat() }) { Text("New chat", color = C.Muted) }
@@ -126,7 +126,7 @@ fun ChatScreen(hub: HubViewModel, onBack: () -> Unit) {
             OutlinedTextField(
                 input, { input = it },
                 modifier = Modifier.weight(1f).heightIn(max = 160.dp),
-                placeholder = { Text("Ideas for the meal plan…", color = C.Muted) },
+                placeholder = { Text("Ask anything…", color = C.Muted) },
                 shape = RoundedCornerShape(22.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = C.Accent, unfocusedBorderColor = C.Line, focusedTextColor = C.Text,
@@ -211,7 +211,7 @@ private fun SettingsDialog(hub: HubViewModel, onDismiss: () -> Unit) {
                             modifier = Modifier.clickable { showAll = true }.padding(vertical = 3.dp))
                     }
                 }
-                Text("Newest first. A mid-size model is plenty for meal planning; the big ones cost more per message.",
+                Text("Newest first. A mid-size model is plenty; the big ones cost more per message.",
                     style = MaterialTheme.typography.labelMedium, color = C.Muted)
                 OutlinedTextField(hr, { hr = it }, label = { Text("Max heart rate (for strain)") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

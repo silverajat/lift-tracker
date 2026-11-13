@@ -54,7 +54,7 @@ private fun kindLabel(k: Kind) = when (k) {
     Kind.NIGHT -> "Wrap-up"; Kind.WEATHER -> "Weather"; Kind.WEEKLY -> "Week"
 }
 
-/** Every summary the app has sent (Fitbit-style), plus the meal-plan brainstorm. */
+/** Every summary the app has sent (Fitbit-style), plus Brainstorm (GPT). */
 @Composable
 fun InsightsScreen(hub: HubViewModel) {
     var chat by rememberSaveable { mutableStateOf(false) }
@@ -96,8 +96,8 @@ fun InsightsScreen(hub: HubViewModel) {
         item {
             Card(Modifier.fillMaxWidth(), onClick = { chat = true }) {
                 Column {
-                    Text("Brainstorm your meal plan", style = MaterialTheme.typography.titleMedium)
-                    Text("Chat with GPT about changing the plan. It sees your food log, weight trend, training and Fitbit data.",
+                    Text("Brainstorm", style = MaterialTheme.typography.titleMedium)
+                    Text("Chat with GPT about anything. It sees your training, food, weight and Fitbit data.",
                         color = C.Muted, style = MaterialTheme.typography.bodyMedium)
                 }
             }
