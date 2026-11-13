@@ -110,6 +110,14 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
     val key by hub.apiKey.collectAsStateWithLifecycle()
     val items by hub.items.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { hub.refreshHealth() }
+    // last night's sleep often reaches Health Connect a while after you wake: keep checking every 2 min while it's missing
+    val sleepMissing = a?.today?.sleep == null
+    LaunchedEffect(sleepMissing) {
+        while (sleepMissing && java.time.LocalTime.now().hour in 4..13) {
+            kotlinx.coroutines.delay(120_000)
+            hub.refreshHealth()
+        }
+    }
     var detail by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<Detail?>(null) }
     var logging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var info by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.silverajat.lifttracker.activity.ActivityItem?>(null) }
@@ -307,7 +315,7 @@ private fun Scoreboard(d: Analysis.Day?, onDetail: (Detail) -> Unit) {
                 Text("Sleep", style = MaterialTheme.typography.titleSmall, color = C.Muted)
                 Text(d?.sleep?.let { hmin(it.asleepMin) } ?: "Not yet", style = if (d?.sleep == null) MaterialTheme.typography.headlineSmall
                     else MaterialTheme.typography.displaySmall.merge(Tnum), color = if (d?.sleep == null) C.Muted else SleepPurple)
-                Text(d?.sleep?.let { "${it.performance}% of what you needed" } ?: "from your Fitbit", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                Text(d?.sleep?.let { "${it.performance}% of what you needed" } ?: if (java.time.LocalTime.now().hour in 4..13) "waiting on Fitbit" else "from your Fitbit", style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
     }
