@@ -19,6 +19,7 @@ enum class Sport(val label: String, val emoji: String) {
     companion object {
         fun ofFitbit(type: String) = when (type) {
             "Run" -> RUN; "Walk" -> WALK; "Swim" -> SWIM; "Bike" -> CYCLE
+            "Football", "Soccer" -> FOOTBALL; "Badminton" -> BADMINTON
             "Strength training", "Weightlifting" -> GYM
             else -> OTHER
         }
@@ -87,6 +88,25 @@ class ActivityStore(root: File) {
     }
 }
 
+/**
+ * Your corrections to what the Fitbit detected ("that soccer was a walk"),
+ * keyed by the workout's start time. null sport = hidden (not an activity).
+ */
+class ActivityOverrides(root: File) {
+    private val f = File(root, "activity_overrides.json")
+
+    fun all(): Map<Long, Sport?> = runCatching {
+        val o = JSONObject(f.readText())
+        o.keys().asSequence().associate { k -> k.toLong() to o.getString(k).let { v -> if (v == "HIDDEN") null else Sport.valueOf(v) } }
+    }.getOrDefault(emptyMap())
+
+    fun set(startMs: Long, sport: Sport?) {
+        val o = runCatching { JSONObject(f.readText()) }.getOrDefault(JSONObject())
+        o.put(startMs.toString(), sport?.name ?: "HIDDEN")
+        f.writeText(o.toString())
+    }
+}
+
 /** Everything you did, from all sources, as one list for the Strain page. */
 data class ActivityItem(
     val key: String,
@@ -110,8 +130,10 @@ object ActivityLog {
      * first. Where a logged activity overlaps a Fitbit workout, they're one
      * item: your name and distance, the Fitbit's heart rate.
      */
-    fun merge(days: List<HealthDay>, manual: List<Activity>, manualHr: Map<String, Workout>, sessions: List<Session>): List<ActivityItem> {
-        val fitbit = days.flatMap { it.workouts }
+    fun merge(days: List<HealthDay>, manual: List<Activity>, manualHr: Map<String, Workout>, sessions: List<Session>,
+              overrides: Map<Long, Sport?> = emptyMap()): List<ActivityItem> {
+        // hidden ones are dropped; the rest keep your corrected type
+        val fitbit = days.flatMap { it.workouts }.filter { w -> !(overrides.containsKey(w.start.toEpochMilli()) && overrides[w.start.toEpochMilli()] == null) }
         val used = HashSet<Workout>()
         val out = ArrayList<ActivityItem>()
         for (a in manual) {
@@ -129,7 +151,9 @@ object ActivityLog {
                 fw?.avgHr, fw?.maxHr, fw?.trimp?.let { Analysis.strainOf(it) }, "Pod", sessionId = s.id)
         }
         for (w in fitbit.filter { it !in used }) {
-            out += ActivityItem("f-${w.start.toEpochMilli()}", Sport.ofFitbit(w.type), w.title ?: w.type, w.start, w.end,
+            val fixed = overrides[w.start.toEpochMilli()]
+            val sport = fixed ?: Sport.ofFitbit(w.type)
+            out += ActivityItem("f-${w.start.toEpochMilli()}", sport, if (fixed != null) sport.label else w.title ?: w.type, w.start, w.end,
                 Duration.between(w.start, w.end).toMinutes().toInt(), w.distanceKm, w.avgHr, w.maxHr, w.trimp?.let { Analysis.strainOf(it) }, "Fitbit")
         }
         return out.sortedByDescending { it.start }

@@ -330,6 +330,10 @@ class HealthRepo(private val context: Context) {
         ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL -> "Swim"
         ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL -> "Elliptical"
         ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING -> "Stairs"
+        ExerciseSessionRecord.EXERCISE_TYPE_SOCCER -> "Football"
+        ExerciseSessionRecord.EXERCISE_TYPE_BADMINTON -> "Badminton"
+        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL -> "Run"
+        ExerciseSessionRecord.EXERCISE_TYPE_HIKING -> "Walk"
         else -> "Workout"
     }
 }

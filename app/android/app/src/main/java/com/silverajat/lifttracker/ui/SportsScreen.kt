@@ -89,7 +89,8 @@ fun SportsScreen(hub: HubViewModel, onStartRun: () -> Unit, onOpenGym: (Long) ->
     if (live.active) { LiveSession(live, onFinish = { note -> RunTracker.stop(ctx, note) }); return }
 
     logSport?.let { sp -> LogActivityDialog(sp, onDismiss = { logSport = null }) { s, start, min, km, note -> hub.addActivity(s, start, min, km, note); logSport = null } }
-    info?.let { it -> ActivityInfo(it, onDismiss = { info = null }, onDelete = it.manualId?.let { id -> { hub.deleteActivity(id); info = null } }) }
+    info?.let { it -> ActivityInfo(it, onDismiss = { info = null }, onDelete = it.manualId?.let { id -> { hub.deleteActivity(id); info = null } },
+        onChange = { s -> hub.changeType(it, s); info = null }) }
 
     fun open(it: ActivityItem) {
         when {
@@ -439,8 +440,9 @@ fun LogActivityDialog(start: Sport, onDismiss: () -> Unit, onSave: (Sport, Long,
 }
 
 @Composable
-fun ActivityInfo(it: ActivityItem, onDismiss: () -> Unit, onDelete: (() -> Unit)?) {
+fun ActivityInfo(it: ActivityItem, onDismiss: () -> Unit, onDelete: (() -> Unit)?, onChange: ((Sport?) -> Unit)? = null) {
     val zone = ZoneId.systemDefault()
+    var changing by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = C.Surface,
         title = { Text("${it.sport.emoji} ${it.title}") },
@@ -452,6 +454,21 @@ fun ActivityInfo(it: ActivityItem, onDismiss: () -> Unit, onDelete: (() -> Unit)
                 it.avgHr?.let { h -> Text("Average heart rate $h, max ${it.maxHr ?: "–"}", style = MaterialTheme.typography.bodyMedium) }
                 it.strain?.let { s -> Text("Strain %.1f".format(s), style = MaterialTheme.typography.titleMedium, color = StrainBlue) }
                 Text("From: ${it.source}", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                if (onChange != null && it.sessionId == null) {
+                    if (!changing) Text("Wrong type? Change it", style = MaterialTheme.typography.titleSmall, color = C.Accent,
+                        modifier = Modifier.padding(top = 8.dp).clickable { changing = true })
+                    else Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                        Text("What was it?", style = MaterialTheme.typography.titleSmall)
+                        FlowRowCompat(spacing = 6.dp) {
+                            Sport.entries.filter { s -> s != Sport.GYM }.forEach { s ->
+                                Tag("${s.emoji} ${s.label}", color = if (s == it.sport) C.Accent else C.Text, modifier = Modifier.clickable { onChange(s) })
+                            }
+                        }
+                        if (it.manualId == null) Text("Not an activity: hide it", style = MaterialTheme.typography.labelLarge, color = C.Stop,
+                            modifier = Modifier.clickable { onChange(null) })
+                        Text("Heart rate and strain stay the same; it just moves to the right sport.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                    }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close", color = C.Accent) } },

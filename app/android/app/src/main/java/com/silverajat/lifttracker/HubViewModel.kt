@@ -272,6 +272,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     private val _activities = MutableStateFlow(activityStore.all())
     val activities: StateFlow<List<com.silverajat.lifttracker.activity.Activity>> = _activities
     private val manualHr = HashMap<String, com.silverajat.lifttracker.health.Workout>()
+    private val overrides = com.silverajat.lifttracker.activity.ActivityOverrides(app.filesDir)
     private val _items = MutableStateFlow<List<com.silverajat.lifttracker.activity.ActivityItem>>(emptyList())
     /** Everything you did, newest first (the Strain page and the Sports tab). */
     val items: StateFlow<List<com.silverajat.lifttracker.activity.ActivityItem>> = _items
@@ -288,13 +289,23 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
                 }?.let { manualHr[a.id] = it }
             }
             _items.value = withContext(Dispatchers.Default) {
-                com.silverajat.lifttracker.activity.ActivityLog.merge(_days.value, list, manualHr, sessions.all())
+                com.silverajat.lifttracker.activity.ActivityLog.merge(_days.value, list, manualHr, sessions.all(), overrides.all())
             }
         }
     }
 
     fun addActivity(sport: com.silverajat.lifttracker.activity.Sport, startMs: Long, minutes: Int, km: Double?, note: String) {
         activityStore.add(com.silverajat.lifttracker.activity.Activity("a$startMs", sport, startMs, minutes * 60, km, note))
+        refreshActivities()
+    }
+
+    /** Fix what an activity was (the Fitbit called a walk "soccer"); null hides a Fitbit one that wasn't an activity. */
+    fun changeType(item: com.silverajat.lifttracker.activity.ActivityItem, sport: com.silverajat.lifttracker.activity.Sport?) {
+        val manual = item.manualId?.let { id -> activityStore.all().firstOrNull { it.id == id } }
+        when {
+            manual != null -> if (sport == null) activityStore.delete(manual.id) else activityStore.add(manual.copy(sport = sport))
+            item.key.startsWith("f-") -> overrides.set(item.start.toEpochMilli(), sport)
+        }
         refreshActivities()
     }
 
