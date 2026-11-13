@@ -2,6 +2,7 @@ package com.silverajat.lifttracker.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,7 +66,7 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
 }
 
 @Composable
-fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> Unit) {
+fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> Unit, strength: List<com.silverajat.lifttracker.health.Analysis.ExerciseTrend> = emptyList()) {
     val conn by vm.pod.conn.collectAsStateWithLifecycle()
     val status by vm.pod.status.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
@@ -128,6 +129,35 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                 last = last,
                 onClick = { vm.open(Screen.Workout(day)) },
             )
+        }
+        // Strength: estimated 1RM per lift and what to do next session
+        if (strength.isNotEmpty()) {
+            item { SectionLabel("Strength", Modifier.padding(top = 6.dp)) }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column {
+                        strength.forEachIndexed { i, e ->
+                            if (i > 0) androidx.compose.material3.HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 12.dp))
+                            Row(verticalAlignment = Alignment.Top) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(e.name, style = MaterialTheme.typography.titleSmall)
+                                    Text(e.suggestion, style = MaterialTheme.typography.bodyMedium)
+                                    Text("Last: ${e.lastSets.substringBefore(" (")}", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("${e.e1rmNow.roundToInt()} kg", style = MaterialTheme.typography.headlineSmall.merge(Tnum))
+                                    e.changePct?.let {
+                                        Text("${if (it >= 0) "+" else ""}${"%.1f".format(it)}%", style = MaterialTheme.typography.labelLarge.merge(Tnum),
+                                            color = if (it >= 0) C.Done else C.Stop)
+                                    }
+                                }
+                            }
+                        }
+                        Text("Estimated one-rep max, and what to do next session.", style = MaterialTheme.typography.bodySmall, color = C.Muted,
+                            modifier = Modifier.padding(top = 12.dp))
+                    }
+                }
+            }
         }
         // Every past workout (unfinished ones too), newest first, each with delete.
         val past = history.filter { it.id != session?.id && (it.sets.isNotEmpty() || it.endMs == null) }

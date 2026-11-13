@@ -62,6 +62,10 @@ object Analysis {
         val needMin: Int, val asleepMin: Int, val performance: Int, val debtMin: Int,
         val consistency: Int?, val efficiency: Int?, val deepPct: Int?, val remPct: Int?,
         val bed: Instant, val wake: Instant,
+        // what the need is made of: 8 h baseline + yesterday's strain + half the recent debt
+        val needStrainMin: Int = 0, val needDebtMin: Int = 0,
+        val deepMin: Int = 0, val remMin: Int = 0, val lightMin: Int = 0, val awakeMin: Int = 0,
+        val stages: List<SleepStage> = emptyList(),
     )
 
     data class StrainResult(val strain: Double, val target: ClosedFloatingPointRange<Double>?, val trimp: Int, val moderateMin: Int, val vigorousMin: Int)
@@ -147,7 +151,8 @@ object Analysis {
     fun sleep(days: List<HealthDay>, i: Int, strainPrev: Double?, zone: ZoneId): SleepResult? {
         val s = days[i].sleep ?: return null
         var need = 480.0
-        if (strainPrev != null && strainPrev > 10) need += ((strainPrev - 10) * 4).coerceAtMost(45.0)
+        val forStrain = if (strainPrev != null && strainPrev > 10) ((strainPrev - 10) * 4).coerceAtMost(45.0) else 0.0
+        need += forStrain
         val prev = (1..3).mapNotNull { k -> days.getOrNull(i - k)?.sleep }
         val debt = prev.sumOf { (480 - it.totalMin).coerceAtLeast(0) } * 0.5
         need += debt.coerceAtMost(60.0)
@@ -166,6 +171,8 @@ object Analysis {
             deepPct = if (staged && s.totalMin > 0) s.deepMin * 100 / s.totalMin else null,
             remPct = if (staged && s.totalMin > 0) s.remMin * 100 / s.totalMin else null,
             bed = s.start, wake = s.end,
+            needStrainMin = forStrain.roundToInt(), needDebtMin = debt.coerceAtMost(60.0).roundToInt(),
+            deepMin = s.deepMin, remMin = s.remMin, lightMin = s.lightMin, awakeMin = s.awakeMin, stages = s.stages,
         )
     }
 

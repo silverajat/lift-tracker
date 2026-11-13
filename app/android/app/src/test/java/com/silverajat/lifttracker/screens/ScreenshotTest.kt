@@ -56,11 +56,27 @@ class ScreenshotTest {
         HealthDay(
             date = d, steps = 7000L + rnd.nextInt(7000), kcalTotal = 2900.0 + rnd.nextInt(300), kcalActive = 700.0,
             restingHr = 54 + rnd.nextInt(5), hrvMs = 58.0 + rnd.nextGaussian() * 8 + (if (i == 29) 10 else 0), spo2 = 97.0, respRate = 15.0 + rnd.nextGaussian() * 0.4,
-            sleep = SleepSummary(d.minusDays(1).atTime(23, 40).atZone(zone).toInstant(),
-                d.minusDays(1).atTime(23, 40).plusMinutes(asleep + 25L).atZone(zone).toInstant(), asleep, 75, 95, asleep - 190, 25),
-            workouts = emptyList(),
-            load = Load(60 + rnd.nextInt(120), 20 + rnd.nextInt(30), 5 + rnd.nextInt(20), 1400),
+            sleep = stagedNight(d, asleep, i),
+            workouts = if (i % 7 == 2) listOf(com.silverajat.lifttracker.health.Workout(ms(d, 18).let { java.time.Instant.ofEpochMilli(it) },
+                java.time.Instant.ofEpochMilli(ms(d, 18, 50)), "Walk", null, 104, 128, 22, 4.1)) else emptyList(),
+            load = Load(60 + rnd.nextInt(120), 20 + rnd.nextInt(30), 5 + rnd.nextInt(20), 1400, listOf(40 + rnd.nextInt(30), 25 + rnd.nextInt(20), 12 + rnd.nextInt(12), 6 + rnd.nextInt(8), rnd.nextInt(5))),
         )
+    }
+
+    /** A night of 90-minute cycles: deep early, REM later, a couple of short wake-ups. */
+    private fun stagedNight(d: LocalDate, asleep: Int, seed: Int): SleepSummary {
+        val start = d.minusDays(1).atTime(23, 30 + seed % 25).atZone(zone).toInstant()
+        val stages = ArrayList<com.silverajat.lifttracker.health.SleepStage>()
+        var t = start
+        fun add(type: Int, min: Int) { val e = t.plusSeconds(min * 60L); stages += com.silverajat.lifttracker.health.SleepStage(t, e, type); t = e }
+        add(0, 8)
+        for (c in 0 until 5) {
+            add(1, 20 + c * 4); add(2, (40 - c * 9).coerceAtLeast(5)); add(1, 12); add(3, 10 + c * 7)
+            if (c == 2 || c == 4) add(0, 4)
+        }
+        val mins = { ty: Int -> stages.filter { it.type == ty }.sumOf { java.time.Duration.between(it.start, it.end).toMinutes().toInt() } }
+        val total = mins(1) + mins(2) + mins(3)
+        return SleepSummary(start, t, total, mins(2), mins(3), mins(1), mins(0), stages)
     }
 
     private val sessions: List<Session> = (0 until 8).map { k ->
@@ -161,6 +177,40 @@ class ScreenshotTest {
         val s = s0.copy(sets = s0.sets.mapIndexed { i, l -> l.copy(repScores = List(l.reps) { r -> (95 - r * (3 + i % 4)).coerceAtLeast(40) },
             speedDrop = if (i % 4 == 3) 24 else 8, liveReps = if (i == 2) l.reps - 1 else l.reps) })
         com.silverajat.lifttracker.ui.SessionContent(s, sessions)
+    }
+
+    private val route: List<com.silverajat.lifttracker.activity.RoutePoint> = run {
+        // a 10 km loop-ish route around Kent Ridge, one point every 25 m
+        val pts = ArrayList<com.silverajat.lifttracker.activity.RoutePoint>()
+        val t0 = ms(today.minusDays(5), 7)
+        for (i in 0..400) {
+            val a = i / 400.0 * 2 * Math.PI
+            pts += com.silverajat.lifttracker.activity.RoutePoint(1.2966 + 0.012 * Math.sin(a) + 0.003 * Math.sin(3 * a), 103.7764 + 0.018 * Math.cos(a), t0 + i * 8_400L, 20 + 15 * Math.sin(2 * a))
+        }
+        pts
+    }
+    private val acts = listOf(
+        com.silverajat.lifttracker.activity.Activity("r1", com.silverajat.lifttracker.activity.Sport.RUN, ms(today.minusDays(5), 7), 3360, 10.02, "", route,
+            listOf(338, 334, 331, 336, 340, 333, 329, 335, 332, 322), 3400),
+        com.silverajat.lifttracker.activity.Activity("r0", com.silverajat.lifttracker.activity.Sport.RUN, ms(today.minusDays(12), 7), 3450, 10.0),
+        com.silverajat.lifttracker.activity.Activity("f1", com.silverajat.lifttracker.activity.Sport.FOOTBALL, ms(today, 17), 75 * 60, null, "5-a-side"),
+        com.silverajat.lifttracker.activity.Activity("b1", com.silverajat.lifttracker.activity.Sport.BADMINTON, ms(today.minusDays(2), 19), 90 * 60),
+    )
+    private val hrFor = mapOf(
+        "r1" to com.silverajat.lifttracker.health.Workout(java.time.Instant.EPOCH, java.time.Instant.EPOCH, "", null, 162, 184, 210),
+        "f1" to com.silverajat.lifttracker.health.Workout(java.time.Instant.EPOCH, java.time.Instant.EPOCH, "", null, 148, 181, 160),
+        "b1" to com.silverajat.lifttracker.health.Workout(java.time.Instant.EPOCH, java.time.Instant.EPOCH, "", null, 139, 172, 120),
+    )
+    private val items = com.silverajat.lifttracker.activity.ActivityLog.merge(days, acts, hrFor, sessions)
+
+    @Test fun recoveryDetail() = shoot("detail_recovery") { com.silverajat.lifttracker.ui.RecoveryDetail(analysis, days) {} }
+    @Test fun strainDetail() = shoot("detail_strain") { com.silverajat.lifttracker.ui.StrainDetail(analysis, days, items, 0.25, {}, {}, {}) }
+    @Test fun sleepDetail() = shoot("detail_sleep") { com.silverajat.lifttracker.ui.SleepDetail(analysis, days) {} }
+    @Test fun runDetail() = shoot("run_detail") { com.silverajat.lifttracker.ui.RunDetail(acts[0], items.first { it.manualId == "r1" }, {}, {}) }
+    @Test fun liveRun() = shoot("run_live") {
+        com.silverajat.lifttracker.ui.LiveSession(com.silverajat.lifttracker.activity.RunTracker.State(
+            active = true, startMs = System.currentTimeMillis() - 1_520_000, distanceM = 4630.0, points = route.take(185),
+            splitsS = listOf(331, 327, 334, 329), paceSPerKm = 322, gpsOk = true, accuracyM = 6f)) {}
     }
 
     @Suppress("unused") private val keepFoods = Foods.all.size

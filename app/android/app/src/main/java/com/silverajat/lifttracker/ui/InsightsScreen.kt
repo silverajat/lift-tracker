@@ -87,37 +87,10 @@ fun InsightsScreen(hub: HubViewModel) {
                 color = C.Muted, style = MaterialTheme.typography.bodyMedium)
         }
         item {
-            Card(Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Notifications", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        Switch(on, { hub.setNotifyOn(it) }, colors = SwitchDefaults.colors(checkedTrackColor = C.Accent))
-                    }
-                    Text("Mute single kinds in Android settings (each kind is its own channel).", style = MaterialTheme.typography.labelMedium, color = C.Muted)
-                    TextButton(onClick = { hub.checkInsights(force = true) }, enabled = !checking) {
-                        Text(if (checking) "Checking…" else "Send me a summary now", color = C.Accent, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-        item {
-            Card(Modifier.fillMaxWidth(), onClick = { keyDialog = true }, border = if (key.isEmpty()) C.Accent.copy(alpha = 0.6f) else androidx.compose.ui.graphics.Color.Transparent) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("GPT key", style = MaterialTheme.typography.titleMedium)
-                        Text(if (key.isEmpty()) "Not added. Paste your OpenAI key to turn on Brainstorm, the daily coach's take and the Monday review."
-                            else "Added (ends ${key.takeLast(4)}). Tap to change it or pick a model.",
-                            color = C.Muted, style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Text(if (key.isEmpty()) "Add" else "Edit", color = C.Accent, style = MaterialTheme.typography.titleSmall)
-                }
-            }
-        }
-        item {
             Card(Modifier.fillMaxWidth(), onClick = { chat = true }) {
                 Column {
                     Text("Brainstorm", style = MaterialTheme.typography.titleMedium)
-                    Text("Chat with GPT about anything. It sees your training, food, weight and Fitbit data.",
+                    Text("Chat with GPT about anything. It sees your training, food, weight and Fitbit data. Change the key or model with the gear inside.",
                         color = C.Muted, style = MaterialTheme.typography.bodyMedium)
                 }
             }

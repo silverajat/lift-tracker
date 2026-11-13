@@ -8,12 +8,20 @@ import kotlin.math.roundToInt
 /** One heart-rate reading. */
 data class HrSample(val time: Instant, val bpm: Int)
 
+/** One stretch of a night in one stage. type: 0 awake, 1 light, 2 deep, 3 REM. */
+data class SleepStage(val start: Instant, val end: Instant, val type: Int)
+
 data class SleepSummary(
     val start: Instant, val end: Instant,
     val totalMin: Int, val deepMin: Int, val remMin: Int, val lightMin: Int, val awakeMin: Int,
+    val stages: List<SleepStage> = emptyList(),
 )
 
-data class Workout(val start: Instant, val end: Instant, val type: String, val title: String?)
+/** A workout the Fitbit recorded, with what its heart rate said. */
+data class Workout(
+    val start: Instant, val end: Instant, val type: String, val title: String?,
+    val avgHr: Int? = null, val maxHr: Int? = null, val trimp: Int? = null, val distanceKm: Double? = null,
+)
 
 /** A day of Fitbit data from Health Connect (anything missing is null). */
 data class HealthDay(
@@ -31,7 +39,7 @@ data class HealthDay(
 )
 
 /** Training load from heart rate (see Scores.load). */
-data class Load(val trimp: Int, val moderateMin: Int, val vigorousMin: Int, val samples: Int)
+data class Load(val trimp: Int, val moderateMin: Int, val vigorousMin: Int, val samples: Int, val zones: List<Int> = emptyList())
 
 /**
  * Our own scores. Google's Cardio Load and readiness aren't shared with
@@ -56,6 +64,7 @@ object Scores {
         var trimp = 0.0
         var moderate = 0.0
         var vigorous = 0.0
+        val zones = DoubleArray(5)   // minutes at 50-60, 60-70, 70-80, 80-90, 90%+ of max heart rate
         for (i in 0 until s.size - 1) {
             val gapMin = (s[i + 1].time.epochSecond - s[i].time.epochSecond) / 60.0
             if (gapMin <= 0 || gapMin > 5) continue          // a gap in the data: don't invent minutes
@@ -63,8 +72,10 @@ object Scores {
             val hrr = ((hr - rest) / range).coerceIn(0.0, 1.0)
             if (hrr >= 0.3) trimp += gapMin * hrr * 0.64 * exp(1.92 * hrr)
             if (hrr >= 0.7) vigorous += gapMin else if (hrr >= 0.5) moderate += gapMin
+            val pct = hr / hrMax
+            if (pct >= 0.5) zones[((pct - 0.5) / 0.1).toInt().coerceIn(0, 4)] += gapMin
         }
-        return Load(trimp.roundToInt(), moderate.roundToInt(), vigorous.roundToInt(), s.size)
+        return Load(trimp.roundToInt(), moderate.roundToInt(), vigorous.roundToInt(), s.size, zones.map { it.roundToInt() })
     }
 
     fun weekLoad(days: List<HealthDay>): Int = days.takeLast(7).sumOf { it.load?.trimp ?: 0 }

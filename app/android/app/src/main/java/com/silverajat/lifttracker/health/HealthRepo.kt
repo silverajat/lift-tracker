@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
@@ -44,6 +45,7 @@ class HealthRepo(private val context: Context) {
         HealthPermission.getReadPermission(OxygenSaturationRecord::class),
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(RespiratoryRateRecord::class),
+        HealthPermission.getReadPermission(DistanceRecord::class),
     )
 
     /** Lets the hourly check read new data while the app is closed (Android 14+). */
@@ -132,14 +134,30 @@ class HealthRepo(private val context: Context) {
                 .mapValues { (_, v) -> summarise(v.maxBy { Duration.between(it.startTime, it.endTime) }) }
         }.getOrDefault(emptyMap()) else emptyMap()
 
-        val workouts = if (has(ExerciseSessionRecord::class)) runCatching {
-            readAll(ExerciseSessionRecord::class, start, end).groupBy { dayOf(it.startTime) }
-                .mapValues { (_, v) -> v.map { Workout(it.startTime, it.endTime, exerciseName(it.exerciseType), it.title) } }
-        }.getOrDefault(emptyMap()) else emptyMap()
-
         val hr = if (has(HeartRateRecord::class)) runCatching {
             readAll(HeartRateRecord::class, start, end).flatMap { r -> r.samples.map { HrSample(it.time, it.beatsPerMinute.toInt()) } }
                 .groupBy { dayOf(it.time) }
+        }.getOrDefault(emptyMap()) else emptyMap()
+
+        val distances = if (has(DistanceRecord::class)) runCatching { readAll(DistanceRecord::class, start, end) }.getOrDefault(emptyList()) else emptyList()
+
+        // each workout with its own heart rate, strain and distance
+        val workouts = if (has(ExerciseSessionRecord::class)) runCatching {
+            readAll(ExerciseSessionRecord::class, start, end).groupBy { dayOf(it.startTime) }
+                .mapValues { (d, v) ->
+                    v.map { w ->
+                        val inside = hr[d].orEmpty().filter { it.time >= w.startTime && it.time <= w.endTime }
+                        val km = distances.filter { it.startTime < w.endTime && it.endTime > w.startTime }
+                            .sumOf { it.distance.inMeters } / 1000.0
+                        Workout(
+                            w.startTime, w.endTime, exerciseName(w.exerciseType), w.title,
+                            avgHr = inside.takeIf { it.size >= 3 }?.map { it.bpm }?.average()?.toInt(),
+                            maxHr = inside.maxOfOrNull { it.bpm },
+                            trimp = Scores.load(inside, rhr[d], hrMax)?.trimp,
+                            distanceKm = km.takeIf { it > 0.05 },
+                        )
+                    }
+                }
         }.getOrDefault(emptyMap()) else emptyMap()
 
         return generateSequence(first) { it.plusDays(1) }.takeWhile { !it.isAfter(today) }.map { d ->
@@ -216,6 +234,16 @@ class HealthRepo(private val context: Context) {
         else -> pkg
     }
 
+    /** Heart rate during a window (a run you tracked, a football game you logged). */
+    suspend fun windowStats(from: Instant, to: Instant, restingHr: Int?, hrMax: Int): Workout? {
+        if (HealthPermission.getReadPermission(HeartRateRecord::class) !in granted()) return null
+        val s = runCatching { readAll(HeartRateRecord::class, from, to).flatMap { r -> r.samples.map { HrSample(it.time, it.beatsPerMinute.toInt()) } } }
+            .getOrDefault(emptyList()).filter { it.time >= from && it.time <= to }
+        if (s.size < 3) return null
+        return Workout(from, to, "", null, avgHr = s.map { it.bpm }.average().toInt(), maxHr = s.maxOf { it.bpm },
+            trimp = Scores.load(s, restingHr, hrMax)?.trimp)
+    }
+
     /** Steps in a window (e.g. the 45 min after a meal), or null without permission. */
     suspend fun steps(from: Instant, to: Instant): Long? {
         if (HealthPermission.getReadPermission(StepsRecord::class) !in granted()) return null
@@ -266,6 +294,16 @@ class HealthRepo(private val context: Context) {
         fun mins(types: Set<Int>) = s.stages.filter { it.stage in types }
             .sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }.toInt()
         val total = Duration.between(s.startTime, s.endTime).toMinutes().toInt()
+        val timeline = s.stages.sortedBy { it.startTime }.mapNotNull {
+            val type = when (it.stage) {
+                SleepSessionRecord.STAGE_TYPE_DEEP -> 2
+                SleepSessionRecord.STAGE_TYPE_REM -> 3
+                SleepSessionRecord.STAGE_TYPE_LIGHT, SleepSessionRecord.STAGE_TYPE_SLEEPING -> 1
+                SleepSessionRecord.STAGE_TYPE_AWAKE, SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED, SleepSessionRecord.STAGE_TYPE_OUT_OF_BED -> 0
+                else -> null
+            }
+            type?.let { t -> SleepStage(it.startTime, it.endTime, t) }
+        }
         val awake = mins(setOf(SleepSessionRecord.STAGE_TYPE_AWAKE, SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED,
             SleepSessionRecord.STAGE_TYPE_OUT_OF_BED))
         return SleepSummary(
@@ -275,6 +313,7 @@ class HealthRepo(private val context: Context) {
             remMin = mins(setOf(SleepSessionRecord.STAGE_TYPE_REM)),
             lightMin = mins(setOf(SleepSessionRecord.STAGE_TYPE_LIGHT)),
             awakeMin = awake,
+            stages = timeline,
         )
     }
 

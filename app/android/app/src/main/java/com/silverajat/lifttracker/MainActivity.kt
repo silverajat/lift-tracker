@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -46,7 +47,7 @@ import com.silverajat.lifttracker.ui.MealsScreen
 import com.silverajat.lifttracker.ui.TodayScreen
 import com.silverajat.lifttracker.ui.WorkoutScreen
 
-enum class Tab(val title: String) { TODAY("Today"), GYM("Gym"), MEALS("Food"), INSIGHTS("Insights") }
+enum class Tab(val title: String) { TODAY("Today"), GYM("Gym"), SPORTS("Sports"), MEALS("Food"), INSIGHTS("Insights") }
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -81,6 +82,18 @@ class MainActivity : ComponentActivity() {
         if (granted.values.all { it }) vm.pod.connect()
     }
 
+    /** GPS for a run (and notifications for the live run). */
+    private val askLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
+        if (granted[Manifest.permission.ACCESS_FINE_LOCATION] == true)
+            com.silverajat.lifttracker.activity.RunTracker.start(this, com.silverajat.lifttracker.activity.Sport.RUN)
+    }
+
+    private fun startRun() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED)
+            com.silverajat.lifttracker.activity.RunTracker.start(this, com.silverajat.lifttracker.activity.Sport.RUN)
+        else askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
     private fun connectPod() {
         if (vm.pod.hasPermissions()) vm.pod.connect()
         else askBluetooth.launch(
@@ -101,6 +114,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        com.silverajat.lifttracker.activity.RunTracker.restore(this)
         InsightEngine.channels(this)
         InsightEngine.schedule(this)
         if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
@@ -141,11 +155,16 @@ class MainActivity : ComponentActivity() {
                             Tab.TODAY -> TodayScreen(hub, vm, onConnectHealth = ::connectHealth, onConnectPod = ::connectPod,
                                 onOpenGym = { tab = Tab.GYM }, onOpenNet = { tab = Tab.MEALS })
                             Tab.GYM -> when (val s = screen) {
-                                Screen.Home -> HomeScreen(vm, onConnect = ::connectPod, onExport = ::share)
+                                Screen.Home -> {
+                                    val an by hub.analysis.collectAsStateWithLifecycle()
+                                    HomeScreen(vm, onConnect = ::connectPod, onExport = ::share, strength = an?.exercises.orEmpty())
+                                }
                                 is Screen.Workout -> WorkoutScreen(vm, s.day, onShare = ::share)
                                 is Screen.ExerciseInfo -> ExerciseScreen(vm, s.exerciseId)
                                 is Screen.Past -> com.silverajat.lifttracker.ui.SessionScreen(vm, s.sessionId, onShare = ::share)
                             }
+                            Tab.SPORTS -> com.silverajat.lifttracker.ui.SportsScreen(hub, onStartRun = ::startRun,
+                                onOpenGym = { id -> vm.open(Screen.Past(id)); tab = Tab.GYM })
                             Tab.MEALS -> MealsScreen(hub)
                             Tab.INSIGHTS -> InsightsScreen(hub)
                         }
@@ -160,6 +179,7 @@ class MainActivity : ComponentActivity() {
                                     Icon(when (t) {
                                         Tab.TODAY -> Icons.Filled.Favorite
                                         Tab.GYM -> Icons.Filled.FitnessCenter
+                                        Tab.SPORTS -> Icons.Filled.SportsSoccer
                                         Tab.MEALS -> Icons.Filled.Restaurant
                                         Tab.INSIGHTS -> Icons.Filled.Notifications
                                     }, t.title)

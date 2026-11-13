@@ -135,6 +135,28 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
             }
         }
     }
+
+    // body weight: completed-week averages and what they mean for the goal
+    a?.let { an ->
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SectionLabel("Body weight")
+                    an.weight.lastWeekAvg?.let { w ->
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text("%.1f kg".format(w), style = MaterialTheme.typography.displaySmall.merge(Tnum))
+                            an.weight.changeKg?.let {
+                                Text("  ${"%+.2f".format(it)} kg on the week before", style = MaterialTheme.typography.bodyMedium, color = C.Muted,
+                                    modifier = Modifier.padding(bottom = 6.dp))
+                            }
+                        }
+                    }
+                    Text(an.weight.verdict + ".", style = MaterialTheme.typography.bodyMedium, color = if (an.weight.lastWeekAvg == null) C.Muted else C.Text)
+                    Text("Log your weight each morning in Log, at the bottom.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                }
+            }
+        }
+    }
 }
 
 @Composable

@@ -112,6 +112,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             _syncedAt.value = System.currentTimeMillis()
             _healthState.value = HealthState.OK
             refreshWalks()
+            refreshActivities()
             checkInsights()
         }
     }
@@ -243,6 +244,39 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---- activities (runs, football, badminton, gym, Fitbit workouts) -------------------
+    private val activityStore = com.silverajat.lifttracker.activity.ActivityStore(app.filesDir)
+    private val _activities = MutableStateFlow(activityStore.all())
+    val activities: StateFlow<List<com.silverajat.lifttracker.activity.Activity>> = _activities
+    private val manualHr = HashMap<String, com.silverajat.lifttracker.health.Workout>()
+    private val _items = MutableStateFlow<List<com.silverajat.lifttracker.activity.ActivityItem>>(emptyList())
+    /** Everything you did, newest first (the Strain page and the Sports tab). */
+    val items: StateFlow<List<com.silverajat.lifttracker.activity.ActivityItem>> = _items
+
+    fun refreshActivities() {
+        _activities.value = activityStore.all()
+        viewModelScope.launch {
+            val list = _activities.value
+            // heart rate for things you logged or tracked (once each), from the Fitbit
+            if (_healthState.value == HealthState.OK) for (a in list.filter { it.id !in manualHr }.takeLast(30)) {
+                val rest = _days.value.lastOrNull { it.restingHr != null }?.restingHr
+                withContext(Dispatchers.IO) {
+                    health.windowStats(Instant.ofEpochMilli(a.startMs), Instant.ofEpochMilli(a.endMs), rest, _hrMax.value)
+                }?.let { manualHr[a.id] = it }
+            }
+            _items.value = withContext(Dispatchers.Default) {
+                com.silverajat.lifttracker.activity.ActivityLog.merge(_days.value, list, manualHr, sessions.all())
+            }
+        }
+    }
+
+    fun addActivity(sport: com.silverajat.lifttracker.activity.Sport, startMs: Long, minutes: Int, km: Double?, note: String) {
+        activityStore.add(com.silverajat.lifttracker.activity.Activity("a$startMs", sport, startMs, minutes * 60, km, note))
+        refreshActivities()
+    }
+
+    fun deleteActivity(id: String) { activityStore.delete(id); manualHr.remove(id); refreshActivities() }
+
     // ---- GPT's daily take ------------------------------------------------------------------
     private val _take = MutableStateFlow(com.silverajat.lifttracker.chat.Coach.load(app.filesDir))
     val take: StateFlow<com.silverajat.lifttracker.chat.Coach.Take?> = _take
@@ -330,6 +364,8 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        viewModelScope.launch { com.silverajat.lifttracker.activity.RunTracker.saved.collect { if (it != null) refreshActivities() } }
+        refreshActivities()
         refreshHealth()
         refreshAnalysis()
     }

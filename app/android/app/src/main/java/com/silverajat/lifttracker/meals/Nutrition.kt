@@ -48,6 +48,8 @@ object Foods {
         Food("guava", "Guava, 1 cup", Macros(112.0, 4.2, 24.0, 1.6, 9.0)),
         Food("dragon_fruit", "Red dragon fruit, 1 cup", Macros(100.0, 2.0, 22.0, 0.5, 5.0)),
         Food("mango", "Mango, 1 cup", Macros(99.0, 1.4, 25.0, 0.6, 2.6)),
+        Food("apple", "Apple, 1 medium", Macros(95.0, 0.5, 25.0, 0.3, 4.4)),
+        Food("orange", "Orange, 1 medium", Macros(62.0, 1.2, 15.0, 0.2, 3.1)),
         Food("supplements", "Zinc 30 mg, magnesium glycinate 200 mg, D3/K2, omega-3", Macros(10.0, 0.0, 0.0, 1.0)),
         Food("psyllium", "Psyllium husk, 5 g (with water)", Macros(15.0, 0.1, 4.5, 0.0, 4.0)),
         Food("meiji", "Meiji protein drink (30 g protein)", Macros(170.0, 30.0, 10.0, 1.5), "estimate"),
@@ -84,6 +86,9 @@ object Targets {
 data class PlannedItem(val slot: Slot, val food: Food, val optional: Boolean = false)
 
 object MealPlan {
+    /** Every fruit you have in the bowl, for swapping on any day. */
+    val allFruits: List<String> = listOf("kiwi2", "blueberries", "mixed_fruit", "apple", "orange", "guava", "dragon_fruit", "mango")
+
     /** Fruit for the 9 PM yoghurt bowl. Saturday: guava or red dragon fruit. */
     fun fruit(d: DayOfWeek): List<Food> = when (d) {
         DayOfWeek.MONDAY, DayOfWeek.THURSDAY -> listOf(Foods.get("kiwi2"))
