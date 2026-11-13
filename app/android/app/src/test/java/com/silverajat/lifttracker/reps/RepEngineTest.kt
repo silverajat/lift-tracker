@@ -43,6 +43,37 @@ class RepEngineTest {
         assertEquals(fx.size, within1)
     }
 
+    /** Racking the weight, walking to the phone and picking it up after the last rep. */
+    private fun junk(seconds: Int, seed: Int): List<FloatArray> {
+        val r = java.util.Random(seed.toLong())
+        return (0 until seconds * 25).map { i ->
+            val t = i / 25.0
+            floatArrayOf(
+                (0.2 + 1.2 * kotlin.math.sin(2 * Math.PI * 1.8 * t) + 0.3 * r.nextGaussian()).toFloat(),
+                (0.9 * kotlin.math.cos(2 * Math.PI * 0.7 * t) + 0.3 * r.nextGaussian()).toFloat(),
+                (0.6 + 0.8 * kotlin.math.sin(2 * Math.PI * 2.3 * t) + 0.3 * r.nextGaussian()).toFloat(),
+                (250 * kotlin.math.sin(2 * Math.PI * 1.1 * t) + 40 * r.nextGaussian()).toFloat(),
+                (180 * kotlin.math.cos(2 * Math.PI * 1.9 * t) + 40 * r.nextGaussian()).toFloat(),
+                (220 * kotlin.math.sin(2 * Math.PI * 0.6 * t) + 40 * r.nextGaussian()).toFloat(),
+            )
+        }
+    }
+
+    @Test
+    fun junkAfterTheSetDoesntWipeTheCount() {
+        val fx = fixtures()
+        var raw = 0; var ok = 0
+        fx.forEachIndexed { i, f ->
+            val d = f.data + junk(4 + i % 6, i)
+            val before = RepEngine.count(if (f.oneArm) d.slice(RepEngine.lastBout(d, 25)) else d, 25)?.reps ?: 0
+            val after = RepCounter.count(d, 25, CounterParams(), f.oneArm)
+            if (kotlin.math.abs(before - f.trueReps) <= 1) raw++
+            if (kotlin.math.abs(after - f.trueReps) <= 1) ok++ else println("JUNK ${f.name}: true ${f.trueReps} got $after (untrimmed $before)")
+        }
+        println("with junk at the end: within 1 untrimmed $raw/${fx.size}, trimmed $ok/${fx.size}")
+        assertTrue("trimmed within 1 only $ok of ${fx.size}", ok >= fx.size - 2)
+    }
+
     @Test
     fun analysisGivesRomPerRep() {
         val f = fixtures().first { it.name.contains("curl") && !it.oneArm }

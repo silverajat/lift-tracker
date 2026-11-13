@@ -72,13 +72,41 @@ class RepCounter(private val hz: Int = 25) {
     fun snapshot(): List<FloatArray> = ArrayList(buf)
 
     /** Count the set so far (call off the main thread). */
-    fun countNow(): Int = count(snapshot(), hz, params, oneArm)
+    fun countNow(): Int = count(snapshot(), hz, params, oneArm, live = true)
 
     companion object {
-        fun count(data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean): Int {
+        private fun rawCount(data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean): Int {
             val d = if (oneArm) data.slice(RepEngine.lastBout(data, hz)) else data
             return RepEngine.count(d, hz, p)?.reps ?: 0
         }
+
+        /**
+         * The set without the junk after the last rep. Re-racking, walking to the
+         * phone and picking it up are big movements that can swamp the reps (a
+         * 14-rep set read as 2). Tries cutting the last [stepS]..[maxS] seconds off
+         * and keeps a cut only when it finds clearly more reps (>= 2 more), so a
+         * clean set is left alone.
+         */
+        fun trimTail(data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean,
+                     stepS: Int = 1, maxS: Int = 15): List<FloatArray> {
+            if (data.size < 5 * hz) return data
+            val full = rawCount(data, hz, p, oneArm)
+            var best = data
+            var bestN = full
+            var s = stepS
+            while (s <= maxS) {
+                val keep = data.size - s * hz
+                if (keep < 4 * hz) break
+                val cut = data.subList(0, keep)
+                val n = rawCount(cut, hz, p, oneArm)
+                if (n >= full + 2 && n > bestN) { best = cut; bestN = n }
+                s += stepS
+            }
+            return best
+        }
+
+        fun count(data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean, live: Boolean = false): Int =
+            rawCount(if (live) trimTail(data, hz, p, oneArm, 2, 10) else trimTail(data, hz, p, oneArm), hz, p, oneArm)
 
         /**
          * Full analysis of a finished set. ROM % is against refFor(unit) (the
@@ -89,7 +117,8 @@ class RepCounter(private val hz: Int = 25) {
             data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean,
             refFor: (String) -> RomRef?,
         ): SetAnalysis? {
-            val d = if (oneArm) data.slice(RepEngine.lastBout(data, hz)) else data
+            val t = trimTail(data, hz, p, oneArm)
+            val d = if (oneArm) t.slice(RepEngine.lastBout(t, hz)) else t
             if (d.size < hz) return null
             val sig = RepEngine.signals(d, hz)
             val res = RepEngine.count(sig, p) ?: return null

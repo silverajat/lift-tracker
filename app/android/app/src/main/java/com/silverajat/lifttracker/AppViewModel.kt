@@ -584,7 +584,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val examples = store.all().flatMap { s ->
                     s.sets.filter { it.liveReps != null }.mapNotNull { l ->
                         val d = raw.load(s.id, l.exerciseId, l.setNo) ?: return@mapNotNull null
-                        val cut = if (Routines.isOneArm(l.exerciseId)) d.slice(RepEngine.lastBout(d, hz)) else d
+                        val oneArm = Routines.isOneArm(l.exerciseId)
+                        val t = RepCounter.trimTail(d, hz, CounterParams(), oneArm)
+                        val cut = if (oneArm) t.slice(RepEngine.lastBout(t, hz)) else t
                         if (cut.size < hz) null
                         else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps)
                     }
