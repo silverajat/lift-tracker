@@ -17,45 +17,31 @@ Fits the ordered case if <= 4.1 mm thick, <= 12 mm wide, <= ~20.5 mm long (incl.
 If too long: 301015 (3 x 10 x 15 mm, ~25-30 mAh) fits easily, or reprint with the long case.
 The old 302030 140 mAh cell is fine for bench testing (doesn't fit the case).
 
-## Shopping list (buy Nov 14; AliExpress unless noted). Tick as you go.
+## AliExpress order: BOUGHT (Nov 14, 2026)
+19 items, S$129.48 + 9% GST (~S$141). Arrives in several parcels over ~1-2 weeks; the
+batteries likely last (lithium goes by a slower route). Track each parcel in the AliExpress app.
 
-### 1. For the pod (must have)
-- [ ] XINJ 301020 3.7 V lipo, 5 pcs (seller confirms protection board); fits <= ~20.5 mm long
-- [ ] 0820 coin vibration motor, 3 V, wire leads (8 x 2 mm), pack of 5-10
-- [ ] Clone Pico RP2040 (USB-C) flashed with debugprobe firmware (replaces the S$21 official Debug Probe)
-- [ ] M2 washers, zinc-plated steel (NOT stainless: test with a magnet)
-- [ ] Kapton tape 10 mm
-- [ ] Double-sided foam tape ~1 mm
-- [ ] B-7000 glue
-- [ ] 30 AWG silicone wire (a few colours)
+### For the pod
+- [x] XINJ 301020 3.7 V lipo, 5 pcs: check each reads 3.7-4.2 V on the multimeter before soldering
+- [x] 0820 coin vibration motors (8 x 2 mm), 5 pcs
+- [x] Clone Pico RP2040 (USB-C), 2 pcs: SWD probe via debugprobe firmware (the spare is a backup)
+- [x] M2 washers, carbon steel (magnetic)
+- [x] Kapton tape 10 mm, double-sided foam tape 0.5 mm, B-7000 glue
+- [x] 30 AWG silicone wire, 5 colours
 
-### 2. Room soldering kit (lean)
-Skip the all-in-one "iron + multimeter + 20 tools" kits: weak iron, worse meter.
-- [ ] FNIRSI HS-02 iron (needs a USB-C PD charger 45-65 W; a laptop charger works)
-- [ ] Solder 63/37, 0.5 mm, small roll
-- [ ] No-clean flux paste (KEK 559, 10 ml syringe)
-- [ ] Solder wick 2 mm
-- [ ] ESD tweezers set
-- [ ] Flush cutters
-- [ ] Silicone soldering mat (protects the desk)
-- [ ] Multimeter: ANENG DM850
-- [ ] 830-hole breadboard starter kit (resistors, LEDs, caps, Dupont wires)
-- [ ] Isopropyl alcohol 99% + cotton swabs (buy locally)
+### Tools and bench basics
+- [x] FNIRSI HS-02 iron (no charger in the box: use a USB-C PD laptop charger, 65 W+)
+- [x] Mechanic 63/37 solder 0.5 mm, KEK 559 flux paste, solder wick 2 mm
+- [x] ESD tweezers, flush cutters, ESPLB silicone mat
+- [x] ANENG DM850 multimeter
+- [x] 830-hole breadboard kit, female-female jumper wires (20 cm, 40), 40-pin male headers (10)
 
-Later, only if needed: hot air station (chip rework), bench power supply with
-current limit, logic analyzer, USB microscope.
+### Still to get locally
+- [ ] Isopropyl alcohol 99% + cotton swabs
+- Wire stripper: borrow from the lab
 
-AliExpress cart, Nov 14: 17 items, S$123.68 incl. S$15.11 shipping (before 9% GST).
-New-shopper deal lands on the multimeter (S$1.47).
-
-## Buy on AliExpress
-- 0820 coin vibration motor, 3 V, wire leads (8 x 2 mm), pack of 5-10
-- Clone Pico with the debugprobe firmware
-- Pinecil V2 (needs a USB-C PD charger, 45 W+)
-- 63/37 solder 0.5 mm, no-clean flux paste, ESD tweezers, solder wick 2 mm, cheap multimeter
-- 30 AWG silicone or kynar wire, M2 zinc-plated steel washers (not stainless),
-  Kapton tape 10 mm, double-sided foam tape ~1 mm, B-7000 glue
-- Isopropyl alcohol: buy locally (won't ship)
+Later, only if needed: hot air station, bench power supply with current limit,
+logic analyzer, USB microscope.
 
 RS Singapore alternatives if needed: Debug Probe 219-258 (S$27.40), motor
 PUI HD-EM0802-LW15-R 276-753 (S$3.36, 8 x 2 mm). Not 276-754 (3 mm thick).
