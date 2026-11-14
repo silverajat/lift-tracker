@@ -570,7 +570,7 @@ private fun BottomPanel(
                                 Text("$live", style = MaterialTheme.typography.displayLarge.merge(Tnum)
                                     .copy(fontSize = 92.sp, lineHeight = 92.sp), color = C.Text)
                                 Spacer(Modifier.width(8.dp))
-                                Text(if (ex != null && Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "reps\nleft side" else "reps\nright side") else "reps",
+                                Text(if (ex != null && Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "reps\nleft side" else if (Routines.podSeesBothSides(ex.id)) "reps\nper leg" else "reps\nright side") else "reps",
                                     style = MaterialTheme.typography.titleMedium, color = C.Muted,
                                     modifier = Modifier.padding(bottom = 16.dp))
                             }

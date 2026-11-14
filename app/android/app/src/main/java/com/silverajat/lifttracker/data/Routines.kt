@@ -101,6 +101,10 @@ object Routines {
     // pod arm done first: woodchoppers (left side with the pod, then right without)
     private val podSideFirst = setOf(25)
     fun podSideFirst(exerciseId: Int) = exerciseId in podSideFirst
+    // the pod sees both sides (single-leg calf raise: the whole body bobs, left leg then right):
+    // count everything and halve it for reps per side
+    private val bothSidesSeen = setOf(28)
+    fun podSeesBothSides(exerciseId: Int) = exerciseId in bothSidesSeen
     // the wrist hardly moves (legs or hips do the work): the pod can't count these
     private val wristStill = setOf(24, 26, 27)   // reverse ab crunches, leg extension, leg curl
     fun podCounts(exerciseId: Int) = exerciseId !in wristStill

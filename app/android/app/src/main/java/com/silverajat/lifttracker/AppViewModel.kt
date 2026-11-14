@@ -117,6 +117,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Pieces of the set between pauses; each is counted on its own, then added up. */
     private val segments = ArrayList<List<FloatArray>>()
     private val hold = com.silverajat.lifttracker.reps.PeakHold()
+    /** Both sides in one recording (single-leg calf raise): show and save half the count. */
+    private var halve = false
+    private fun perSide(n: Int) = if (halve) (n + 1) / 2 else n
     private var segmentReps = 0
     private var pausedTotalMs = 0L
     private var pausedAt: Long? = null
@@ -155,7 +158,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     countJob = viewModelScope.launch {
                         val snap = counter.snapshot()
                         val n = withContext(Dispatchers.Default) { RepCounter.count(snap, PodProtocol.STREAM_HZ, counter.params, counter.oneArm, counter.firstSide) }
-                        if (collecting) _liveReps.value = segmentReps + hold.update(n, snap.size)
+                        if (collecting) _liveReps.value = segmentReps + perSide(hold.update(n, snap.size))
                     }
                 }
             }
@@ -382,7 +385,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             calibration = calibration,
         )
         _active.value = set
-        counter.reset(_model.value.params(ex.id), Routines.isOneArm(ex), Routines.podSideFirst(ex.id))
+        counter.reset(_model.value.params(ex.id), Routines.isOneArm(ex) && !Routines.podSeesBothSides(ex.id), Routines.podSideFirst(ex.id))
+        halve = Routines.podSeesBothSides(ex.id)
         segments.clear()
         segmentReps = 0
         hold.reset()
@@ -424,7 +428,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val full = if (raw.size < PodProtocol.STREAM_HZ) 0
                 else withContext(Dispatchers.Default) { RepCounter.count(raw, PodProtocol.STREAM_HZ, p, oneArm, firstSide) }
             if (hold.collapsed(full) && idx < segments.size) segments[idx] = hold.cut(raw, full)
-            val n = hold.shown(full)
+            val n = perSide(hold.shown(full))
             hold.reset()
             segmentReps += n
             _liveReps.value = segmentReps
@@ -475,7 +479,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val a = RepCounter.analyze(seg, hz, p, oneArm, firstSide, ref)
                     Triple(seg.size, a?.reps ?: RepCounter.count(seg, hz, p, oneArm, firstSide), a)
                 }
-                Pair(parts.sumOf { it.second }, mergeAnalyses(parts.mapNotNull { it.third }))
+                // both sides in one recording: reps per side, and no quality (it's the body bobbing)
+                if (halve) Pair(parts.sumOf { perSide(it.second) }, null)
+                else Pair(parts.sumOf { it.second }, mergeAnalyses(parts.mapNotNull { it.third }))
             }
             if (!Routines.podCounts(set.exerciseId)) {
                 // wrist stays still on this one: no count or quality from the pod, start from the plan
