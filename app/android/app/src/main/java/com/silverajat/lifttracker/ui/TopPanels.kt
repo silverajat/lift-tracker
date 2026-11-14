@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -45,22 +46,26 @@ import com.silverajat.lifttracker.garden.GardenViewModel
 import com.silverajat.lifttracker.insights.InsightEngine
 import com.silverajat.lifttracker.insights.Kind
 
-/** Top-right: notifications (with a dot for new ones) and settings. */
+/** The bell (with a dot for new notifications) and settings, shown at the right of each tab's header row. */
+data class TopActions(val unread: Int, val panel: String?, val open: (String) -> Unit)
+
+val LocalTopActions = androidx.compose.runtime.compositionLocalOf<TopActions?> { null }
+
 @Composable
-fun TopIcons(panel: String?, unread: Int, onPanel: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(end = 6.dp).height(44.dp),
-        horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+fun TopActionIcons() {
+    val t = LocalTopActions.current ?: return
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Box {
-            TopIcon(Icons.Filled.Notifications, "Notifications", panel == "notifications") { onPanel("notifications") }
-            if (unread > 0) Box(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp).size(9.dp).clip(CircleShape).background(C.Stop))
+            TopIcon(Icons.Filled.Notifications, "Notifications", t.panel == "notifications") { t.open("notifications") }
+            if (t.unread > 0) Box(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp).size(9.dp).clip(CircleShape).background(C.Stop))
         }
-        TopIcon(Icons.Filled.Settings, "Settings", panel == "settings") { onPanel("settings") }
+        TopIcon(Icons.Filled.Settings, "Settings", t.panel == "settings") { t.open("settings") }
     }
 }
 
 @Composable
 private fun TopIcon(icon: ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
-    IconButton(onClick = onClick) { Icon(icon, label, tint = if (on) C.Text else C.Muted) }
+    IconButton(onClick = onClick, modifier = Modifier.size(42.dp)) { Icon(icon, label, tint = if (on) C.Text else C.Muted) }
 }
 
 /** Everything you can switch on and off. */
@@ -74,11 +79,16 @@ fun SettingsScreen(hub: HubViewModel) {
     if (aiDialog) SettingsDialog(hub) { aiDialog = false }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 40.dp),
+        modifier = Modifier.fillMaxSize().statusBarsPadding(),
+        contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 40.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        item { Text("Settings", style = MaterialTheme.typography.headlineLarge) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Settings", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+                TopActionIcons()
+            }
+        }
         item {
             Group("Notifications") {
                 Toggle("Notifications", null, notifyOn) { hub.setNotifyOn(it) }

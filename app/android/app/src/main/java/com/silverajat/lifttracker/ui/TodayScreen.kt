@@ -184,7 +184,7 @@ fun TodayContent(
         // ---- devices + date ----
         item {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     DeviceChip("Fitbit Air", u.health == HealthState.OK, when (u.health) {
                         HealthState.OK -> u.syncedAt?.let { "synced " + Instant.ofEpochMilli(it).atZone(zone).format(hm) } ?: "synced"
                         HealthState.LOADING -> "syncing"
@@ -192,6 +192,8 @@ fun TodayContent(
                         HealthState.UNAVAILABLE -> "needs Health Connect"
                     }, onFitbit)
                     DeviceChip("Pod", u.podReady, u.podSub, onPod)
+                    Box(Modifier.weight(1f))
+                    TopActionIcons()
                 }
                 Text(u.date.format(dayHead), style = MaterialTheme.typography.titleMedium, color = C.Muted)
             }

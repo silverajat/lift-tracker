@@ -141,9 +141,12 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, gard
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Column {
-                    Text("Day", style = MaterialTheme.typography.headlineLarge)
-                    Text(u.today.format(dHead), style = MaterialTheme.typography.titleMedium, color = C.Muted)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Productivity", style = MaterialTheme.typography.headlineLarge)
+                        Text(u.today.format(dHead), style = MaterialTheme.typography.titleMedium, color = C.Muted)
+                    }
+                    TopActionIcons()
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("Plan", "Garden", "Notes", "Past").forEachIndexed { i, s ->

@@ -104,7 +104,7 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 listOf("Net", "Log").forEachIndexed { i, label ->
                     Text(label, style = MaterialTheme.typography.titleMedium,
                         color = if (view == i) C.Text else C.Muted,
@@ -113,6 +113,7 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
                             .clickable { view = i }.padding(vertical = 10.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
+                TopActionIcons()
             }
         }
         if (view == 0) {

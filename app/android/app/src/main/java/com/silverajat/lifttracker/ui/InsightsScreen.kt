@@ -77,7 +77,10 @@ fun InsightsScreen(hub: HubViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Notifications", style = MaterialTheme.typography.headlineMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Notifications", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                TopActionIcons()
+            }
         }
         if (list.isEmpty()) item {
             Text("Nothing yet. Your morning summary, workouts and day wrap-ups show up here.", color = C.Muted)

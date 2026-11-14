@@ -172,8 +172,9 @@ class MainActivity : ComponentActivity() {
                 val unread by hub.unread.collectAsStateWithLifecycle()
 
                 Column(Modifier.fillMaxSize().background(C.Bg).imePadding()) {
-                    if (!fullScreen && panel != "chat") com.silverajat.lifttracker.ui.TopIcons(panel, unread, onPanel = { panel = if (panel == it) null else it })
                     Box(Modifier.weight(1f).fillMaxWidth()) {
+                      androidx.compose.runtime.CompositionLocalProvider(com.silverajat.lifttracker.ui.LocalTopActions provides
+                          (if (fullScreen) null else com.silverajat.lifttracker.ui.TopActions(unread, panel) { panel = if (panel == it) null else it })) {
                         when {
                             !fullScreen && panel == "notifications" -> InsightsScreen(hub)
                             !fullScreen && panel == "settings" -> com.silverajat.lifttracker.ui.SettingsScreen(hub)
@@ -195,6 +196,7 @@ class MainActivity : ComponentActivity() {
                                 Tab.MEALS -> MealsScreen(hub)
                             }
                         }
+                      }
                     }
                     if (!fullScreen) NavigationBar(containerColor = C.Bg, tonalElevation = 0.dp,
                         modifier = Modifier.drawBehind { drawLine(C.Line, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }) {

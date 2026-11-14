@@ -133,6 +133,11 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Movement", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+                    TopActionIcons()
+                }
+                if (gym != null) GymTile(gymHistory, gymPlan, onOpenGymHome)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sports", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                     Text("‹", style = MaterialTheme.typography.headlineMedium, color = C.Text,
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { monthKey = month.minusMonths(1).toString() }.padding(horizontal = 12.dp))
                     Text(if (month.year == LocalDate.now().year) monthName else "$monthName ${month.year}", style = MaterialTheme.typography.titleMedium)
@@ -140,7 +145,6 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
                     Text("›", style = MaterialTheme.typography.headlineMedium, color = if (canNext) C.Text else C.Line,
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(enabled = canNext) { monthKey = month.plusMonths(1).toString() }.padding(horizontal = 12.dp))
                 }
-                if (gym != null) GymTile(gymHistory, gymPlan, onOpenGymHome)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StartTile("Run", Sport.RUN.emoji, "GPS", Plate.Blue, Modifier.weight(1f)) { onStartGps(Sport.RUN) }
                     StartTile("Walk", Sport.WALK.emoji, "GPS", Plate.Chalk, Modifier.weight(1f)) { onStartGps(Sport.WALK) }

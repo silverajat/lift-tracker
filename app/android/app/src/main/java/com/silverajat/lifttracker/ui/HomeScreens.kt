@@ -115,13 +115,15 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            if (onBack != null) Text("‹ Movement", style = MaterialTheme.typography.titleMedium, color = C.Muted,
-                modifier = Modifier.clickable(onClick = onBack).padding(vertical = 4.dp))
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) IconButton(onClick = onBack, modifier = Modifier.padding(end = 4.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to Movement", tint = C.Text)
+                }
                 Column(Modifier.weight(1f)) {
                     Text(dayFmt.format(Date()), style = MaterialTheme.typography.titleSmall, color = C.Muted)
                     Text(greeting(), style = MaterialTheme.typography.headlineLarge)
                 }
+                TopActionIcons()
             }
         }
         item { PodBar(conn, status, onConnect) }
