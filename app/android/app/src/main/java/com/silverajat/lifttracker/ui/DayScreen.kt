@@ -76,6 +76,9 @@ class DayActions(
     val editNote: (String, String) -> Unit = { _, _ -> },
     val pinNote: (String) -> Unit = {},
     val deleteNote: (String) -> Unit = {},
+    val addShop: (String) -> Unit = {},
+    val toggleShop: (String) -> Unit = {},
+    val clearBought: () -> Unit = {},
 )
 
 data class DayUi(
@@ -84,6 +87,7 @@ data class DayUi(
     val notes: List<Note>,
     val leftovers: List<Task>,
     val now: LocalTime = LocalTime.now(),
+    val shopping: List<com.silverajat.lifttracker.journal.ShopItem> = emptyList(),
 )
 
 @Composable
@@ -94,6 +98,7 @@ fun DayScreen(
     val today by j.today.collectAsStateWithLifecycle()
     val pages by j.pages.collectAsStateWithLifecycle()
     val notes by j.notes.collectAsStateWithLifecycle()
+    val shopping by j.shopping.collectAsStateWithLifecycle()
     val focus by g.sessions.collectAsStateWithLifecycle()
     val active by g.active.collectAsStateWithLifecycle()
     val sessions by gym.history.collectAsStateWithLifecycle()
@@ -105,7 +110,7 @@ fun DayScreen(
     val zone = ZoneId.systemDefault()
     val plants = com.silverajat.lifttracker.garden.Garden.plants(
         com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active), today, zone, now)
-    val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() })
+    val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() }, shopping = shopping)
     DayContent(ui, garden = GardenUi(plants, active, focus, now), gAct = GardenActions(
         start = { a, l -> g.start(a, l) }, stop = { g.stop() }, discard = g::discard, delete = g::delete,
     ), act = DayActions(
@@ -114,6 +119,7 @@ fun DayScreen(
         toTomorrow = j::toTomorrow, removeTomorrow = { j.remove(it, today.plusDays(1)) },
         bringOver = j::bringOver, drop = j::dropLeftovers, mood = j::setMood, reflect = j::setReflection,
         addNote = j::addNote, editNote = j::editNote, pinNote = j::pinNote, deleteNote = j::deleteNote,
+        addShop = j::addShop, toggleShop = j::toggleShop, clearBought = j::clearBought,
     ))
 }
 
@@ -184,6 +190,27 @@ private fun LazyListScope.planTab(u: DayUi, page: DayPage, act: DayActions, onEd
         Block("Side things", progress = page.sides.takeIf { it.isNotEmpty() }?.let { "${it.count { t -> t.done }}/${it.size}" }) {
             page.sides.forEach { TaskRow(it, act, onEdit) }
             AddField("Add a side thing") { act.add(it, false, null) }
+        }
+    }
+    item {
+        val bought = u.shopping.count { it.bought }
+        Block("Shopping", progress = u.shopping.takeIf { it.isNotEmpty() }?.let { "${it.size - bought} to buy" }) {
+            u.shopping.forEach { it ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(26.dp).clip(RoundedCornerShape(6.dp))
+                        .background(if (it.bought) C.Accent else C.Bg)
+                        .border(1.5.dp, if (it.bought) C.Accent else C.Line, RoundedCornerShape(6.dp))
+                        .clickable { act.toggleShop(it.id) }, contentAlignment = Alignment.Center) {
+                        if (it.bought) Text("✓", color = C.Bg, style = MaterialTheme.typography.labelLarge)
+                    }
+                    Text(it.text, style = MaterialTheme.typography.bodyLarge, color = if (it.bought) C.Muted else C.Text,
+                        textDecoration = if (it.bought) TextDecoration.LineThrough else null,
+                        modifier = Modifier.weight(1f).clickable { act.toggleShop(it.id) }.padding(start = 12.dp, top = 4.dp, bottom = 4.dp))
+                }
+            }
+            AddField("Add to the shopping list") { act.addShop(it) }
+            if (bought > 0) Text("Clear $bought bought", style = MaterialTheme.typography.titleSmall, color = C.Accent,
+                modifier = Modifier.clickable { act.clearBought() }.padding(top = 2.dp))
         }
     }
     item { Reflect(u, page, act) }

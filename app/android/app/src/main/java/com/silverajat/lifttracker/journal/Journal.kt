@@ -39,6 +39,9 @@ data class Note(
     val pinned: Boolean = false,
 )
 
+/** Something to buy; ticked when bought, then cleared. */
+data class ShopItem(val id: String = UUID.randomUUID().toString().take(8), val text: String, val bought: Boolean = false)
+
 object Journal {
     const val MAINS = 3
 
@@ -127,6 +130,19 @@ class JournalStore(root: File) {
             Task(t.getString("id"), t.getString("text"), t.optBoolean("main"), t.optBoolean("done"), t.optBoolean("carried"))
         }
         return DayPage(date, tasks, if (o.has("mood")) o.getInt("mood") else null, o.optString("reflection"), o.optBoolean("carry"))
+    }
+
+    fun shopping(): List<ShopItem> = runCatching {
+        val a = read().optJSONArray("shopping") ?: return emptyList()
+        (0 until a.length()).map { i -> a.getJSONObject(i).let { ShopItem(it.getString("id"), it.getString("text"), it.optBoolean("bought")) } }
+    }.getOrDefault(emptyList())
+
+    fun saveShopping(items: List<ShopItem>) {
+        val o = read()
+        val a = JSONArray()
+        items.forEach { a.put(JSONObject().put("id", it.id).put("text", it.text).put("bought", it.bought)) }
+        o.put("shopping", a)
+        write(o)
     }
 
     fun notes(): List<Note> = runCatching {

@@ -18,6 +18,9 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
     private val _notes = MutableStateFlow<List<Note>>(emptyList())
     val notes: StateFlow<List<Note>> = _notes
 
+    private val _shopping = MutableStateFlow<List<ShopItem>>(emptyList())
+    val shopping: StateFlow<List<ShopItem>> = _shopping
+
     init { refresh() }
 
     /** Re-reads the file and moves to a new day after 4 AM. */
@@ -25,6 +28,7 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         _today.value = Journal.dayOf(LocalDateTime.now())
         _pages.value = store.pages()
         _notes.value = store.notes()
+        _shopping.value = store.shopping()
     }
 
     fun page(d: LocalDate = _today.value): DayPage = _pages.value[d] ?: DayPage(d)
@@ -60,6 +64,15 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setMood(m: Int?) = save(page().copy(mood = m))
     fun setReflection(s: String) = save(page().copy(reflection = s))
+
+    fun addShop(text: String) {
+        val t = text.trim()
+        if (t.isEmpty() || _shopping.value.any { !it.bought && it.text.equals(t, true) }) return
+        setShop(_shopping.value + ShopItem(text = t))
+    }
+    fun toggleShop(id: String) = setShop(_shopping.value.map { if (it.id == id) it.copy(bought = !it.bought) else it })
+    fun clearBought() = setShop(_shopping.value.filter { !it.bought })
+    private fun setShop(items: List<ShopItem>) { store.saveShopping(items); _shopping.value = items }
 
     fun addNote(text: String) {
         if (text.isBlank()) return

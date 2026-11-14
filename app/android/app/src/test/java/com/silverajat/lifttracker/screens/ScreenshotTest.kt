@@ -234,7 +234,8 @@ class ScreenshotTest {
             com.silverajat.lifttracker.journal.Note(text = "Talk to papa on Friday about the IC design chip and the crypto one. Also how the interview went.", created = now - 3_600_000, pinned = true),
             com.silverajat.lifttracker.journal.Note(text = "LED sync and wearable before the holidays, crypto after those 2 are done.", created = now - 86_400_000),
         )
-        return com.silverajat.lifttracker.ui.DayUi(today, mapOf(today to p, y.date to y, tm.date to tm), notes, emptyList(), java.time.LocalTime.of(22, 10))
+        return com.silverajat.lifttracker.ui.DayUi(today, mapOf(today to p, y.date to y, tm.date to tm), notes, emptyList(), java.time.LocalTime.of(22, 10),
+            listOf("Greek yogurt", "Eggs x30", "Isopropyl alcohol 99%", "Bananas").mapIndexed { i, t -> com.silverajat.lifttracker.journal.ShopItem(text = t, bought = i == 0) })
     }
     @Test fun dayPlan() = shoot("day_plan") { com.silverajat.lifttracker.ui.DayContent(journal()) }
     @Test fun dayNotes() = shoot("day_notes") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 2) }
