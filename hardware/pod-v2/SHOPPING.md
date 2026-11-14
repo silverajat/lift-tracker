@@ -54,3 +54,17 @@ PUI HD-EM0802-LW15-R 276-753 (S$3.36, 8 x 2 mm). Not 276-754 (3 mm thick).
 - No more laptop dumps: sets already reach the phone live over Bluetooth, so the new firmware should
   (a) send any set the phone missed over BLE when it reconnects, then (b) free that space on the
   pod's flash automatically. Add an erase-over-BLE command for the app.
+
+## Assembly walkthrough (when everything arrives)
+Practise first on one of the 3 bare boards: tin a pad, solder a 30 AWG wire to it.
+Iron at about 320 °C. Check each cell reads 3.7-4.2 V. Dry-fit board, cell and motor in the case.
+
+1. **Battery:** flux and tin the two pads. Cut and solder ONE lead at a time (never both at once).
+   **Red to +** (no reverse-polarity protection). Confirm the cell voltage across the pads.
+2. **Program:** cut 3 female-female jumpers in half, solder the bare ends to the SWD pads (IO, CK, G).
+   Pico pins: GP2 → CK, GP3 → IO, GND → G. Flash, then test BLE, motor, LEDs, and charging
+   (red LED on the Fitbit Air charger). Desolder the wires and cover the pads with Kapton.
+3. **Motor:** solder to the MOTOR pads (either way round), stick it on the E73 can.
+4. **Fix in place:** cell on the right with foam tape; Kapton square on the marked circle, steel washer glued on top.
+5. **Close:** press the board into the case rim (black side is the bottom), thin bead of B-7000 round the seam, 24 h cure.
+Only glue once everything works.
