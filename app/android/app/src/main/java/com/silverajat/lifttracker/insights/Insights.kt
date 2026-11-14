@@ -59,25 +59,46 @@ object Insights {
     }
     private fun clock(t: LocalTime) = "${if (t.hour % 12 == 0) 12 else t.hour % 12}:${"%02d".format(t.minute)} ${if (t.hour < 12) "AM" else "PM"}"
 
-    /** "about 5 Toyota Corollas" for a weight in kg. */
-    fun heavyThing(kg: Double): String? {
-        val things = listOf("SBS double-decker buses" to 12_000.0, "Asian elephants" to 4_000.0,
-            "Toyota Corollas" to 1_300.0, "grand pianos" to 400.0, "fridges" to 80.0)
-        val (name, w) = things.firstOrNull { kg / it.second >= 1.5 } ?: return null
+    /** "about 5 Toyota Corollas" for a weight in kg. With a [seed] it picks among several that fit, avoiding [recent] ones. */
+    fun heavyThing(kg: Double, seed: String? = null, recent: List<String> = emptyList()): String? {
+        val things = listOf("blue whales" to 150_000.0, "Merlion statues" to 70_000.0, "Boeing 737s" to 41_000.0,
+            "SBS double-decker buses" to 12_000.0, "Asian elephants" to 4_000.0, "Toyota Corollas" to 1_300.0,
+            "polar bears" to 450.0, "grand pianos" to 400.0, "sumo wrestlers" to 150.0, "Vespa scooters" to 110.0, "fridges" to 80.0)
+        val fits = things.filter { kg / it.second in 1.5..40.0 }
+        val (name, w) = (if (seed == null) things.firstOrNull { kg / it.second >= 1.5 }
+            else fits.filter { f -> recent.none { it.contains(f.first) } }.ifEmpty { fits }.let { if (it.isEmpty()) null else it[abs(seed.hashCode()) % it.size] })
+            ?: return null
         val n = kg / w
         return "about ${if (n < 10) "%.1f".format(n).removeSuffix(".0") else n.roundToInt().toString()} $name"
     }
 
-    /** Fun distance for a step count (0.75 m stride). */
-    fun stepsThing(steps: Long): String {
+    private val routes = listOf(
+        "Kent Ridge to VivoCity" to 5.0, "the whole of Orchard Road, twice" to 4.4, "NUS to Marina Bay" to 12.0,
+        "the length of East Coast Park" to 15.0, "the Southern Ridges trail" to 10.0, "a 10K race" to 10.0,
+        "a half marathon" to 21.1, "Tuas to Changi, a third of the way" to 16.0,
+    )
+    private val units = listOf(
+        "laps of a running track" to 0.4, "lengths of the Helix Bridge" to 0.28, "football pitches end to end" to 0.105,
+        "lengths of the MBS SkyPark" to 0.34, "Eiffel Towers laid flat" to 0.33, "Burj Khalifas laid flat" to 0.828,
+        "Olympic pools" to 0.05, "Orchard Roads" to 2.2,
+    )
+
+    /**
+     * A fun distance for a step count (0.75 m stride). Picks from several comparisons that fit,
+     * skipping any used in [recent] notifications, so it doesn't say the same thing every day.
+     */
+    fun stepsThing(steps: Long, seed: String = "", recent: List<String> = emptyList()): String {
         val km = steps * 0.00075
-        val laps = (km / 0.4).roundToInt()
-        return if (km >= 9) "%.1f km: that's NUS to Marina Bay on foot".format(km) else "%.1f km, or $laps laps of a running track".format(km)
+        val opts = routes.filter { km / it.second in 0.8..1.25 }.map { "%.1f km: about ${it.first} on foot".format(km) to it.first } +
+            units.filter { km / it.second in 2.0..60.0 }.map { "%.1f km, or ${(km / it.second).roundToInt()} ${it.first}".format(km) to it.first }
+        if (opts.isEmpty()) return "%.1f km".format(km)
+        val fresh = opts.filter { o -> recent.none { it.contains(o.second) } }.ifEmpty { opts }
+        return fresh[abs(seed.hashCode()) % fresh.size].first
     }
 
     // ---- after a gym session ---------------------------------------------------------------
 
-    fun workout(s: Session, history: List<Session>, zone: ZoneId): Insight {
+    fun workout(s: Session, history: List<Session>, zone: ZoneId, recent: List<String> = emptyList()): Insight {
         val end = s.endMs ?: System.currentTimeMillis()
         val mins = ((end - s.startMs) / 60_000).toInt()
         val work = s.sets.filter { !it.warmup }
@@ -104,7 +125,7 @@ object Insights {
         }
         val lines = ArrayList<String>()
         lines += "$mins min, ${work.size} working sets, ${"%,d".format(volume.roundToInt())} kg moved" +
-            (heavyThing(volume)?.let { " ($it)" } ?: "") + "."
+            (heavyThing(volume, s.id.toString(), recent)?.let { " ($it)" } ?: "") + "."
         if (pct != null) lines += when {
             pct >= 105 -> "That's $pct% of your usual: more work than the last ${past.size}."
             pct <= 85 -> "$pct% of your usual: a lighter one."
@@ -196,12 +217,12 @@ object Insights {
 
     // ---- a Fitbit workout just ended -------------------------------------------------------
 
-    fun activity(w: Workout, st: ActivityStats, meals: List<MealEntry>, now: Long): Insight {
+    fun activity(w: Workout, st: ActivityStats, meals: List<MealEntry>, now: Long, recent: List<String> = emptyList()): Insight {
         val mins = Duration.between(w.start, w.end).toMinutes().toInt()
         val emoji = when (w.type) { "Walk" -> "🚶"; "Run" -> "🏃"; "Bike" -> "🚴"; "Swim" -> "🏊"; else -> "⚡" }
         val name = (w.title ?: w.type).lowercase()
         val lines = ArrayList<String>()
-        st.steps?.takeIf { it > 300 }?.let { lines += "${"%,d".format(it)} steps (${stepsThing(it)})." }
+        st.steps?.takeIf { it > 300 }?.let { lines += "${"%,d".format(it)} steps (${stepsThing(it, w.start.toString(), recent)})." }
         st.avgHr?.let { lines += "Avg heart rate $it" + (st.maxHr?.let { m -> ", peaking at $m" } ?: "") + "." }
         val mains = setOf("salad_egg", "salad_carrot", "chicken_rice", "mixed_rice")
         val meal = meals.filter { it.foodId in mains || it.slot == Slot.LUNCH || it.slot == Slot.DINNER }
@@ -246,12 +267,12 @@ object Insights {
 
     fun night(
         a: Analysis.Result, today: HealthDay?, sessions: List<Session>, entries: List<MealEntry>,
-        date: LocalDate, zone: ZoneId, now: LocalTime, nowMs: Long,
+        date: LocalDate, zone: ZoneId, now: LocalTime, nowMs: Long, recent: List<String> = emptyList(),
     ): Insight {
         val seed = "night$date"
         val steps = today?.steps ?: 0L
         val lines = ArrayList<String>()
-        if (steps > 0) lines += "${"%,d".format(steps)} steps: ${stepsThing(steps)}" +
+        if (steps > 0) lines += "${"%,d".format(steps)} steps: ${stepsThing(steps, seed, recent)}" +
             (if (steps >= 10_000) " 🎉" else " (${"%,d".format(10_000 - steps)} short of 10k)") + "."
         today?.load?.let { l ->
             val azm = l.moderateMin + 2 * l.vigorousMin

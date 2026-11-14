@@ -635,7 +635,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch(Dispatchers.Default) {
                 runCatching {
                     com.silverajat.lifttracker.insights.InsightEngine.post(app,
-                        com.silverajat.lifttracker.insights.Insights.workout(done, hist, java.time.ZoneId.systemDefault()))
+                        com.silverajat.lifttracker.insights.Insights.workout(done, hist, java.time.ZoneId.systemDefault(),
+                            com.silverajat.lifttracker.insights.InsightStore(app.filesDir).all().take(15).map { it.title + " " + it.body }))
                 }
             }
         }

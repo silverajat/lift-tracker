@@ -114,6 +114,10 @@ object WeatherApi {
  */
 object InsightEngine {
     const val NOTIFY_ON = "notify_on"
+    const val GPT_VOICE = "gpt_voice"
+
+    /** Recent notification text, so the fun comparisons don't repeat. */
+    private fun recentText(ctx: Context) = InsightStore(ctx.filesDir).all().take(15).map { it.title + " " + it.body }
 
     fun channels(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -135,9 +139,17 @@ object InsightEngine {
     fun post(ctx: Context, i: Insight, notify: Boolean = true, tab: String = "INSIGHTS") {
         val store = InsightStore(ctx.filesDir)
         if (i.key in store.sent()) return
-        store.add(i)
         store.markSent(i.key)
-        val on = ctx.getSharedPreferences("hub", Context.MODE_PRIVATE).getBoolean(NOTIFY_ON, true)
+        val prefs = ctx.getSharedPreferences("hub", Context.MODE_PRIVATE)
+        // with a GPT key: fresh wording each time (same facts), checked against recent ones
+        val key = prefs.getString("openai_key", "") ?: ""
+        val recent = store.all()
+        val i = if (key.isNotEmpty() && prefs.getBoolean(GPT_VOICE, true))
+            Voice.rewrite(key, prefs.getString("openai_model", com.silverajat.lifttracker.chat.Gpt.DEFAULT_MODEL)!!, i,
+                recent.filter { it.kind == i.kind }.take(6) + recent.filter { it.kind != i.kind }.take(4))
+        else i
+        store.add(i)
+        val on = prefs.getBoolean(NOTIFY_ON, true)
         if (!notify || !on) return
         if (ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val open = PendingIntent.getActivity(ctx, 0,
@@ -259,7 +271,7 @@ object InsightEngine {
                 if (Duration.between(w.start, w.end).toMinutes() < 8) continue
                 val st = health.activityStats(w.start, w.end)
                 val d = w.start.atZone(zone).toLocalDate()
-                post(ctx, Insights.activity(w, st, meals.day(d), nowMs))
+                post(ctx, Insights.activity(w, st, meals.day(d), nowMs, recentText(ctx)))
             }
         }
 
@@ -278,7 +290,7 @@ object InsightEngine {
         }
         if (t >= LocalTime.of(21, 45) && "night-$today" !in sent) {
             val a = analysis()
-            post(ctx, Insights.night(a, days().lastOrNull { it.date == today }, sessions, meals.day(today), today, zone, t, nowMs))
+            post(ctx, Insights.night(a, days().lastOrNull { it.date == today }, sessions, meals.day(today), today, zone, t, nowMs, recentText(ctx)))
         }
 
         // refresh the home-screen widget every run (hourly)
