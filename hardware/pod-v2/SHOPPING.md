@@ -22,7 +22,7 @@ The old 302030 140 mAh cell is fine for bench testing (doesn't fit the case).
 ### 1. For the pod (must have)
 - [ ] XINJ 301020 3.7 V lipo, 5 pcs (seller confirms protection board); fits <= ~20.5 mm long
 - [ ] 0820 coin vibration motor, 3 V, wire leads (8 x 2 mm), pack of 5-10
-- [ ] Raspberry Pi Debug Probe (or RS 219-258)
+- [ ] Clone Pico RP2040 (USB-C) flashed with debugprobe firmware (replaces the S$21 official Debug Probe)
 - [ ] M2 washers, zinc-plated steel (NOT stainless: test with a magnet)
 - [ ] Kapton tape 10 mm
 - [ ] Double-sided foam tape ~1 mm
@@ -31,25 +31,28 @@ The old 302030 140 mAh cell is fine for bench testing (doesn't fit the case).
 
 ### 2. Room soldering kit (lean)
 Skip the all-in-one "iron + multimeter + 20 tools" kits: weak iron, worse meter.
-- [ ] Pinecil V2 + its silicone stand (needs a USB-C PD charger 45-65 W; a laptop charger works)
+- [ ] FNIRSI HS-02 iron (needs a USB-C PD charger 45-65 W; a laptop charger works)
 - [ ] Solder 63/37, 0.5 mm, small roll
-- [ ] No-clean flux pen
+- [ ] No-clean flux paste (KEK 559, 10 ml syringe)
 - [ ] Solder wick 2 mm
 - [ ] ESD tweezers set
 - [ ] Flush cutters
 - [ ] Silicone soldering mat (protects the desk)
-- [ ] Multimeter: ANENG AN8008 (budget) or UNI-T UT61E+
-- [ ] Digital calipers (stainless, 150 mm)
+- [ ] Multimeter: ANENG DM850
+- [ ] 830-hole breadboard starter kit (resistors, LEDs, caps, Dupont wires)
 - [ ] Isopropyl alcohol 99% + cotton swabs (buy locally)
 
 Later, only if needed: hot air station (chip rework), bench power supply with
 current limit, logic analyzer, USB microscope.
 
+AliExpress cart, Nov 14: 17 items, S$123.68 incl. S$15.11 shipping (before 9% GST).
+New-shopper deal lands on the multimeter (S$1.47).
+
 ## Buy on AliExpress
 - 0820 coin vibration motor, 3 V, wire leads (8 x 2 mm), pack of 5-10
-- Raspberry Pi Debug Probe (or a Pico with the debugprobe firmware)
+- Clone Pico with the debugprobe firmware
 - Pinecil V2 (needs a USB-C PD charger, 45 W+)
-- 63/37 solder 0.5 mm, no-clean flux pen, ESD tweezers, solder wick 2 mm, cheap multimeter
+- 63/37 solder 0.5 mm, no-clean flux paste, ESD tweezers, solder wick 2 mm, cheap multimeter
 - 30 AWG silicone or kynar wire, M2 zinc-plated steel washers (not stainless),
   Kapton tape 10 mm, double-sided foam tape ~1 mm, B-7000 glue
 - Isopropyl alcohol: buy locally (won't ship)
