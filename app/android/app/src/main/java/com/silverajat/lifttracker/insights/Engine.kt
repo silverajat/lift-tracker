@@ -132,7 +132,7 @@ object InsightEngine {
     }
 
     /** Save to the feed and show it (once per key). */
-    fun post(ctx: Context, i: Insight, notify: Boolean = true) {
+    fun post(ctx: Context, i: Insight, notify: Boolean = true, tab: String = "INSIGHTS") {
         val store = InsightStore(ctx.filesDir)
         if (i.key in store.sent()) return
         store.add(i)
@@ -141,7 +141,7 @@ object InsightEngine {
         if (!notify || !on) return
         if (ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val open = PendingIntent.getActivity(ctx, 0,
-            Intent(ctx, MainActivity::class.java).putExtra("tab", "INSIGHTS").addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            Intent(ctx, MainActivity::class.java).putExtra("tab", tab).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = NotificationCompat.Builder(ctx, i.kind.name)
             .setSmallIcon(R.drawable.ic_stat_lift)
@@ -230,6 +230,22 @@ object InsightEngine {
                     }
                 }
             }
+        }
+
+        // Day tab: set today's 3 once you're up; tick off and reflect at 9:30 PM
+        val jStore = com.silverajat.lifttracker.journal.JournalStore(ctx.filesDir)
+        val jDay = com.silverajat.lifttracker.journal.Journal.dayOf(now)
+        val jPage = jStore.page(jDay)
+        if (now.hour in 6..12 && "plan-am-$jDay" !in sent && !jPage.planned && (days().lastOrNull()?.sleep != null || now.hour >= 9)) {
+            val left = jStore.page(jDay.minusDays(1)).tasks.count { !it.done }
+            post(ctx, Insight("plan-am-$jDay", Kind.PLAN, "Set today's 3",
+                "What are the 3 main things today?" + if (left > 0) " $left left over from yesterday." else "", nowMs), tab = "DAY")
+        }
+        val tNow = now.toLocalTime()
+        if (tNow >= LocalTime.of(21, 30) && "plan-pm-$jDay" !in sent && !jPage.reflected) {
+            val m = jPage.mains
+            post(ctx, Insight("plan-pm-$jDay", Kind.PLAN, "Tick off and reflect",
+                (if (m.isNotEmpty()) "${m.count { it.done }} of ${m.size} main things done. " else "") + "Write a line about today.", nowMs), tab = "DAY")
         }
 
         // Fitbit workouts that ended in the last 6 hours

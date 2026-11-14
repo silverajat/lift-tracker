@@ -29,6 +29,7 @@ enum class Kind(val title: String, val about: String) {
     NIGHT("Day wrap-up", "9:45 PM: your whole day, and when to sleep"),
     WEATHER("Weather", "Rain coming up"),
     WEEKLY("Weekly review", "Monday: last week in numbers"),
+    PLAN("Plan and reflect", "Morning: set today's 3. 9:30 PM: tick off and reflect"),
 }
 
 data class Insight(val key: String, val kind: Kind, val title: String, val body: String, val timeMs: Long)

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SportsSoccer
@@ -47,11 +48,12 @@ import com.silverajat.lifttracker.ui.MealsScreen
 import com.silverajat.lifttracker.ui.TodayScreen
 import com.silverajat.lifttracker.ui.WorkoutScreen
 
-enum class Tab(val title: String) { TODAY("Today"), GYM("Gym"), SPORTS("Sports"), MEALS("Food"), INSIGHTS("Insights") }
+enum class Tab(val title: String) { TODAY("Today"), DAY("Day"), GYM("Gym"), SPORTS("Sports"), MEALS("Food"), INSIGHTS("Insights") }
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
     private val hub: HubViewModel by viewModels()
+    private val journal: com.silverajat.lifttracker.journal.JournalViewModel by viewModels()
 
     private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -148,6 +150,7 @@ class MainActivity : ComponentActivity() {
                 }
                 LaunchedEffect(tab) {
                     if (tab == Tab.TODAY) hub.refreshAnalysis()
+                    if (tab == Tab.TODAY || tab == Tab.DAY) journal.refresh()
                     if (tab == Tab.INSIGHTS) hub.reloadInsights()
                 }
 
@@ -155,7 +158,8 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         when (shown) {
                             Tab.TODAY -> TodayScreen(hub, vm, onConnectHealth = ::connectHealth, onConnectPod = ::connectPod,
-                                onOpenGym = { tab = Tab.GYM }, onOpenNet = { tab = Tab.MEALS })
+                                onOpenGym = { tab = Tab.GYM }, onOpenNet = { tab = Tab.MEALS }, journal = journal, onOpenDay = { tab = Tab.DAY })
+                            Tab.DAY -> com.silverajat.lifttracker.ui.DayScreen(journal)
                             Tab.GYM -> when (val s = screen) {
                                 Screen.Home -> {
                                     val an by hub.analysis.collectAsStateWithLifecycle()
@@ -180,6 +184,7 @@ class MainActivity : ComponentActivity() {
                                 icon = {
                                     Icon(when (t) {
                                         Tab.TODAY -> Icons.Filled.Favorite
+                                        Tab.DAY -> Icons.Filled.EditNote
                                         Tab.GYM -> Icons.Filled.FitnessCenter
                                         Tab.SPORTS -> Icons.Filled.SportsSoccer
                                         Tab.MEALS -> Icons.Filled.Restaurant

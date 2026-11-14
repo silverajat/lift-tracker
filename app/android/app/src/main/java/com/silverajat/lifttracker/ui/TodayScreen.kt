@@ -92,10 +92,14 @@ data class TodayUi(
     val date: LocalDate = LocalDate.now(),
     val now: LocalTime = LocalTime.now(),
     val items: List<com.silverajat.lifttracker.activity.ActivityItem> = emptyList(),
+    val plan: com.silverajat.lifttracker.journal.DayPage? = null,
 )
 
 @Composable
-fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Unit, onConnectPod: () -> Unit, onOpenGym: () -> Unit, onOpenNet: () -> Unit) {
+fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Unit, onConnectPod: () -> Unit, onOpenGym: () -> Unit, onOpenNet: () -> Unit,
+                journal: com.silverajat.lifttracker.journal.JournalViewModel? = null, onOpenDay: () -> Unit = {}) {
+    val jPages = journal?.pages?.collectAsStateWithLifecycle()?.value
+    val jToday = journal?.today?.collectAsStateWithLifecycle()?.value
     val state by hub.healthState.collectAsStateWithLifecycle()
     val a by hub.analysis.collectAsStateWithLifecycle()
     val days by hub.days.collectAsStateWithLifecycle()
@@ -150,7 +154,9 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
             podSub = if (ready) (status?.let { "${it.batteryPct}%" + if (it.charging) ", charging" else "" } ?: "connected") else "for the gym",
             food = food, goalKg = goal, take = take, taking = taking, takeError = takeError, hasKey = key.isNotEmpty(),
             items = items,
+            plan = jToday?.let { d -> jPages?.get(d) ?: com.silverajat.lifttracker.journal.DayPage(d) },
         ),
+        onOpenDay = onOpenDay, onTogglePlan = { id -> journal?.toggle(id) },
         onDetail = { detail = it },
         onFitbit = if (state == HealthState.OK) ({ dataDialog = true }) else onConnectHealth,
         onPod = onConnectPod, onOpenGym = onOpenGym, onOpenNet = onOpenNet,
@@ -165,6 +171,7 @@ fun TodayContent(
     onFitbit: () -> Unit = {}, onPod: () -> Unit = {}, onOpenGym: () -> Unit = {}, onOpenNet: () -> Unit = {}, onRefreshTake: () -> Unit = {},
     onAddKey: () -> Unit = {},
     onDetail: (Detail) -> Unit = {},
+    onOpenDay: () -> Unit = {}, onTogglePlan: (String) -> Unit = {},
 ) {
     val zone = ZoneId.systemDefault()
     val a = u.analysis
@@ -205,6 +212,8 @@ fun TodayContent(
         }
 
         item { Scoreboard(today, onDetail) }
+
+        u.plan?.let { p -> item { PlanGlance(p, u.now, onOpenDay, onTogglePlan) } }
 
         item { CoachTake(u, a, onRefreshTake, onAddKey) }
 
@@ -484,4 +493,34 @@ fun FitbitDataDialog(hub: HubViewModel, onDismiss: () -> Unit) {
             }) { Text("Health Connect", color = C.Muted) }
         },
     )
+}
+
+
+/** Today's main 3 from the Day tab: tick them here, tap the card to open the full plan. */
+@Composable
+private fun PlanGlance(p: com.silverajat.lifttracker.journal.DayPage, now: LocalTime, onOpen: () -> Unit, onToggle: (String) -> Unit) {
+    Card(Modifier.fillMaxWidth(), onClick = onOpen) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Today's 3", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                if (p.mains.isNotEmpty()) Text("${p.mains.count { it.done }}/${p.mains.size}", style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Muted)
+            }
+            if (p.mains.isEmpty()) Text("Set your 3 main things for today", style = MaterialTheme.typography.bodyMedium, color = C.Accent)
+            p.mains.forEach { t ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(22.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(if (t.done) C.Accent else C.Bg)
+                        .border(1.5.dp, if (t.done) C.Accent else C.Line, androidx.compose.foundation.shape.CircleShape)
+                        .clickable { onToggle(t.id) }, contentAlignment = Alignment.Center) {
+                        if (t.done) Text("✓", color = C.Bg, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Text(t.text, style = MaterialTheme.typography.bodyLarge, color = if (t.done) C.Muted else C.Text,
+                        textDecoration = if (t.done) androidx.compose.ui.text.style.TextDecoration.LineThrough else null,
+                        modifier = Modifier.padding(start = 12.dp))
+                }
+            }
+            if (p.mains.isNotEmpty() && (now.hour >= 18 || now.hour < 4) && !p.reflected)
+                Text("Tick off and reflect", style = MaterialTheme.typography.titleSmall, color = C.Accent)
+        }
+    }
 }

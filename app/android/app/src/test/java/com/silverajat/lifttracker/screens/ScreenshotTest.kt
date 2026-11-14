@@ -216,6 +216,29 @@ class ScreenshotTest {
     @Test fun strainDetail() = shoot("detail_strain") { com.silverajat.lifttracker.ui.StrainDetail(analysis, days, items, 0.0, {}, {}, {}) }
     @Test fun sleepDetail() = shoot("detail_sleep") { com.silverajat.lifttracker.ui.SleepDetail(analysis, days) {} }
     @Test fun runDetail() = shoot("run_detail") { com.silverajat.lifttracker.ui.RunDetail(acts[0], items.first { it.manualId == "r1" }, {}, {}) }
+    private fun journal(): com.silverajat.lifttracker.ui.DayUi {
+        val J = com.silverajat.lifttracker.journal.Journal
+        val today = java.time.LocalDate.now()
+        var p = com.silverajat.lifttracker.journal.DayPage(today)
+        listOf("Interview prep", "Pick up 3D print", "Study 2 chapters").forEach { p = J.add(p, it, true) }
+        listOf("Do claims on UREX", "Buy yogurt", "Amitaansh bday msg").forEach { p = J.add(p, it, false) }
+        p = J.toggle(p, p.mains[1].id); p = J.toggle(p, p.sides[0].id); p = J.toggle(p, p.sides[2].id)
+        p = p.copy(mood = 4, reflection = "Prep went well, 3D print looks clean. Didn't get to chapter 2.")
+        var y = com.silverajat.lifttracker.journal.DayPage(today.minusDays(1))
+        listOf("Order PCBs", "Pay for 3D print", "Study 2 chapters").forEach { y = J.add(y, it, true) }
+        y = J.toggle(J.toggle(y, y.mains[0].id), y.mains[1].id).copy(mood = 5, reflection = "Finally ordered everything for the pod.")
+        var tm = com.silverajat.lifttracker.journal.DayPage(today.plusDays(1))
+        tm = J.add(tm, "Talk to papa about the crypto project", true)
+        val now = System.currentTimeMillis()
+        val notes = listOf(
+            com.silverajat.lifttracker.journal.Note(text = "Talk to papa on Friday about the IC design chip and the crypto one. Also how the interview went.", created = now - 3_600_000, pinned = true),
+            com.silverajat.lifttracker.journal.Note(text = "LED sync and wearable before the holidays, crypto after those 2 are done.", created = now - 86_400_000),
+        )
+        return com.silverajat.lifttracker.ui.DayUi(today, mapOf(today to p, y.date to y, tm.date to tm), notes, emptyList(), java.time.LocalTime.of(22, 10))
+    }
+    @Test fun dayPlan() = shoot("day_plan") { com.silverajat.lifttracker.ui.DayContent(journal()) }
+    @Test fun dayNotes() = shoot("day_notes") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 1) }
+    @Test fun dayPast() = shoot("day_past") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 2) }
     @Test fun badmintonDetail() = shoot("activity_badminton") {
         val item = items.first { it.manualId == "b1" }
         val samples = (0..(93 * 12)).map { i ->
