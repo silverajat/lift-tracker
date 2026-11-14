@@ -33,6 +33,10 @@ import kotlin.math.sqrt
  *   breathing rate (z, lower is better) weight 0.10
  *   score = 50 + 20 x weighted z, zones: green >= 67, yellow 34-66, red < 34.
  *   Weights renormalise over what's available; needs 5+ days of baseline.
+ *   The baseline is a rolling 30 days, so it follows you: if your resting HR
+ *   settles at 52, within a few weeks 52 is your normal. Each metric's spread
+ *   has a floor (HRV 8%, resting HR 2 bpm, breathing 0.6/min) and each z is
+ *   capped at +-2.5, so a very steady month can't turn a small blip into a crash.
  *
  * STRAIN (0-21), cardiovascular, from heart rate:
  *   strain = 21 x (1 - e^(-TRIMP / 110)), TRIMP = Banister (see Scores.load).
@@ -116,12 +120,20 @@ object Analysis {
 
     private data class Base(val mean: Double, val sd: Double, val n: Int)
 
-    private fun base(x: List<Double>): Base? {
+    /**
+     * Your normal over the window, and how much it usually varies. [floor] is the least
+     * spread we assume: a Fitbit that read 50 bpm every night for a month would otherwise
+     * make 52 look like a crisis.
+     */
+    private fun base(x: List<Double>, floor: Double): Base? {
         if (x.size < 5) return null
         val m = x.average()
-        val sd = sqrt(x.sumOf { (it - m) * (it - m) } / (x.size - 1)).coerceAtLeast(1e-6)
+        val sd = sqrt(x.sumOf { (it - m) * (it - m) } / (x.size - 1)).coerceAtLeast(floor)
         return Base(m, sd, x.size)
     }
+
+    /** One metric can move the score this far and no further. */
+    private fun clampZ(z: Double) = z.coerceIn(-2.5, 2.5)
 
     fun strainOf(trimp: Int): Double = 21.0 * (1 - exp(-trimp / 110.0))
 
@@ -188,15 +200,15 @@ object Analysis {
         val past = days.subList(maxOf(0, i - 30), i)
         val parts = ArrayList<Pair<Double, Double>>()   // (z, weight)
         val contrib = ArrayList<Contributor>()
-        val hrvBase = base(past.mapNotNull { it.hrvMs?.takeIf { v -> v > 0 }?.let { v -> ln(v) } })
+        val hrvBase = base(past.mapNotNull { it.hrvMs?.takeIf { v -> v > 0 }?.let { v -> ln(v) } }, floor = 0.08)
         if (d.hrvMs != null && d.hrvMs > 0 && hrvBase != null) {
-            val z = (ln(d.hrvMs) - hrvBase.mean) / hrvBase.sd
+            val z = clampZ((ln(d.hrvMs) - hrvBase.mean) / hrvBase.sd)
             parts += z to 0.5
             contrib += Contributor("HRV", "${d.hrvMs.roundToInt()} ms", "normal ${exp(hrvBase.mean).roundToInt()} ms", if (abs(z) < 0.5) null else z > 0)
         }
-        val rhrBase = base(past.mapNotNull { it.restingHr?.toDouble() })
+        val rhrBase = base(past.mapNotNull { it.restingHr?.toDouble() }, floor = 2.0)
         if (d.restingHr != null && rhrBase != null) {
-            val z = (rhrBase.mean - d.restingHr) / rhrBase.sd
+            val z = clampZ((rhrBase.mean - d.restingHr) / rhrBase.sd)
             parts += z to 0.2
             contrib += Contributor("Resting HR", "${d.restingHr} bpm", "normal ${rhrBase.mean.roundToInt()}", if (abs(z) < 0.5) null else z > 0)
         }
@@ -205,9 +217,9 @@ object Analysis {
             parts += z to 0.2
             contrib += Contributor("Sleep performance", "$sleepPerf%", "aim 85%+", if (abs(z) < 0.5) null else z > 0)
         }
-        val rrBase = base(past.mapNotNull { it.respRate })
+        val rrBase = base(past.mapNotNull { it.respRate }, floor = 0.6)
         if (d.respRate != null && rrBase != null) {
-            val z = (rrBase.mean - d.respRate) / rrBase.sd
+            val z = clampZ((rrBase.mean - d.respRate) / rrBase.sd)
             parts += z to 0.1
             contrib += Contributor("Breathing rate", "%.1f /min".format(d.respRate), "normal %.1f".format(rrBase.mean), if (abs(z) < 1.0 || abs(d.respRate - rrBase.mean) < 0.5) null else z > 0)
         }

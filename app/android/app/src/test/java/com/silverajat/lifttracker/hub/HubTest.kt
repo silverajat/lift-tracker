@@ -65,6 +65,26 @@ class HubTest {
         ),
     )
 
+    /** A month of rock-steady readings mustn't make a 2 bpm bump look like a crash. */
+    @Test fun steadyBaselineDoesntOverreact() {
+        val start = LocalDate.of(2026, 10, 1)
+        val base = (0 until 25).map { i -> day(start.plusDays(i.toLong()), 44.0 + (i % 2), 50) }
+        val today = base + day(start.plusDays(25), 44.0, 52, 450)
+        val r = Analysis.recovery(today, 25, 90)!!
+        // resting HR 2 above a perfectly flat 50: about one "usual spread" worse, not a red day
+        assertTrue(r.score.toString(), r.score in 40..60)
+    }
+
+    /** The normal follows you: after a few weeks at 52, 52 is normal again. */
+    @Test fun baselineFollowsYou() {
+        val start = LocalDate.of(2026, 9, 1)
+        val days = (0 until 30).map { i -> day(start.plusDays(i.toLong()), 50.0 + (i % 3), 50 + (i % 2)) } +
+            (30 until 62).map { i -> day(start.plusDays(i.toLong()), 50.0 + (i % 3), 52) }
+        val r = Analysis.recovery(days, 61, 90)!!
+        val rhr = r.contributors.first { it.name == "Resting HR" }
+        assertEquals("normal 52", rhr.vsNormal)
+    }
+
     @Test fun recoveryZones() {
         val start = LocalDate.of(2026, 10, 1)
         val base = (0 until 20).map { i -> day(start.plusDays(i.toLong()), if (i % 2 == 0) 55.0 else 65.0, if (i % 2 == 0) 55 else 57) }

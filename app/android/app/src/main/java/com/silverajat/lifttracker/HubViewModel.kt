@@ -80,7 +80,23 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     private val _goal = MutableStateFlow(0.0)
     val goal: StateFlow<Double> = _goal
 
-    fun setHrMax(v: Int) { _hrMax.value = v.coerceIn(150, 230); prefs.edit().putInt("hr_max", _hrMax.value).apply(); refreshHealth(full = true) }
+    fun setHrMax(v: Int) { _hrMax.value = v.coerceIn(150, 230); prefs.edit().putInt("hr_max", _hrMax.value).putBoolean("hr_max_manual", true).apply(); refreshHealth(full = true) }
+
+    /**
+     * Max heart rate learns upwards (unless you set it yourself): once two different
+     * activities in the last 4 months peak above it, the second-highest peak becomes
+     * the new max. Two, so one bad optical reading can't do it.
+     */
+    private fun learnHrMax(items: List<com.silverajat.lifttracker.activity.ActivityItem>) {
+        if (prefs.getBoolean("hr_max_manual", false)) return
+        val since = Instant.now().minusSeconds(120L * 86_400)
+        val second = items.filter { it.start > since }.mapNotNull { it.maxHr }.filter { it <= 225 }.sortedDescending().getOrNull(1) ?: return
+        if (second > _hrMax.value) {
+            _hrMax.value = second
+            prefs.edit().putInt("hr_max", second).apply()
+            refreshHealth(full = true)
+        }
+    }
 
     // ---- Health Connect -----------------------------------------------------------
     /** Last Fitbit days, saved on the phone so the app opens with data instead of an empty screen. */
@@ -307,6 +323,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             _items.value = withContext(Dispatchers.Default) {
                 com.silverajat.lifttracker.activity.ActivityLog.merge(_days.value, list, manualHr, sessions.all(), overrides.all())
             }
+            learnHrMax(_items.value)
         }
     }
 
