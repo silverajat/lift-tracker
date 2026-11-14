@@ -150,7 +150,7 @@ object InsightEngine {
         else i
         store.add(i)
         val on = prefs.getBoolean(NOTIFY_ON, true)
-        if (!notify || !on) return
+        if (!notify || !on || prefs.getBoolean("notify_off_${i.kind.name}", false)) return
         if (ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val open = PendingIntent.getActivity(ctx, 0,
             Intent(ctx, MainActivity::class.java).putExtra("tab", tab).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),

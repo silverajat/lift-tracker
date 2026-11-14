@@ -68,7 +68,10 @@ private val SportOrange = Color(0xFFF08A3C)
 
 /** Runs (with GPS), football and badminton; everything else your Fitbit picks up. */
 @Composable
-fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Long) -> Unit) {
+fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Long) -> Unit,
+                 gym: com.silverajat.lifttracker.AppViewModel? = null, onOpenGymHome: () -> Unit = {}) {
+    val gymHistory = gym?.history?.collectAsStateWithLifecycle()?.value.orEmpty()
+    val gymPlan = gym?.plan?.collectAsStateWithLifecycle()?.value
     val items by hub.items.collectAsStateWithLifecycle()
     val acts by hub.activities.collectAsStateWithLifecycle()
     val live by RunTracker.state.collectAsStateWithLifecycle()
@@ -129,7 +132,7 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
         item {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Sports", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+                    Text("Movement", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
                     Text("‹", style = MaterialTheme.typography.headlineMedium, color = C.Text,
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { monthKey = month.minusMonths(1).toString() }.padding(horizontal = 12.dp))
                     Text(if (month.year == LocalDate.now().year) monthName else "$monthName ${month.year}", style = MaterialTheme.typography.titleMedium)
@@ -137,6 +140,7 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
                     Text("›", style = MaterialTheme.typography.headlineMedium, color = if (canNext) C.Text else C.Line,
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(enabled = canNext) { monthKey = month.plusMonths(1).toString() }.padding(horizontal = 12.dp))
                 }
+                if (gym != null) GymTile(gymHistory, gymPlan, onOpenGymHome)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     StartTile("Run", Sport.RUN.emoji, "GPS", Plate.Blue, Modifier.weight(1f)) { onStartGps(Sport.RUN) }
                     StartTile("Walk", Sport.WALK.emoji, "GPS", Plate.Chalk, Modifier.weight(1f)) { onStartGps(Sport.WALK) }
@@ -247,6 +251,40 @@ private fun StartTile(name: String, emoji: String, sub: String, color: Color, mo
         // one line even for "Badminton" on a narrow phone
         Text(name, style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp), color = color, maxLines = 1, softWrap = false)
         Text("Start, $sub", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+    }
+}
+
+/** The gym gets the big tile: today's plan, this week and your last session. */
+@Composable
+private fun GymTile(history: List<com.silverajat.lifttracker.data.Session>, plan: Map<java.time.DayOfWeek, com.silverajat.lifttracker.data.Day?>?, onOpen: () -> Unit) {
+    val zone = ZoneId.systemDefault()
+    val today = LocalDate.now(zone)
+    val done = history.filter { it.sets.isNotEmpty() }.sortedByDescending { it.startMs }
+    val todayDone = done.firstOrNull { Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate() == today }
+    val planned = plan?.get(today.dayOfWeek)
+    val week = done.count { Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate() > today.minusDays(7) }
+    val color = Plate.Red
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(color.copy(alpha = 0.16f)).clickable(onClick = onOpen)
+            .padding(horizontal = 18.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(Sport.GYM.emoji, style = MaterialTheme.typography.displaySmall)
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text("Gym", style = MaterialTheme.typography.headlineMedium, color = color)
+                Text(when {
+                    todayDone != null -> "${todayDone.day.title} day done today ✓"
+                    planned != null -> "Today: ${planned.title} day"
+                    else -> "Rest day"
+                }, style = MaterialTheme.typography.titleMedium)
+            }
+            Text("›", style = MaterialTheme.typography.displaySmall, color = color)
+        }
+        Text("$week session${if (week == 1) "" else "s"} this week" +
+            (done.firstOrNull()?.let { s -> ", last: ${s.day.title} " + Instant.ofEpochMilli(s.startMs).atZone(zone).toLocalDate().let { d ->
+                if (d == today) "today" else if (d == today.minusDays(1)) "yesterday" else d.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) } } ?: ""),
+            style = MaterialTheme.typography.bodyMedium, color = C.Muted)
     }
 }
 

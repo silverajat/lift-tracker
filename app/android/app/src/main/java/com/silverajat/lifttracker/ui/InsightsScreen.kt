@@ -62,12 +62,6 @@ private fun kindLabel(k: Kind) = when (k) {
 /** Every summary the app has sent (Fitbit-style), plus Brainstorm (GPT). */
 @Composable
 fun InsightsScreen(hub: HubViewModel) {
-    var chat by rememberSaveable { mutableStateOf(false) }
-    if (chat) {
-        BackHandler { chat = false }
-        ChatScreen(hub, onBack = { chat = false })
-        return
-    }
     val list by hub.insights.collectAsStateWithLifecycle()
     val on by hub.notifyOn.collectAsStateWithLifecycle()
     val checking by hub.checking.collectAsStateWithLifecycle()
@@ -83,17 +77,10 @@ fun InsightsScreen(hub: HubViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Insights", style = MaterialTheme.typography.headlineMedium)
-        }
-        item {
-            Card(Modifier.fillMaxWidth(), onClick = { chat = true }) {
-                Column {
-                    Text("Brainstorm", style = MaterialTheme.typography.titleMedium)
-                }
-            }
+            Text("Notifications", style = MaterialTheme.typography.headlineMedium)
         }
         if (list.isEmpty()) item {
-            Text("Nothing yet. Finish a workout, or tap \"Send me a summary now\".", color = C.Muted)
+            Text("Nothing yet. Your morning summary, workouts and day wrap-ups show up here.", color = C.Muted)
         }
         items(list, key = { it.key }) { i -> InsightCard(i, today) }
     }

@@ -17,12 +17,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -48,7 +46,7 @@ import com.silverajat.lifttracker.ui.MealsScreen
 import com.silverajat.lifttracker.ui.TodayScreen
 import com.silverajat.lifttracker.ui.WorkoutScreen
 
-enum class Tab(val title: String) { TODAY("Today"), DAY("Day"), GYM("Gym"), SPORTS("Sports"), MEALS("Food"), INSIGHTS("Insights") }
+enum class Tab(val title: String) { TODAY("Today"), DAY("Productivity"), MOVE("Movement"), MEALS("Food") }
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -60,10 +58,20 @@ class MainActivity : ComponentActivity() {
 
     /** Tab to open (a notification opens Insights). */
     private val startTab = kotlinx.coroutines.flow.MutableStateFlow<Tab?>(null)
+    /** Notifications open the notification list over whatever tab you're on. */
+    private val startPanel = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    private fun openFrom(t: String) {
+        when (t) {
+            "INSIGHTS" -> startPanel.value = "notifications"
+            "GYM", "SPORTS" -> startTab.value = Tab.MOVE
+            else -> startTab.value = runCatching { Tab.valueOf(t) }.getOrNull()
+        }
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.getStringExtra("tab")?.let { t -> startTab.value = runCatching { Tab.valueOf(t) }.getOrNull() }
+        intent.getStringExtra("tab")?.let { openFrom(it) }
     }
 
     /** Health Connect's own permission screen (Fitbit data via the Google Health app). */
@@ -124,7 +132,7 @@ class MainActivity : ComponentActivity() {
         InsightEngine.schedule(this)
         if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
             askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
-        intent?.getStringExtra("tab")?.let { t -> startTab.value = runCatching { Tab.valueOf(t) }.getOrNull() }
+        intent?.getStringExtra("tab")?.let { openFrom(it) }
 
         setContent {
             LiftTheme {
@@ -138,61 +146,71 @@ class MainActivity : ComponentActivity() {
                     else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 }
                 var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
+                var gymOpen by rememberSaveable { mutableStateOf(false) }
+                var panel by rememberSaveable { mutableStateOf<String?>(null) }   // notifications, settings, chat
                 val wanted by startTab.collectAsStateWithLifecycle()
-                LaunchedEffect(wanted) { wanted?.let { tab = it; startTab.value = null } }
-                // in a workout or an exercise page the gym tab owns the whole screen
+                LaunchedEffect(wanted) { wanted?.let { tab = it; panel = null; startTab.value = null } }
+                val wantedPanel by startPanel.collectAsStateWithLifecycle()
+                LaunchedEffect(wantedPanel) { wantedPanel?.let { panel = it; startPanel.value = null } }
+                // in a workout or an exercise page the gym owns the whole screen
                 val fullScreen = screen != Screen.Home
-                val shown = if (fullScreen) Tab.GYM else tab
+                val shown = if (fullScreen) Tab.MOVE else tab
                 BackHandler(enabled = screen != Screen.Home) { vm.back() }
-                BackHandler(enabled = screen == Screen.Home && tab != Tab.TODAY) { tab = Tab.TODAY }
-                LaunchedEffect(shown == Tab.GYM || session != null) {
-                    wantPod = shown == Tab.GYM || session != null
+                BackHandler(enabled = !fullScreen && panel != null) { panel = null }
+                BackHandler(enabled = !fullScreen && panel == null && tab == Tab.MOVE && gymOpen) { gymOpen = false }
+                BackHandler(enabled = screen == Screen.Home && panel == null && !gymOpen && tab != Tab.TODAY) { tab = Tab.TODAY }
+                val gymShown = fullScreen || (tab == Tab.MOVE && gymOpen && panel == null)
+                LaunchedEffect(gymShown || session != null) {
+                    wantPod = gymShown || session != null
                     if (wantPod) connectPod()
                 }
                 LaunchedEffect(tab) {
                     if (tab == Tab.TODAY) hub.refreshAnalysis()
                     if (tab == Tab.TODAY || tab == Tab.DAY) journal.refresh()
-                    if (tab == Tab.INSIGHTS) hub.reloadInsights()
                 }
+                LaunchedEffect(panel) { if (panel == "notifications") { hub.reloadInsights(); hub.markInsightsSeen() } }
+                val unread by hub.unread.collectAsStateWithLifecycle()
 
                 Column(Modifier.fillMaxSize().background(C.Bg).imePadding()) {
+                    if (!fullScreen) com.silverajat.lifttracker.ui.TopIcons(panel, unread, onPanel = { panel = if (panel == it) null else it })
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        when (shown) {
-                            Tab.TODAY -> TodayScreen(hub, vm, onConnectHealth = ::connectHealth, onConnectPod = ::connectPod,
-                                onOpenGym = { tab = Tab.GYM }, onOpenNet = { tab = Tab.MEALS }, journal = journal, onOpenDay = { tab = Tab.DAY })
-                            Tab.DAY -> com.silverajat.lifttracker.ui.DayScreen(journal, garden, hub, vm)
-                            Tab.GYM -> when (val s = screen) {
-                                Screen.Home -> {
-                                    val an by hub.analysis.collectAsStateWithLifecycle()
-                                    HomeScreen(vm, onConnect = ::connectPod, onExport = ::share, strength = an?.exercises.orEmpty())
+                        when {
+                            !fullScreen && panel == "notifications" -> InsightsScreen(hub)
+                            !fullScreen && panel == "settings" -> com.silverajat.lifttracker.ui.SettingsScreen(hub)
+                            !fullScreen && panel == "chat" -> com.silverajat.lifttracker.ui.ChatScreen(hub, onBack = { panel = null })
+                            else -> when (shown) {
+                                Tab.TODAY -> TodayScreen(hub, vm, onConnectHealth = ::connectHealth, onConnectPod = ::connectPod,
+                                    onOpenGym = { tab = Tab.MOVE; gymOpen = true }, onOpenNet = { tab = Tab.MEALS }, journal = journal, onOpenDay = { tab = Tab.DAY })
+                                Tab.DAY -> com.silverajat.lifttracker.ui.DayScreen(journal, garden, hub, vm)
+                                Tab.MOVE -> when (val s = screen) {
+                                    Screen.Home -> if (gymOpen) {
+                                        val an by hub.analysis.collectAsStateWithLifecycle()
+                                        HomeScreen(vm, onConnect = ::connectPod, onExport = ::share, strength = an?.exercises.orEmpty(), onBack = { gymOpen = false })
+                                    } else com.silverajat.lifttracker.ui.SportsScreen(hub, onStartGps = ::startGps,
+                                        onOpenGym = { id -> vm.open(Screen.Past(id)) }, gym = vm, onOpenGymHome = { gymOpen = true })
+                                    is Screen.Workout -> WorkoutScreen(vm, s.day, onShare = ::share)
+                                    is Screen.ExerciseInfo -> ExerciseScreen(vm, s.exerciseId)
+                                    is Screen.Past -> com.silverajat.lifttracker.ui.SessionScreen(vm, s.sessionId, onShare = ::share)
                                 }
-                                is Screen.Workout -> WorkoutScreen(vm, s.day, onShare = ::share)
-                                is Screen.ExerciseInfo -> ExerciseScreen(vm, s.exerciseId)
-                                is Screen.Past -> com.silverajat.lifttracker.ui.SessionScreen(vm, s.sessionId, onShare = ::share)
+                                Tab.MEALS -> MealsScreen(hub)
                             }
-                            Tab.SPORTS -> com.silverajat.lifttracker.ui.SportsScreen(hub, onStartGps = ::startGps,
-                                onOpenGym = { id -> vm.open(Screen.Past(id)); tab = Tab.GYM })
-                            Tab.MEALS -> MealsScreen(hub)
-                            Tab.INSIGHTS -> InsightsScreen(hub)
                         }
                     }
                     if (!fullScreen) NavigationBar(containerColor = C.Bg, tonalElevation = 0.dp,
                         modifier = Modifier.drawBehind { drawLine(C.Line, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), 1.dp.toPx()) }) {
                         Tab.entries.forEach { t ->
                             NavigationBarItem(
-                                selected = tab == t,
-                                onClick = { tab = t },
+                                selected = tab == t && panel == null,
+                                onClick = { if (tab == t && t == Tab.MOVE && panel == null) gymOpen = false; tab = t; panel = null },
                                 icon = {
                                     Icon(when (t) {
                                         Tab.TODAY -> Icons.Filled.Favorite
                                         Tab.DAY -> Icons.Filled.EditNote
-                                        Tab.GYM -> Icons.Filled.FitnessCenter
-                                        Tab.SPORTS -> Icons.Filled.SportsSoccer
+                                        Tab.MOVE -> Icons.Filled.FitnessCenter
                                         Tab.MEALS -> Icons.Filled.Restaurant
-                                        Tab.INSIGHTS -> Icons.Filled.Notifications
                                     }, t.title)
                                 },
-                                label = { Text(t.title) },
+                                label = { Text(t.title, maxLines = 1) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = C.Text, selectedTextColor = C.Text, indicatorColor = C.Raised,
                                     unselectedIconColor = C.Muted, unselectedTextColor = C.Muted,
@@ -224,5 +242,6 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         if (wantPod && vm.pod.hasPermissions()) vm.pod.connect()
         hub.refreshHealth()
+        hub.reloadInsights()
     }
 }

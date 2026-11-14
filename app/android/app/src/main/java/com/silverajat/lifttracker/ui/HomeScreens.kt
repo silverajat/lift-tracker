@@ -70,7 +70,8 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
 }
 
 @Composable
-fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> Unit, strength: List<com.silverajat.lifttracker.health.Analysis.ExerciseTrend> = emptyList()) {
+fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> Unit, strength: List<com.silverajat.lifttracker.health.Analysis.ExerciseTrend> = emptyList(),
+               onBack: (() -> Unit)? = null) {
     val conn by vm.pod.conn.collectAsStateWithLifecycle()
     val status by vm.pod.status.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
@@ -114,6 +115,8 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
+            if (onBack != null) Text("‹ Movement", style = MaterialTheme.typography.titleMedium, color = C.Muted,
+                modifier = Modifier.clickable(onClick = onBack).padding(vertical = 4.dp))
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(dayFmt.format(Date()), style = MaterialTheme.typography.titleSmall, color = C.Muted)

@@ -36,7 +36,12 @@ class GardenViewModel(app: Application) : AndroidViewModel(app) {
     fun delete(id: String) { _sessions.value = _sessions.value.filter { it.id != id }; store.saveSessions(_sessions.value) }
 
     /** You switched to another app (not just locked the phone): growth pauses. */
-    fun leftApp() { _active.value?.takeIf { it.awaySince == null }?.let { setActive(it.copy(awaySince = System.currentTimeMillis())) } }
+    fun leftApp() {
+        if (!getApplication<Application>().getSharedPreferences("hub", android.content.Context.MODE_PRIVATE).getBoolean(PAUSE_AWAY, true)) return
+        _active.value?.takeIf { it.awaySince == null }?.let { setActive(it.copy(awaySince = System.currentTimeMillis())) }
+    }
+
+    companion object { const val PAUSE_AWAY = "focus_pause_away" }
 
     /** Back in the app: the time away is set aside. */
     fun cameBack() {

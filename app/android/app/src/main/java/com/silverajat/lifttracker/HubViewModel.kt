@@ -152,7 +152,13 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setNotifyOn(on: Boolean) { _notifyOn.value = on; prefs.edit().putBoolean(InsightEngine.NOTIFY_ON, on).apply() }
 
-    fun reloadInsights() { _insights.value = insightStore.all() }
+    fun reloadInsights() { _insights.value = insightStore.all(); _unread.value = countUnread() }
+
+    /** Notifications since you last opened the list (the dot on the bell). */
+    private fun countUnread() = insightStore.all().count { it.timeMs > prefs.getLong("insights_seen", 0L) }
+    private val _unread = MutableStateFlow(0)
+    val unread: StateFlow<Int> = _unread
+    fun markInsightsSeen() { prefs.edit().putLong("insights_seen", System.currentTimeMillis()).apply(); _unread.value = 0 }
 
     /** Send anything that's due (the app opening counts as a check). [force]: a fresh morning summary now. */
     fun checkInsights(force: Boolean = false) {
