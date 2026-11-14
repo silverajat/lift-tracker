@@ -97,7 +97,7 @@ object Routines {
 
     // Done one arm at a time, left arm first. The pod is on the right wrist,
     // so it counts the right arm's reps (you match them on the left).
-    private val oneArm = setOf(5, 9, 12, 25)
+    private val oneArm = setOf(5, 9, 12, 25, 28)   // 28: single-leg calf raise, one side at a time
     // pod arm done first: woodchoppers (left side with the pod, then right without)
     private val podSideFirst = setOf(25)
     fun podSideFirst(exerciseId: Int) = exerciseId in podSideFirst

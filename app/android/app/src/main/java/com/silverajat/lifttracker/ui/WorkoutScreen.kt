@@ -51,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -285,7 +286,7 @@ private fun ExerciseCard(
                 Text(ex.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     listOfNotNull(group.label, ex.detail.ifEmpty { null },
-                        if (Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "pod side first" else "one arm at a time") else null,
+                        if (Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "pod side first" else "one side at a time") else null,
                         "rest ${clock(Routines.restSeconds(ex) * 1000L)}").joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                 )
@@ -440,6 +441,9 @@ private fun SetRow(
             modifier = Modifier.weight(W_PREV).clickable(onClick = onCopyPrev).padding(vertical = 6.dp),
         )
         Column(Modifier.weight(W_KG).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            // same height as the add-on line below, so the weight box sits level with the rest of the row
+            Text("+ add-on", style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                modifier = Modifier.alpha(0f).padding(bottom = 3.dp).padding(horizontal = 4.dp, vertical = 2.dp))
             if (done || active) {
                 Text(weight, style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Text)
             } else {
@@ -566,7 +570,7 @@ private fun BottomPanel(
                                 Text("$live", style = MaterialTheme.typography.displayLarge.merge(Tnum)
                                     .copy(fontSize = 92.sp, lineHeight = 92.sp), color = C.Text)
                                 Spacer(Modifier.width(8.dp))
-                                Text(if (ex != null && Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "reps\nleft side" else "reps\nright arm") else "reps",
+                                Text(if (ex != null && Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "reps\nleft side" else "reps\nright side") else "reps",
                                     style = MaterialTheme.typography.titleMedium, color = C.Muted,
                                     modifier = Modifier.padding(bottom = 16.dp))
                             }
