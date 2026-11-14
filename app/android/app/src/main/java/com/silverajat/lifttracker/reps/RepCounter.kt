@@ -95,7 +95,7 @@ class RepCounter(private val hz: Int = 25) {
          */
         fun analyze(
             data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean,
-            refFor: (String) -> RomRef?, firstSide: Boolean = false,
+            firstSide: Boolean = false, refFor: (String) -> RomRef?,
         ): SetAnalysis? {
             val d = side(data, hz, oneArm, firstSide)
             if (d.size < hz) return null

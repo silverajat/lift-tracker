@@ -472,7 +472,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val (n, a) = withContext(Dispatchers.Default) {
                 val hz = PodProtocol.STREAM_HZ
                 val parts = segs.filter { it.size >= hz }.map { seg ->
-                    val a = RepCounter.analyze(seg, hz, p, oneArm, ref, firstSide)
+                    val a = RepCounter.analyze(seg, hz, p, oneArm, firstSide, ref)
                     Triple(seg.size, a?.reps ?: RepCounter.count(seg, hz, p, oneArm, firstSide), a)
                 }
                 Pair(parts.sumOf { it.second }, mergeAnalyses(parts.mapNotNull { it.third }))
