@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
@@ -46,12 +45,11 @@ import com.silverajat.lifttracker.garden.GardenViewModel
 import com.silverajat.lifttracker.insights.InsightEngine
 import com.silverajat.lifttracker.insights.Kind
 
-/** Top-right: Brainstorm (GPT chat), notifications (with a dot for new ones) and settings. */
+/** Top-right: notifications (with a dot for new ones) and settings. */
 @Composable
 fun TopIcons(panel: String?, unread: Int, onPanel: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(end = 6.dp).height(44.dp),
         horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-        TopIcon(Icons.Filled.Forum, "Brainstorm", panel == "chat") { onPanel("chat") }
         Box {
             TopIcon(Icons.Filled.Notifications, "Notifications", panel == "notifications") { onPanel("notifications") }
             if (unread > 0) Box(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp).size(9.dp).clip(CircleShape).background(C.Stop))
@@ -101,7 +99,7 @@ fun SettingsScreen(hub: HubViewModel) {
             Group("AI and body") {
                 Column(Modifier.fillMaxWidth().clickable { aiDialog = true }.padding(vertical = 4.dp)) {
                     Text("OpenAI key, model and max heart rate", style = MaterialTheme.typography.titleMedium)
-                    Text(if (key.isEmpty()) "No key yet: Brainstorm, Coach's take and GPT notifications need one" else "Key saved",
+                    Text(if (key.isEmpty()) "No key yet: Brainstorm (Productivity, Notes), Coach's take and GPT notifications need one" else "Key saved",
                         style = MaterialTheme.typography.bodySmall, color = C.Muted)
                 }
             }

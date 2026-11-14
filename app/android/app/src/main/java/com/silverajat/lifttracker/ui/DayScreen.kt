@@ -79,6 +79,7 @@ class DayActions(
     val addShop: (String) -> Unit = {},
     val toggleShop: (String) -> Unit = {},
     val clearBought: () -> Unit = {},
+    val brainstorm: () -> Unit = {},
 )
 
 data class DayUi(
@@ -94,6 +95,7 @@ data class DayUi(
 fun DayScreen(
     j: JournalViewModel, g: com.silverajat.lifttracker.garden.GardenViewModel,
     hub: com.silverajat.lifttracker.HubViewModel, gym: com.silverajat.lifttracker.AppViewModel,
+    onBrainstorm: () -> Unit = {},
 ) {
     val today by j.today.collectAsStateWithLifecycle()
     val pages by j.pages.collectAsStateWithLifecycle()
@@ -119,7 +121,7 @@ fun DayScreen(
         toTomorrow = j::toTomorrow, removeTomorrow = { j.remove(it, today.plusDays(1)) },
         bringOver = j::bringOver, drop = j::dropLeftovers, mood = j::setMood, reflect = j::setReflection,
         addNote = j::addNote, editNote = j::editNote, pinNote = j::pinNote, deleteNote = j::deleteNote,
-        addShop = j::addShop, toggleShop = j::toggleShop, clearBought = j::clearBought,
+        addShop = j::addShop, toggleShop = j::toggleShop, clearBought = j::clearBought, brainstorm = onBrainstorm,
     ))
 }
 
@@ -324,6 +326,18 @@ private fun TaskDialog(t: Task, roomForMain: Boolean, act: DayActions, onDone: (
 
 private fun LazyListScope.notesTab(u: DayUi, act: DayActions, onEdit: (Note) -> Unit) {
     item { NoteCapture(act) }
+    item {
+        Card(Modifier.fillMaxWidth(), onClick = act.brainstorm) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("💬", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(end = 14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Brainstorm with GPT", style = MaterialTheme.typography.titleMedium)
+                    Text("Talk an idea through. It knows your training, sleep and food.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                }
+                Text("›", style = MaterialTheme.typography.headlineMedium, color = C.Muted)
+            }
+        }
+    }
     if (u.notes.size > 6) item { NoteSearch() }
     val q = noteQuery.value.trim().lowercase()
     val shown = u.notes.filter { q.isEmpty() || q in it.text.lowercase() }

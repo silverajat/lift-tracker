@@ -172,7 +172,7 @@ class MainActivity : ComponentActivity() {
                 val unread by hub.unread.collectAsStateWithLifecycle()
 
                 Column(Modifier.fillMaxSize().background(C.Bg).imePadding()) {
-                    if (!fullScreen) com.silverajat.lifttracker.ui.TopIcons(panel, unread, onPanel = { panel = if (panel == it) null else it })
+                    if (!fullScreen && panel != "chat") com.silverajat.lifttracker.ui.TopIcons(panel, unread, onPanel = { panel = if (panel == it) null else it })
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         when {
                             !fullScreen && panel == "notifications" -> InsightsScreen(hub)
@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity() {
                             else -> when (shown) {
                                 Tab.TODAY -> TodayScreen(hub, vm, onConnectHealth = ::connectHealth, onConnectPod = ::connectPod,
                                     onOpenGym = { tab = Tab.MOVE; gymOpen = true }, onOpenNet = { tab = Tab.MEALS }, journal = journal, onOpenDay = { tab = Tab.DAY })
-                                Tab.DAY -> com.silverajat.lifttracker.ui.DayScreen(journal, garden, hub, vm)
+                                Tab.DAY -> com.silverajat.lifttracker.ui.DayScreen(journal, garden, hub, vm, onBrainstorm = { panel = "chat" })
                                 Tab.MOVE -> when (val s = screen) {
                                     Screen.Home -> if (gymOpen) {
                                         val an by hub.analysis.collectAsStateWithLifecycle()
