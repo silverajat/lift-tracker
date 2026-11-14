@@ -53,12 +53,16 @@ class RepCounter(private val hz: Int = 25) {
         private set
     @Volatile var oneArm = false
         private set
+    /** One-arm lift with the pod arm done first: count the first stretch, not the last. */
+    @Volatile var firstSide = false
+        private set
 
     @Synchronized
-    fun reset(params: CounterParams, oneArm: Boolean) {
+    fun reset(params: CounterParams, oneArm: Boolean, firstSide: Boolean = false) {
         buf.clear()
         this.params = params
         this.oneArm = oneArm
+        this.firstSide = firstSide
     }
 
     /** Adds a sample. Returns true every 5th sample (time to recount). */
@@ -72,11 +76,15 @@ class RepCounter(private val hz: Int = 25) {
     fun snapshot(): List<FloatArray> = ArrayList(buf)
 
     /** Count the set so far (call off the main thread). */
-    fun countNow(): Int = count(snapshot(), hz, params, oneArm)
+    fun countNow(): Int = count(snapshot(), hz, params, oneArm, firstSide)
 
     companion object {
-        fun count(data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean): Int {
-            val d = if (oneArm) data.slice(RepEngine.lastBout(data, hz)) else data
+        /** The part of a set the pod arm did (one-arm lifts), else all of it. */
+        fun side(data: List<FloatArray>, hz: Int, oneArm: Boolean, firstSide: Boolean = false): List<FloatArray> =
+            if (!oneArm) data else data.slice(if (firstSide) RepEngine.firstBout(data, hz) else RepEngine.lastBout(data, hz))
+
+        fun count(data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean, firstSide: Boolean = false): Int {
+            val d = side(data, hz, oneArm, firstSide)
             return RepEngine.count(d, hz, p)?.reps ?: 0
         }
 
@@ -87,9 +95,9 @@ class RepCounter(private val hz: Int = 25) {
          */
         fun analyze(
             data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean,
-            refFor: (String) -> RomRef?,
+            refFor: (String) -> RomRef?, firstSide: Boolean = false,
         ): SetAnalysis? {
-            val d = if (oneArm) data.slice(RepEngine.lastBout(data, hz)) else data
+            val d = side(data, hz, oneArm, firstSide)
             if (d.size < hz) return null
             val sig = RepEngine.signals(d, hz)
             val res = RepEngine.count(sig, p) ?: return null

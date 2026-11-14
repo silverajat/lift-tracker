@@ -285,7 +285,7 @@ private fun ExerciseCard(
                 Text(ex.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     listOfNotNull(group.label, ex.detail.ifEmpty { null },
-                        if (Routines.isOneArm(ex)) "one arm at a time" else null,
+                        if (Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "pod side first" else "one arm at a time") else null,
                         "rest ${clock(Routines.restSeconds(ex) * 1000L)} (warm-up 1:00)").joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                 )
@@ -574,7 +574,7 @@ private fun BottomPanel(
                                 Text("$live", style = MaterialTheme.typography.displayLarge.merge(Tnum)
                                     .copy(fontSize = 92.sp, lineHeight = 92.sp), color = C.Text)
                                 Spacer(Modifier.width(8.dp))
-                                Text(if (ex != null && Routines.isOneArm(ex)) "reps\nright arm" else "reps",
+                                Text(if (ex != null && Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "reps\nleft side" else "reps\nright arm") else "reps",
                                     style = MaterialTheme.typography.titleMedium, color = C.Muted,
                                     modifier = Modifier.padding(bottom = 16.dp))
                             }
@@ -666,9 +666,9 @@ private fun BottomPanel(
                             style = MaterialTheme.typography.bodyMedium, color = if (next != null) C.Text else C.Done,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(when {
-                                restS >= 180 -> "Big lift · ${clock(restS * 1000L)}"
-                                restS <= 90 -> "Arms · ${clock(restS * 1000L)}"
-                                else -> clock(restS * 1000L)
+                                restS >= 180 -> "Heavy lift · ${clock(restS * 1000L)}"
+                                restS <= 60 -> "Warm-up · ${clock(restS * 1000L)}"
+                                else -> "Rest · ${clock(restS * 1000L)}"
                             },
                             style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                         Row {

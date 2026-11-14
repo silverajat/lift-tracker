@@ -154,7 +154,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (collecting && counter.add(s) && countJob?.isActive != true) {
                     countJob = viewModelScope.launch {
                         val snap = counter.snapshot()
-                        val n = withContext(Dispatchers.Default) { RepCounter.count(snap, PodProtocol.STREAM_HZ, counter.params, counter.oneArm) }
+                        val n = withContext(Dispatchers.Default) { RepCounter.count(snap, PodProtocol.STREAM_HZ, counter.params, counter.oneArm, counter.firstSide) }
                         if (collecting) _liveReps.value = segmentReps + hold.update(n, snap.size)
                     }
                 }
@@ -382,7 +382,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             calibration = calibration,
         )
         _active.value = set
-        counter.reset(_model.value.params(ex.id), Routines.isOneArm(ex))
+        counter.reset(_model.value.params(ex.id), Routines.isOneArm(ex), Routines.podSideFirst(ex.id))
         segments.clear()
         segmentReps = 0
         hold.reset()
@@ -417,11 +417,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val raw = counter.snapshot()
         val p = counter.params
         val oneArm = counter.oneArm
+        val firstSide = counter.firstSide
         val idx = segments.size
         segments += raw
         viewModelScope.launch {
             val full = if (raw.size < PodProtocol.STREAM_HZ) 0
-                else withContext(Dispatchers.Default) { RepCounter.count(raw, PodProtocol.STREAM_HZ, p, oneArm) }
+                else withContext(Dispatchers.Default) { RepCounter.count(raw, PodProtocol.STREAM_HZ, p, oneArm, firstSide) }
             if (hold.collapsed(full) && idx < segments.size) segments[idx] = hold.cut(raw, full)
             val n = hold.shown(full)
             hold.reset()
@@ -434,7 +435,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_phase.value != Phase.LIFTING || !_paused.value) return
         pausedAt?.let { pausedTotalMs += System.currentTimeMillis() - it }
         pausedAt = null
-        counter.reset(counter.params, counter.oneArm)
+        counter.reset(counter.params, counter.oneArm, counter.firstSide)
         _paused.value = false
         collecting = true
     }
@@ -452,11 +453,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _active.value = set.copy(endMs = System.currentTimeMillis())
         val p = counter.params
         val oneArm = counter.oneArm
+        val firstSide = counter.firstSide
         viewModelScope.launch {
             // the end of the set (re-racking, picking up the phone) can wipe the count: cut it back
             if (last != null) {
                 val full = if (last.size < PodProtocol.STREAM_HZ) 0
-                    else withContext(Dispatchers.Default) { RepCounter.count(last, PodProtocol.STREAM_HZ, p, oneArm) }
+                    else withContext(Dispatchers.Default) { RepCounter.count(last, PodProtocol.STREAM_HZ, p, oneArm, firstSide) }
                 segments += lastHold.cut(last, full)
             }
             hold.reset()
@@ -470,8 +472,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val (n, a) = withContext(Dispatchers.Default) {
                 val hz = PodProtocol.STREAM_HZ
                 val parts = segs.filter { it.size >= hz }.map { seg ->
-                    val a = RepCounter.analyze(seg, hz, p, oneArm, ref)
-                    Triple(seg.size, a?.reps ?: RepCounter.count(seg, hz, p, oneArm), a)
+                    val a = RepCounter.analyze(seg, hz, p, oneArm, ref, firstSide)
+                    Triple(seg.size, a?.reps ?: RepCounter.count(seg, hz, p, oneArm, firstSide), a)
                 }
                 Pair(parts.sumOf { it.second }, mergeAnalyses(parts.mapNotNull { it.third }))
             }
@@ -603,7 +605,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val examples = store.all().flatMap { s ->
                     s.sets.filter { it.liveReps != null }.mapNotNull { l ->
                         val d = raw.load(s.id, l.exerciseId, l.setNo) ?: return@mapNotNull null
-                        val cut = if (Routines.isOneArm(l.exerciseId)) d.slice(RepEngine.lastBout(d, hz)) else d
+                        val cut = RepCounter.side(d, hz, Routines.isOneArm(l.exerciseId), Routines.podSideFirst(l.exerciseId))
                         if (cut.size < hz) null
                         else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps)
                     }

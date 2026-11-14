@@ -44,6 +44,18 @@ class RepEngineTest {
     }
 
     @Test
+    fun firstAndLastBoutPickTheRightSide() {
+        fun move(sec: Int) = List(sec * 25) { i -> val t = i / 25.0
+            floatArrayOf(0f, 0f, 1f, (150 * kotlin.math.sin(2 * Math.PI * 0.5 * t)).toFloat(), 0f, 0f) }
+        fun still(sec: Int) = List(sec * 25) { floatArrayOf(0f, 0f, 1f, 0f, 0f, 0f) }
+        val d = still(2) + move(8) + still(4) + move(6) + still(2)
+        val first = RepEngine.firstBout(d, 25)
+        val last = RepEngine.lastBout(d, 25)
+        assertTrue("first $first", first.first < 3 * 25 && first.last < 12 * 25)
+        assertTrue("last $last", last.first > 12 * 25)
+    }
+
+    @Test
     fun peakHoldKeepsTheCountWhenTheEndWipesItOut() {
         val h = PeakHold()
         // counting up through the set, then picking up the phone collapses it to 2

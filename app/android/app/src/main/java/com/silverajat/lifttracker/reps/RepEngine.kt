@@ -297,7 +297,12 @@ object RepEngine {
      * stretch of movement long enough to be a set (>= 3 s), with 0.5 s
      * either side. The whole set if there isn't one.
      */
-    fun lastBout(data: List<FloatArray>, hz: Int): IntRange {
+    fun lastBout(data: List<FloatArray>, hz: Int): IntRange = bout(data, hz, last = true)
+
+    /** The first clear stretch of movement: one-arm lifts done pod-arm first (woodchoppers). */
+    fun firstBout(data: List<FloatArray>, hz: Int): IntRange = bout(data, hz, last = false)
+
+    private fun bout(data: List<FloatArray>, hz: Int, last: Boolean): IntRange {
         val n = data.size
         if (n < hz) return 0 until n
         val bias = gyroBias(data, hz)
@@ -326,7 +331,7 @@ object RepEngine {
         }
         val long = merged.filter { it[1] - it[0] >= 3 * hz }
         if (long.isEmpty()) return 0 until n
-        val (a, b) = long.last()
+        val (a, b) = if (last) long.last() else long.first()
         return max(0, a - hz / 2) until min(n, b + hz / 2)
     }
 
