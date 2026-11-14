@@ -29,8 +29,16 @@ object Voice {
         Reply with JSON only: {"title": "...", "body": "..."}
     """.trimIndent()
 
-    /** Numbers in a text (commas and signs stripped), for checking GPT didn't invent any. */
-    fun numbers(s: String): Set<String> = Regex("""\d[\d,]*(\.\d+)?""").findAll(s).map { it.value.replace(",", "").trimEnd('0').trimEnd('.') }.toSet()
+    /** Numbers in a text ("14,200" -> 14200, "14k" -> 14000), for checking GPT didn't invent any. */
+    fun numbers(s: String): List<Double> = Regex("""(\d[\d,]*(?:\.\d+)?)([kK]\b)?""").findAll(s).mapNotNull { m ->
+        m.groupValues[1].replace(",", "").toDoubleOrNull()?.let { if (m.groupValues[2].isNotEmpty()) it * 1000 else it }
+    }.toList()
+
+    /** Every number in [out] is one from [draft], allowing rounding (14,200 -> "14k", 10.7 -> "11"). */
+    fun sameNumbers(draft: String, out: String): Boolean {
+        val have = numbers(draft)
+        return numbers(out).all { n -> have.any { d -> n == d || (d != 0.0 && kotlin.math.abs(n - d) / kotlin.math.abs(d) <= 0.06) } }
+    }
 
     /** The rewrite, or null to keep the draft. */
     fun check(draft: Insight, reply: String): Insight? {
@@ -40,8 +48,7 @@ object Voice {
         val title = o.optString("title").trim().replace("**", "")
         val body = o.optString("body").trim().replace("**", "")
         if (title.isEmpty() || body.isEmpty() || title.length > 70 || body.length > 400) return null
-        val allowed = numbers(draft.title + " " + draft.body)
-        if (!allowed.containsAll(numbers("$title $body"))) return null
+        if (!sameNumbers(draft.title + " " + draft.body, "$title $body")) return null
         return draft.copy(title = title, body = body)
     }
 
