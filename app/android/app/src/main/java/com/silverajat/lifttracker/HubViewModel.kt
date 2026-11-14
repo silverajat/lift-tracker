@@ -344,11 +344,26 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     val takeError: StateFlow<String?> = _takeError
 
     /** Ask GPT for today's analysis: once a day by itself, or now with [force]. */
+    /**
+     * The coach's take is redone on its own: on a new day, every 3 hours, and
+     * straight after a workout or activity that finished since it was written.
+     */
+    private fun takeStale(today: LocalDate): Boolean {
+        val t = _take.value ?: return true
+        if (t.date != today) return true
+        val now = System.currentTimeMillis()
+        if (now - t.atMs > 3 * 3600_000L) return true
+        val lastGym = sessions.all().mapNotNull { it.endMs }.maxOrNull() ?: 0L
+        val lastActivity = _items.value.maxOfOrNull { it.end.toEpochMilli() } ?: 0L
+        // something new finished after the take (give the Fitbit 10 min to sync it in)
+        return maxOf(lastGym, lastActivity).let { it > t.atMs && now - it > 10 * 60_000L }
+    }
+
     fun refreshTake(force: Boolean = false) {
         val key = _apiKey.value
         if (key.isEmpty() || _taking.value) return
         val today = LocalDate.now(zone)
-        if (!force && _take.value?.date == today) return
+        if (!force && !takeStale(today)) return
         if (!force && _healthState.value == HealthState.LOADING) return
         _taking.value = true
         _takeError.value = null
