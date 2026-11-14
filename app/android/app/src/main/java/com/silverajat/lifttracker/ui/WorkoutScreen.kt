@@ -286,20 +286,12 @@ private fun ExerciseCard(
                 Text(
                     listOfNotNull(group.label, ex.detail.ifEmpty { null },
                         if (Routines.isOneArm(ex)) (if (Routines.podSideFirst(ex.id)) "pod side first" else "one arm at a time") else null,
-                        "rest ${clock(Routines.restSeconds(ex) * 1000L)} (warm-up 1:00)").joinToString(" · "),
+                        "rest ${clock(Routines.restSeconds(ex) * 1000L)}").joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted,
                 )
             }
             Icon(Icons.Filled.ChevronRight, "Progress", tint = C.Muted)
         }
-        val cal = vm.calibration(ex.id)
-        Text(
-            if (cal != null) "◎ 100% ROM = ${cal.rom.toInt()}${com.silverajat.lifttracker.reps.unitLabel(cal.unit)} · calibrated ${calDate.format(java.util.Date(cal.atMs))}"
-            else "◎ ROM not calibrated: tap a set number until it shows C, do a slow full-range set",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (cal != null) C.Pod else C.Muted,
-            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp),
-        )
         NoteLine(vm, ex.id, Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp))
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
