@@ -224,15 +224,21 @@ fun HrChart(a: SportAnalysis.Result) {
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 8f)))
                 }
                 // the curve (a gap of over 2 min in the data isn't bridged)
-                val s = a.samples
+                // smoothed: readings averaged into ~240 steps across the width (a 1-5 s Fitbit trace is too jittery to read)
+                val step = maxOf(10L, (t1 - t0) / 240)
+                val s = a.samples.groupBy { (it.time.epochSecond - t0) / step }.toSortedMap().map { (k, v) ->
+                    com.silverajat.lifttracker.health.HrSample(java.time.Instant.ofEpochSecond(t0 + k * step + step / 2), v.map { it.bpm }.average().toInt())
+                }
                 for (i in 1 until s.size) {
                     val p = s[i - 1]; val q = s[i]
                     if (q.time.epochSecond - p.time.epochSecond > 120) continue
                     drawLine(hrZoneColor((p.bpm + q.bpm) / 2, a.hrMax), Offset(x(p.time.epochSecond), y(p.bpm.toDouble())),
                         Offset(x(q.time.epochSecond), y(q.bpm.toDouble())), 2.2.dp.toPx(), cap = StrokeCap.Round)
                 }
-                drawCircle(Plate.Red, 4.5.dp.toPx(), Offset(x(a.peakAt.epochSecond), y(a.max.toDouble())))
-                drawCircle(C.Surface, 2.dp.toPx(), Offset(x(a.peakAt.epochSecond), y(a.max.toDouble())))
+                s.maxByOrNull { it.bpm }?.let { pk ->
+                    drawCircle(Plate.Red, 4.5.dp.toPx(), Offset(x(pk.time.epochSecond), y(pk.bpm.toDouble())))
+                    drawCircle(C.Surface, 2.dp.toPx(), Offset(x(pk.time.epochSecond), y(pk.bpm.toDouble())))
+                }
             }
         }
         Row(Modifier.fillMaxWidth().padding(start = 34.dp)) {
