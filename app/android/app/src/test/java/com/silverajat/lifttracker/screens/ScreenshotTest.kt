@@ -112,15 +112,18 @@ class ScreenshotTest {
         }
 
     @Test fun today() = shoot("today") {
+      androidx.compose.runtime.CompositionLocalProvider(com.silverajat.lifttracker.ui.LocalTopActions provides com.silverajat.lifttracker.ui.TopActions(2, null) {}) {
         TodayContent(TodayUi(
             health = HealthState.OK, analysis = analysisPartial, todayHealth = days.last().copy(kcalTotal = 1750.0), syncedAt = System.currentTimeMillis(),
-            podReady = false, podSub = "for the gym", food = meals[today].orEmpty(), goalKg = 0.0,
+            food = meals[today].orEmpty(), goalKg = 0.0,
             take = Coach.Take(today, "- Recovery is up to 74% after your best sleep in a week: HRV is back above normal.\n" +
                 "- Net calories averaged +190 against a +275 goal, and the scale agrees: you're gaining slowly.\n" +
                 "- Incline bench has gone up three sessions running.\nToday:\n- Lower day: push the top sets, you're recovered.\n" +
                 "- Add a Meiji tonight to close the calorie gap.", System.currentTimeMillis()),
             taking = false, takeError = null, hasKey = true, date = today, now = LocalTime.of(14, 30),
+            podReady = true, podSub = "37%",
         ))
+      }
     }
 
     @Test fun todayEmpty() = shoot("today_new_user") {
