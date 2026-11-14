@@ -335,6 +335,20 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteActivity(id: String) { activityStore.delete(id); manualHr.remove(id); refreshActivities() }
 
+    /** The heart-rate curve and breakdown for one activity's page (null until the Fitbit has synced it). */
+    suspend fun analyzeActivity(item: com.silverajat.lifttracker.activity.ActivityItem): com.silverajat.lifttracker.activity.SportAnalysis.Result? {
+        if (_healthState.value != HealthState.OK) return null
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val samples = health.hrSamples(item.start.minusSeconds(60), item.end.plusSeconds(240))
+                val st = health.activityStats(item.start, item.end)
+                val rest = _days.value.lastOrNull { it.restingHr != null }?.restingHr
+                com.silverajat.lifttracker.activity.SportAnalysis.analyze(item.sport, item.start, item.end, samples, rest, _hrMax.value,
+                    st.steps, st.kcal, item.strain, _items.value.filter { it.key != item.key })
+            }.getOrNull()
+        }
+    }
+
     // ---- GPT's daily take ------------------------------------------------------------------
     private val _take = MutableStateFlow(com.silverajat.lifttracker.chat.Coach.load(app.filesDir))
     val take: StateFlow<com.silverajat.lifttracker.chat.Coach.Take?> = _take

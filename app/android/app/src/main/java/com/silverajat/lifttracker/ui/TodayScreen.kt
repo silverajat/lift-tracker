@@ -124,8 +124,11 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
     if (logging) LogActivityDialog(com.silverajat.lifttracker.activity.Sport.FOOTBALL, onDismiss = { logging = false }) { sp, st, m, km, note ->
         hub.addActivity(sp, st, m, km, note); logging = false
     }
-    info?.let { it -> ActivityInfo(it, onDismiss = { info = null }, onDelete = it.manualId?.let { id -> { hub.deleteActivity(id); info = null } },
-        onChange = { s -> hub.changeType(it, s); info = null }) }
+    info?.let { it ->
+        androidx.activity.compose.BackHandler { info = null }
+        ActivityScreen(hub, it, onBack = { info = null })
+        return
+    }
     detail?.let { d ->
         androidx.activity.compose.BackHandler { detail = null }
         when (d) {

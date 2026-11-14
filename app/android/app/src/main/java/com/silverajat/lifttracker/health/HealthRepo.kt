@@ -247,6 +247,13 @@ class HealthRepo(private val context: Context) {
             trimp = Scores.load(s, restingHr, hrMax)?.trimp)
     }
 
+    /** Every heart-rate reading in a window, oldest first (the curve on an activity's page). */
+    suspend fun hrSamples(from: Instant, to: Instant): List<HrSample> {
+        if (HealthPermission.getReadPermission(HeartRateRecord::class) !in granted()) return emptyList()
+        return runCatching { readAll(HeartRateRecord::class, from, to).flatMap { r -> r.samples.map { HrSample(it.time, it.beatsPerMinute.toInt()) } } }
+            .getOrDefault(emptyList()).filter { it.time >= from && it.time <= to }.sortedBy { it.time }
+    }
+
     /** Steps in a window (e.g. the 45 min after a meal), or null without permission. */
     suspend fun steps(from: Instant, to: Instant): Long? {
         if (HealthPermission.getReadPermission(StepsRecord::class) !in granted()) return null

@@ -216,6 +216,21 @@ class ScreenshotTest {
     @Test fun strainDetail() = shoot("detail_strain") { com.silverajat.lifttracker.ui.StrainDetail(analysis, days, items, 0.0, {}, {}, {}) }
     @Test fun sleepDetail() = shoot("detail_sleep") { com.silverajat.lifttracker.ui.SleepDetail(analysis, days) {} }
     @Test fun runDetail() = shoot("run_detail") { com.silverajat.lifttracker.ui.RunDetail(acts[0], items.first { it.manualId == "r1" }, {}, {}) }
+    @Test fun badmintonDetail() = shoot("activity_badminton") {
+        val item = items.first { it.manualId == "b1" }
+        val samples = (0..(93 * 12)).map { i ->
+            val sec = i * 5L
+            val bpm = when {
+                sec > 90 * 60 -> (158 - (sec - 90 * 60) / 3).toInt()
+                sec % 270 in 0..45 -> 168 + rnd.nextInt(14)
+                else -> 128 + rnd.nextInt(18) + (if (sec > 50 * 60) -6 else 0)
+            }
+            com.silverajat.lifttracker.health.HrSample(item.start.plusSeconds(sec), bpm)
+        }
+        val a = com.silverajat.lifttracker.activity.SportAnalysis.analyze(item.sport, item.start, item.end, samples, 56, 196, 6120, 812.0, item.strain,
+            listOf(item.copy(key = "x1", start = item.start.minusSeconds(4 * 86400), strain = 9.1), item.copy(key = "x2", start = item.start.minusSeconds(9 * 86400), strain = 8.7)))
+        com.silverajat.lifttracker.ui.ActivityDetail(item, a, false, {})
+    }
     @Test fun liveRun() = shoot("run_live") {
         com.silverajat.lifttracker.ui.LiveSession(com.silverajat.lifttracker.activity.RunTracker.State(
             active = true, startMs = System.currentTimeMillis() - 1_520_000, distanceM = 4630.0, points = route.take(185),

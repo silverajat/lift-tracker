@@ -82,15 +82,22 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
         val run = acts.firstOrNull { it.id == id }
         if (run != null) {
             BackHandler { runOpen = null }
-            RunDetail(run, items.firstOrNull { it.manualId == id }, onBack = { runOpen = null }, onDelete = { hub.deleteActivity(id); runOpen = null })
+            val item = items.firstOrNull { it.manualId == id }
+            val hr by androidx.compose.runtime.produceState<com.silverajat.lifttracker.activity.SportAnalysis.Result?>(null, item?.key, item?.end) {
+                value = item?.let { hub.analyzeActivity(it) }
+            }
+            RunDetail(run, item, onBack = { runOpen = null }, onDelete = { hub.deleteActivity(id); runOpen = null }, hr = hr)
             return
         }
     }
     if (live.active) { LiveSession(live, onFinish = { note -> RunTracker.stop(ctx, note) }); return }
 
     logSport?.let { sp -> LogActivityDialog(sp, onDismiss = { logSport = null }) { s, start, min, km, note -> hub.addActivity(s, start, min, km, note); logSport = null } }
-    info?.let { it -> ActivityInfo(it, onDismiss = { info = null }, onDelete = it.manualId?.let { id -> { hub.deleteActivity(id); info = null } },
-        onChange = { s -> hub.changeType(it, s); info = null }) }
+    info?.let { it ->
+        BackHandler { info = null }
+        ActivityScreen(hub, it, onBack = { info = null })
+        return
+    }
 
     fun open(it: ActivityItem) {
         when {
@@ -339,7 +346,8 @@ fun Route(points: List<RoutePoint>, color: Color, modifier: Modifier = Modifier.
 // ---- a finished run ----------------------------------------------------------------------------
 
 @Composable
-fun RunDetail(r: Activity, item: ActivityItem?, onBack: () -> Unit, onDelete: () -> Unit) {
+fun RunDetail(r: Activity, item: ActivityItem?, onBack: () -> Unit, onDelete: () -> Unit,
+              hr: com.silverajat.lifttracker.activity.SportAnalysis.Result? = null) {
     val zone = ZoneId.systemDefault()
     val start = Instant.ofEpochMilli(r.startMs).atZone(zone)
     var confirm by remember { mutableStateOf(false) }
@@ -373,6 +381,7 @@ fun RunDetail(r: Activity, item: ActivityItem?, onBack: () -> Unit, onDelete: ()
                     }
                 }
             }
+            if (hr != null) heartRateSections(hr)
             if (r.splitsS.isNotEmpty()) item {
                 Column {
                     Text("Splits", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
