@@ -87,7 +87,7 @@ object PixelPlant {
     }
 
     private fun bamboo(g: Grid, bx: Int, by: Int, h: Int, level: Int, pal: IntArray, rnd: Random) {
-        val xs = listOf(0, -4, 4, -7, 7).take(min(1 + level / 2, 5))
+        val xs = listOf(0, -5, 5, -10, 10).take(min(1 + level / 2, 5))
         xs.forEachIndexed { i, off ->
             val sh = (h * (if (i == 0) 1f else 0.65f + 0.3f * rnd.nextFloat())).roundToInt().coerceAtLeast(3)
             val x = bx + off - 1
