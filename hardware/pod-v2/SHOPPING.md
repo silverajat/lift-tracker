@@ -1,6 +1,7 @@
-# Pod v2: order status and shopping list (Nov 13, 2026)
+# Pod v2: order status and shopping list (updated Nov 14, 2026)
 
-## JLC order: placed, awaiting payment
+## JLC order W2026111321500069: PAID Nov 14 (PCB + 2 assembled + 2 resin cases, US$164.09)
+The case passed the thin-wall review with the fixed lugs. Next: wait for both parcels, then assemble (see the walkthrough below).
 - PCB: 5 boards, 4 layers, 0.8 mm, black, ENIG. Standard PCBA (X-ray), top side, 2 boards.
   Checked in the cart: U102 = LSM6DSV16XTR (C5267406), placement preview OK.
   JLC shows 71 x 70 mm because it adds edge rails for Standard PCBA (snap off).
