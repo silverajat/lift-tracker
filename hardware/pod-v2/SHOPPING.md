@@ -61,3 +61,6 @@ PUI HD-EM0802-LW15-R 276-753 (S$3.36, 8 x 2 mm). Not 276-754 (3 mm thick).
 - Motor buzzes from the app: **1 buzz = rest done**, **2 buzzes = set starting**
   (new OP_BUZZ [op][count] command; the app sends it at rest end and when the countdown finishes).
 - Port the logger from the XIAO to the E73 + LSM6DSV16X (SPI), W25Q16 flash, LEDs, motor, charge status.
+- No more laptop dumps: sets already reach the phone live over Bluetooth, so the new firmware should
+  (a) send any set the phone missed over BLE when it reconnects, then (b) free that space on the
+  pod's flash automatically. Add an erase-over-BLE command for the app.

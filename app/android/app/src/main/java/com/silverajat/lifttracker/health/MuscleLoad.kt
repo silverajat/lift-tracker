@@ -25,13 +25,13 @@ import kotlin.math.roundToInt
  *   muscle     = legs 1.3, back/chest 1.0, shoulders 0.75, arms 0.6, core 0.5
  *   warm-ups   × 0.3
  *
- * Session score: muscular strain 0-21 = 21(1 − e^(−load/140)); a normal hard
+ * Session score: muscular strain 0-21 = 21(1 − e^(−load/260)); a normal hard
  * session lands around 11-13. For the day's Strain, a quarter of the load is
  * added to the heart-rate load (TRIMP), so a hard session adds ~3-5 points.
  */
 object MuscleLoad {
     const val TO_TRIMP = 0.25
-    private const val SCALE = 140.0
+    private const val SCALE = 260.0   // a full 20-set day near failure lands ~13; was 140 (read 17.7 "brutal" for a normal lower day)
 
     data class SetScore(val log: SetLog, val load: Double, val rir: Double?, val intensity: Double)
     data class SessionLoad(val load: Double, val strain: Double, val sets: List<SetScore>, val byGroup: Map<Group, Double>)
