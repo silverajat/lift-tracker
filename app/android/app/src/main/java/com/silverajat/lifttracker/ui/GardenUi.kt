@@ -140,7 +140,7 @@ private fun FocusCard(g: GardenUi, act: GardenActions) {
             Text("${areaEmoji(a.area)} ${if (a.area == Area.STUDY) "Studying" else "Working"}" + if (a.label.isNotBlank()) ": ${a.label}" else "",
                 style = MaterialTheme.typography.titleMedium, color = C.Muted)
             PlantArt(a.area, p.level, p.progress, dry = false, growing = true, modifier = Modifier.fillMaxWidth().height(200.dp))
-            Text(clock(s), style = MaterialTheme.typography.displayMedium.merge(Tnum))
+            Text(focusClock(s), style = MaterialTheme.typography.displayMedium.merge(Tnum))
             Text("${a.area.label} Lv ${p.level} · ${(p.progress * 100).toInt()}% to Lv ${p.level + 1}", style = MaterialTheme.typography.bodyMedium, color = areaColor(a.area))
             if (a.awayS >= 60) Text("Paused ${a.awayS / 60} min while you were in other apps", style = MaterialTheme.typography.bodySmall, color = C.Muted)
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp), modifier = Modifier.padding(top = 6.dp)) {
@@ -151,7 +151,7 @@ private fun FocusCard(g: GardenUi, act: GardenActions) {
     }
 }
 
-private fun clock(s: Long) = if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+private fun focusClock(s: Long) = if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
 
 @Composable
 private fun PlantCard(p: Garden.Plant, modifier: Modifier) {
