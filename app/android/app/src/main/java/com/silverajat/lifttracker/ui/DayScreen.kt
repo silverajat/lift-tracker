@@ -114,7 +114,7 @@ fun DayScreen(
         com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active), today, zone, now)
     val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() }, shopping = shopping)
     DayContent(ui, garden = GardenUi(plants, active, focus, now), gAct = GardenActions(
-        start = { a, l -> g.start(a, l) }, stop = { g.stop() }, discard = g::discard, delete = g::delete,
+        start = { a, l -> g.start(a, l) }, stop = { g.stop() }, discard = g::discard, delete = g::delete, save = g::save,
     ), act = DayActions(
         add = { t, m, d -> if (d == null) j.add(t, m) else j.add(t, m, d) },
         toggle = j::toggle, edit = { id, t -> j.edit(id, t) }, remove = { j.remove(it) }, promote = { j.promote(it) },

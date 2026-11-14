@@ -80,6 +80,7 @@ class GardenActions(
     val stop: () -> Unit = {},
     val discard: () -> Unit = {},
     val delete: (String) -> Unit = {},
+    val save: (FocusSession) -> Unit = {},
 )
 
 private val dT = DateTimeFormatter.ofPattern("H:mm")
@@ -96,7 +97,7 @@ fun LazyListScope.gardenTab(g: GardenUi, act: GardenActions) {
             }
         }
     }
-    if (g.sessions.isNotEmpty()) item { FocusLog(g.sessions.take(12), act) }
+    item { FocusLog(g.sessions.take(20), act) }
 }
 
 /** A chunky pixel button: flat colour, black border and a hard drop shadow. */
@@ -189,21 +190,25 @@ private fun PlantCard(p: Garden.Plant, modifier: Modifier) {
 
 @Composable
 private fun FocusLog(ss: List<FocusSession>, act: GardenActions) {
-    var del by remember { mutableStateOf<FocusSession?>(null) }
-    del?.let { s ->
-        AlertDialog(onDismissRequest = { del = null }, containerColor = C.Surface, title = { Text("Delete this block?") },
-            confirmButton = { TextButton(onClick = { act.delete(s.id); del = null }) { Text("Delete", color = C.Stop) } },
-            dismissButton = { TextButton(onClick = { del = null }) { Text("Cancel", color = C.Muted) } })
+    var editing by remember { mutableStateOf<FocusSession?>(null) }
+    var adding by remember { mutableStateOf(false) }
+    if (adding) FocusLogDialog(null, onDismiss = { adding = false }, onDelete = null) { act.save(it); adding = false }
+    editing?.let { s ->
+        FocusLogDialog(s, onDismiss = { editing = null }, onDelete = { act.delete(s.id); editing = null }) { act.save(it); editing = null }
     }
     val z = ZoneId.systemDefault()
     val today = LocalDate.now(z)
     Column {
-        Text("FOCUS LOG", style = pxTitle(13), modifier = Modifier.padding(start = 4.dp, bottom = 12.dp))
+        Row(Modifier.padding(start = 4.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("FOCUS LOG", style = pxTitle(13), modifier = Modifier.weight(1f))
+            Text("+ Add past", style = px(14, C.Accent), modifier = Modifier.clickable { adding = true }.padding(4.dp))
+        }
         Card(Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (ss.isEmpty()) Text("Nothing yet. Start a block above, or add one you already did.", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                 ss.forEach { s ->
                     val t = Instant.ofEpochMilli(s.startMs).atZone(z)
-                    Row(Modifier.fillMaxWidth().clickable { del = s }, verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().clickable { editing = s }, verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.padding(end = 12.dp).size(8.dp, 26.dp).background(areaColor(s.area)))
                         Column(Modifier.weight(1f)) {
                             Text(s.label.ifBlank { s.area.label }, style = MaterialTheme.typography.bodyLarge)
@@ -216,6 +221,68 @@ private fun FocusLog(ss: List<FocusSession>, act: GardenActions) {
             }
         }
     }
+}
+
+/** Add a study/work block you already did, or fix one: area, what on, day, start time, minutes. */
+@Composable
+private fun FocusLogDialog(s: FocusSession?, onDismiss: () -> Unit, onDelete: (() -> Unit)?, onSave: (FocusSession) -> Unit) {
+    val z = ZoneId.systemDefault()
+    val today = LocalDate.now(z)
+    val start0 = s?.let { Instant.ofEpochMilli(it.startMs).atZone(z) } ?: java.time.ZonedDateTime.now(z).minusHours(1).withMinute(0)
+    var area by remember { mutableStateOf(s?.area ?: Area.STUDY) }
+    var label by remember { mutableStateOf(s?.label ?: "") }
+    var daysAgo by remember { mutableIntStateOf((today.toEpochDay() - start0.toLocalDate().toEpochDay()).toInt().coerceAtLeast(0)) }
+    var hour by remember { mutableIntStateOf(start0.hour) }
+    var minute by remember { mutableIntStateOf(start0.minute) }
+    var mins by remember { mutableStateOf(s?.minutes?.toString() ?: "60") }
+    var picking by remember { mutableStateOf(false) }
+    var confirm by remember { mutableStateOf(false) }
+    if (picking) TimeDialog(hour, minute, onDismiss = { picking = false }) { h, m -> hour = h; minute = m; picking = false }
+    if (confirm && onDelete != null) AlertDialog(onDismissRequest = { confirm = false }, containerColor = C.Surface, title = { Text("Delete this block?") },
+        confirmButton = { TextButton(onClick = { confirm = false; onDelete() }) { Text("Delete", color = C.Stop) } },
+        dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel", color = C.Muted) } })
+    val colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = C.Accent, unfocusedBorderColor = C.Line, focusedTextColor = C.Text, unfocusedTextColor = C.Text)
+    val day = today.minusDays(daysAgo.toLong())
+    AlertDialog(
+        onDismissRequest = onDismiss, containerColor = C.Surface,
+        title = { Text(if (s == null) "Add a past block" else "Edit block") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    listOf(Area.STUDY, Area.WORK).forEach { a ->
+                        Text(a.label.uppercase(), style = px(14, if (a == area) Ink else C.Muted), textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f).background(if (a == area) areaColor(a) else C.Raised).clickable { area = a }.padding(vertical = 10.dp))
+                    }
+                }
+                OutlinedTextField(label, { label = it }, label = { Text("What on (optional)") }, singleLine = true, colors = colors,
+                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("‹", style = MaterialTheme.typography.headlineMedium, color = C.Text, modifier = Modifier.clickable { daysAgo++ }.padding(horizontal = 12.dp))
+                    Text(when (daysAgo) { 0 -> "Today"; 1 -> "Yesterday"; else -> day.format(dD) }, style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                    Text("›", style = MaterialTheme.typography.headlineMedium, color = if (daysAgo > 0) C.Text else C.Line,
+                        modifier = Modifier.clickable(enabled = daysAgo > 0) { daysAgo-- }.padding(horizontal = 12.dp))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Started", color = C.Muted)
+                    Text("%d:%02d".format(hour, minute), style = MaterialTheme.typography.titleLarge.merge(Tnum),
+                        modifier = Modifier.background(C.Raised).clickable { picking = true }.padding(horizontal = 14.dp, vertical = 6.dp))
+                    OutlinedTextField(mins, { mins = it.filter { c -> c.isDigit() }.take(3) }, label = { Text("Minutes") }, singleLine = true, colors = colors,
+                        modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                }
+                if (onDelete != null) Text("Delete", color = C.Stop, style = MaterialTheme.typography.titleSmall, modifier = Modifier.clickable { confirm = true })
+            }
+        },
+        confirmButton = {
+            val m = mins.toIntOrNull() ?: 0
+            TextButton(enabled = m in 1..720, onClick = {
+                val startMs = day.atTime(hour, minute).atZone(z).toInstant().toEpochMilli()
+                onSave(FocusSession(id = s?.id ?: java.util.UUID.randomUUID().toString().take(8), area = area, label = label.trim(),
+                    startMs = startMs, endMs = startMs + m * 60_000L, awayS = 0))
+            }) { Text("Save", color = C.Accent) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) } },
+    )
 }
 
 // ---- the pixel plants -------------------------------------------------------------

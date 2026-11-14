@@ -33,6 +33,12 @@ class GardenViewModel(app: Application) : AndroidViewModel(app) {
 
     fun discard() = setActive(null)
 
+    /** Log a block after the fact, or fix one (same id replaces it). Newest first. */
+    fun save(s: FocusSession) {
+        _sessions.value = (_sessions.value.filter { it.id != s.id } + s).sortedByDescending { it.startMs }
+        store.saveSessions(_sessions.value)
+    }
+
     fun delete(id: String) { _sessions.value = _sessions.value.filter { it.id != id }; store.saveSessions(_sessions.value) }
 
     /** You switched to another app (not just locked the phone): growth pauses. */
