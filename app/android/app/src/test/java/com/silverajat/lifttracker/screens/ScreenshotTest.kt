@@ -237,8 +237,26 @@ class ScreenshotTest {
         return com.silverajat.lifttracker.ui.DayUi(today, mapOf(today to p, y.date to y, tm.date to tm), notes, emptyList(), java.time.LocalTime.of(22, 10))
     }
     @Test fun dayPlan() = shoot("day_plan") { com.silverajat.lifttracker.ui.DayContent(journal()) }
-    @Test fun dayNotes() = shoot("day_notes") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 1) }
-    @Test fun dayPast() = shoot("day_past") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 2) }
+    @Test fun dayNotes() = shoot("day_notes") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 2) }
+    @Test fun dayPast() = shoot("day_past") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 3) }
+    private fun gardenUi(active: Boolean): com.silverajat.lifttracker.ui.GardenUi {
+        val G = com.silverajat.lifttracker.garden.Garden
+        val A = com.silverajat.lifttracker.garden.Area
+        val now = System.currentTimeMillis()
+        val focus = (1..20).map { i ->
+            com.silverajat.lifttracker.garden.FocusSession(area = if (i % 3 == 0) A.WORK else A.STUDY, label = if (i % 3 == 0) "Lift tracker app" else "EE2023",
+                startMs = now - i * 86_400_000L / 2, endMs = now - i * 86_400_000L / 2 + (40 + i * 7) * 60_000L)
+        }
+        val j = journal()
+        val plants = G.plants(G.Inputs(focus, sessions, items, emptyList(), j.pages,
+            if (active) com.silverajat.lifttracker.garden.ActiveFocus(A.STUDY, "EE2023 tutorial 6", now - 34 * 60_000L - 12_000) else null),
+            java.time.LocalDate.now(), java.time.ZoneId.systemDefault(), now)
+            .map { p -> if (p.area == com.silverajat.lifttracker.garden.Area.SLEEP) G.Plant(p.area, 2650, G.level(2650), G.progress(2650), "5/7 good nights", java.time.LocalDate.now(), 0) else p }
+        return com.silverajat.lifttracker.ui.GardenUi(plants,
+            if (active) com.silverajat.lifttracker.garden.ActiveFocus(A.STUDY, "EE2023 tutorial 6", now - 34 * 60_000L - 12_000, awayS = 180) else null, focus, now)
+    }
+    @Test fun garden() = shoot("day_garden") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 1, garden = gardenUi(false)) }
+    @Test fun gardenFocus() = shoot("day_garden_focus") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 1, garden = gardenUi(true)) }
     @Test fun badmintonDetail() = shoot("activity_badminton") {
         val item = items.first { it.manualId == "b1" }
         val samples = (0..(93 * 12)).map { i ->

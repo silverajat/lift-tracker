@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
     private val hub: HubViewModel by viewModels()
     private val journal: com.silverajat.lifttracker.journal.JournalViewModel by viewModels()
+    private val garden: com.silverajat.lifttracker.garden.GardenViewModel by viewModels()
 
     private val askNotify = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
@@ -159,7 +160,7 @@ class MainActivity : ComponentActivity() {
                         when (shown) {
                             Tab.TODAY -> TodayScreen(hub, vm, onConnectHealth = ::connectHealth, onConnectPod = ::connectPod,
                                 onOpenGym = { tab = Tab.GYM }, onOpenNet = { tab = Tab.MEALS }, journal = journal, onOpenDay = { tab = Tab.DAY })
-                            Tab.DAY -> com.silverajat.lifttracker.ui.DayScreen(journal)
+                            Tab.DAY -> com.silverajat.lifttracker.ui.DayScreen(journal, garden, hub, vm)
                             Tab.GYM -> when (val s = screen) {
                                 Screen.Home -> {
                                     val an by hub.analysis.collectAsStateWithLifecycle()
@@ -206,6 +207,18 @@ class MainActivity : ComponentActivity() {
 
     /** The pod is only worn at the gym: look for it on the Gym tab or during a workout. */
     private var wantPod = false
+
+    /** Focus timer: switching to another app pauses growth; just locking the phone doesn't. */
+    override fun onStop() {
+        super.onStop()
+        val screenOn = getSystemService(android.os.PowerManager::class.java)?.isInteractive ?: true
+        if (screenOn && !isChangingConfigurations) garden.leftApp()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        garden.cameBack()
+    }
 
     override fun onResume() {
         super.onResume()

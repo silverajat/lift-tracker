@@ -87,13 +87,28 @@ data class DayUi(
 )
 
 @Composable
-fun DayScreen(j: JournalViewModel) {
+fun DayScreen(
+    j: JournalViewModel, g: com.silverajat.lifttracker.garden.GardenViewModel,
+    hub: com.silverajat.lifttracker.HubViewModel, gym: com.silverajat.lifttracker.AppViewModel,
+) {
     val today by j.today.collectAsStateWithLifecycle()
     val pages by j.pages.collectAsStateWithLifecycle()
     val notes by j.notes.collectAsStateWithLifecycle()
+    val focus by g.sessions.collectAsStateWithLifecycle()
+    val active by g.active.collectAsStateWithLifecycle()
+    val sessions by gym.history.collectAsStateWithLifecycle()
+    val items by hub.items.collectAsStateWithLifecycle()
+    val an by hub.analysis.collectAsStateWithLifecycle()
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(active) { while (active != null) { now = System.currentTimeMillis(); kotlinx.coroutines.delay(1000) } }
     LaunchedEffect(Unit) { j.refresh() }
+    val zone = ZoneId.systemDefault()
+    val plants = com.silverajat.lifttracker.garden.Garden.plants(
+        com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active), today, zone, now)
     val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() })
-    DayContent(ui, DayActions(
+    DayContent(ui, garden = GardenUi(plants, active, focus, now), gAct = GardenActions(
+        start = { a, l -> g.start(a, l) }, stop = { g.stop() }, discard = g::discard, delete = g::delete,
+    ), act = DayActions(
         add = { t, m, d -> if (d == null) j.add(t, m) else j.add(t, m, d) },
         toggle = j::toggle, edit = { id, t -> j.edit(id, t) }, remove = { j.remove(it) }, promote = { j.promote(it) },
         toTomorrow = j::toTomorrow, removeTomorrow = { j.remove(it, today.plusDays(1)) },
@@ -103,7 +118,7 @@ fun DayScreen(j: JournalViewModel) {
 }
 
 @Composable
-fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0) {
+fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, garden: GardenUi? = null, gAct: GardenActions = GardenActions()) {
     var tab by rememberSaveable { mutableStateOf(startTab) }
     val page = u.pages[u.today] ?: DayPage(u.today)
     var editing by remember { mutableStateOf<Task?>(null) }
@@ -123,7 +138,7 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0) {
                     Text(u.today.format(dHead), style = MaterialTheme.typography.titleMedium, color = C.Muted)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Plan", "Notes", "Past").forEachIndexed { i, s ->
+                    listOf("Plan", "Garden", "Notes", "Past").forEachIndexed { i, s ->
                         Text(s, style = MaterialTheme.typography.titleSmall, color = if (tab == i) C.Text else C.Muted,
                             modifier = Modifier.clip(RoundedCornerShape(50)).background(if (tab == i) C.Raised else C.Bg)
                                 .clickable { tab = i }.padding(horizontal = 16.dp, vertical = 8.dp))
@@ -133,7 +148,8 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0) {
         }
         when (tab) {
             0 -> planTab(u, page, act) { editing = it }
-            1 -> notesTab(u, act) { editingNote = it }
+            1 -> if (garden != null) gardenTab(garden, gAct)
+            2 -> notesTab(u, act) { editingNote = it }
             else -> pastTab(u)
         }
     }
