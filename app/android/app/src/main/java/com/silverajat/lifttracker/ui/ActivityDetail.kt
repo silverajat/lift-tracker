@@ -183,7 +183,7 @@ fun LazyListScope.heartRateSections(a: SportAnalysis.Result) {
 @Composable
 private fun DSection(title: String, content: @Composable () -> Unit) {
     Column {
-        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+        Text(title, style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
         Card(Modifier.fillMaxWidth()) { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { content() } }
     }
 }

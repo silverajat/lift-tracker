@@ -81,6 +81,18 @@ val BarlowCondensed = FontFamily(
     Font(R.font.barlow_condensed_bold, FontWeight.ExtraBold),
 )
 
+/** Pixel fonts (both SIL Open Font License, see docs/fonts): headings across the app and the garden. */
+val PixelFont = FontFamily(Font(R.font.silkscreen))
+val PixelTitle = FontFamily(Font(R.font.press_start))
+
+/** The pixel touches: screen titles, section headings and the tab labels. Numbers and body text stay in Barlow. */
+object Pix {
+    val screen = TextStyle(fontFamily = PixelTitle, fontSize = 19.sp, lineHeight = 28.sp)
+    val bar = TextStyle(fontFamily = PixelTitle, fontSize = 13.sp, lineHeight = 20.sp)
+    val section = TextStyle(fontFamily = PixelFont, fontSize = 19.sp, lineHeight = 24.sp)
+    val tab = TextStyle(fontFamily = PixelFont, fontSize = 10.sp, lineHeight = 12.sp)
+}
+
 /** Tabular figures so timers and counts don't jitter. */
 val Tnum = TextStyle(fontFeatureSettings = "tnum")
 

@@ -212,7 +212,7 @@ class MainActivity : ComponentActivity() {
                                         Tab.MEALS -> Icons.Filled.Restaurant
                                     }, t.title)
                                 },
-                                label = { Text(t.title, maxLines = 1) },
+                                label = { Text(t.title, style = com.silverajat.lifttracker.ui.Pix.tab, maxLines = 1) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = C.Text, selectedTextColor = C.Text, indicatorColor = C.Raised,
                                     unselectedIconColor = C.Muted, unselectedTextColor = C.Muted,

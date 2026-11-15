@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Spotter: one line drawing, a heartbeat inside a ring (a plate). 108 dp adaptive canvas. -->
+<!-- Life: a pixel heart with a white shine, on black. 108 dp adaptive canvas, 4 dp pixels. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#00000000" android:strokeColor="#FF1A1F27" android:strokeWidth="6"
-        android:pathData="M54,27a27,27 0 1,0 0.01,0z" />
-    <path android:fillColor="#00000000" android:strokeColor="#FF1A1F27" android:strokeWidth="6"
-        android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M37,55L44,55L49,45L56,65L61,52L65,55L71,55" />
+    <path android:fillColor="#FF5E0B14" android:pathData="M36,30h4v4h-4zM40,30h4v4h-4zM44,30h4v4h-4zM60,30h4v4h-4zM64,30h4v4h-4zM68,30h4v4h-4zM32,34h4v4h-4zM48,34h4v4h-4zM56,34h4v4h-4zM72,34h4v4h-4zM28,38h4v4h-4zM52,38h4v4h-4zM76,38h4v4h-4zM28,42h4v4h-4zM76,42h4v4h-4zM28,46h4v4h-4zM76,46h4v4h-4zM28,50h4v4h-4zM76,50h4v4h-4zM32,54h4v4h-4zM72,54h4v4h-4zM36,58h4v4h-4zM68,58h4v4h-4zM40,62h4v4h-4zM64,62h4v4h-4zM44,66h4v4h-4zM60,66h4v4h-4zM48,70h4v4h-4zM56,70h4v4h-4zM52,74h4v4h-4z" />
+    <path android:fillColor="#FFE5323D" android:pathData="M36,34h4v4h-4zM40,34h4v4h-4zM44,34h4v4h-4zM60,34h4v4h-4zM64,34h4v4h-4zM68,34h4v4h-4zM32,38h4v4h-4zM44,38h4v4h-4zM48,38h4v4h-4zM56,38h4v4h-4zM60,38h4v4h-4zM64,38h4v4h-4zM68,38h4v4h-4zM72,38h4v4h-4zM32,42h4v4h-4zM44,42h4v4h-4zM48,42h4v4h-4zM52,42h4v4h-4zM56,42h4v4h-4zM60,42h4v4h-4zM64,42h4v4h-4zM68,42h4v4h-4zM72,42h4v4h-4zM32,46h4v4h-4zM40,46h4v4h-4zM44,46h4v4h-4zM48,46h4v4h-4zM52,46h4v4h-4zM56,46h4v4h-4zM60,46h4v4h-4zM64,46h4v4h-4zM68,46h4v4h-4zM72,46h4v4h-4zM32,50h4v4h-4zM36,50h4v4h-4zM40,50h4v4h-4zM44,50h4v4h-4zM48,50h4v4h-4zM52,50h4v4h-4zM56,50h4v4h-4zM60,50h4v4h-4zM64,50h4v4h-4zM68,50h4v4h-4zM36,54h4v4h-4zM40,54h4v4h-4zM44,54h4v4h-4zM48,54h4v4h-4zM52,54h4v4h-4zM56,54h4v4h-4zM60,54h4v4h-4zM64,54h4v4h-4zM40,58h4v4h-4zM44,58h4v4h-4zM48,58h4v4h-4zM52,58h4v4h-4zM56,58h4v4h-4zM60,58h4v4h-4zM44,62h4v4h-4zM48,62h4v4h-4zM52,62h4v4h-4zM56,62h4v4h-4zM48,66h4v4h-4zM52,66h4v4h-4z" />
+    <path android:fillColor="#FFA11B26" android:pathData="M72,50h4v4h-4zM68,54h4v4h-4zM64,58h4v4h-4zM60,62h4v4h-4zM56,66h4v4h-4zM52,70h4v4h-4z" />
+    <path android:fillColor="#FFFF9AA0" android:pathData="M40,42h4v4h-4zM36,46h4v4h-4z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M36,38h4v4h-4zM40,38h4v4h-4zM36,42h4v4h-4z" />
 </vector>

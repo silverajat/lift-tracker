@@ -154,7 +154,7 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, gard
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Productivity", style = MaterialTheme.typography.headlineLarge)
+                        Text("Productivity", style = Pix.screen)
                         Text(u.today.format(dHead), style = MaterialTheme.typography.titleMedium, color = C.Muted)
                     }
                     TopActionIcons()
@@ -277,7 +277,7 @@ private fun Reflect(u: DayUi, page: DayPage, act: DayActions) {
 private fun Block(title: String, progress: String? = null, highlight: Boolean = false, content: @Composable () -> Unit) {
     Column {
         Row(Modifier.padding(start = 4.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            Text(title, style = Pix.section, modifier = Modifier.weight(1f))
             if (progress != null) Text(progress, style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Muted)
         }
         Card(Modifier.fillMaxWidth(), border = if (highlight) C.Accent.copy(alpha = 0.6f) else androidx.compose.ui.graphics.Color.Transparent) {
@@ -289,9 +289,10 @@ private fun Block(title: String, progress: String? = null, highlight: Boolean = 
 @Composable
 private fun TaskRow(t: Task, act: DayActions, onEdit: (Task) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(26.dp).clip(CircleShape)
+        // square, pixel-style tick box
+        Box(Modifier.size(24.dp).clip(RoundedCornerShape(3.dp))
             .background(if (t.done) C.Accent else C.Bg)
-            .border(1.5.dp, if (t.done) C.Accent else C.Line, CircleShape)
+            .border(2.dp, if (t.done) C.Accent else C.Line, RoundedCornerShape(3.dp))
             .clickable { act.toggle(t.id) }, contentAlignment = Alignment.Center) {
             if (t.done) Text("✓", color = C.Bg, style = MaterialTheme.typography.labelLarge)
         }

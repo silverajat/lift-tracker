@@ -132,12 +132,12 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
         item {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Movement", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+                    Text("Movement", style = Pix.screen, modifier = Modifier.weight(1f))
                     TopActionIcons()
                 }
                 if (gym != null) GymTile(gymHistory, gymPlan, onOpenGymHome)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Sports", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                    Text("Sports", style = Pix.section, modifier = Modifier.weight(1f))
                     Text("‹", style = MaterialTheme.typography.headlineMedium, color = C.Text,
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { monthKey = month.minusMonths(1).toString() }.padding(horizontal = 12.dp))
                     Text(if (month.year == LocalDate.now().year) monthName else "$monthName ${month.year}", style = MaterialTheme.typography.titleMedium)
@@ -189,7 +189,7 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
 
         if (other.isNotEmpty()) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Other, from your Fitbit", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp))
+                Text("Other, from your Fitbit", style = Pix.section, modifier = Modifier.padding(start = 4.dp))
                 ShortList(other, ::open, "")
             }
         }
@@ -231,7 +231,7 @@ private fun ShortList(list: List<ActivityItem>, onOpen: (ActivityItem) -> Unit, 
 @Composable
 private fun SectionHead(title: String, action: String, onAction: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+        Text(title, style = Pix.section, modifier = Modifier.weight(1f))
         Text(action, style = MaterialTheme.typography.titleSmall, color = C.Accent, modifier = Modifier.clickable(onClick = onAction).padding(4.dp))
     }
 }
@@ -466,7 +466,7 @@ fun RunDetail(r: Activity, item: ActivityItem?, onBack: () -> Unit, onDelete: ()
             if (hr != null) heartRateSections(hr)
             if (r.splitsS.isNotEmpty()) item {
                 Column {
-                    Text("Splits", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+                    Text("Splits", style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
                     Card(Modifier.fillMaxWidth()) {
                         val fastest = r.splitsS.min(); val slowest = r.splitsS.max()
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

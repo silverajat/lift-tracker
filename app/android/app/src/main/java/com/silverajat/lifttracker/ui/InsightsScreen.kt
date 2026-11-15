@@ -78,7 +78,7 @@ fun InsightsScreen(hub: HubViewModel) {
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Notifications", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                Text("Notifications", style = Pix.screen, modifier = Modifier.weight(1f))
                 TopActionIcons()
             }
         }

@@ -61,9 +61,6 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.floor
 import kotlin.math.min
 
-/** Pixel fonts for the garden (both SIL Open Font License, see docs/fonts). */
-val PixelFont = FontFamily(Font(R.font.silkscreen))
-val PixelTitle = FontFamily(Font(R.font.press_start))
 private fun px(size: Int, color: Color = C.Text) = TextStyle(fontFamily = PixelFont, fontSize = size.sp, color = color, lineHeight = (size + 4).sp)
 private fun pxTitle(size: Int, color: Color = C.Text) = TextStyle(fontFamily = PixelTitle, fontSize = size.sp, color = color, lineHeight = (size + 6).sp)
 private val Ink = Color(0xFF0B0D10)
