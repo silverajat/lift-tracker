@@ -70,7 +70,30 @@ object Analysis {
         val needStrainMin: Int = 0, val needDebtMin: Int = 0,
         val deepMin: Int = 0, val remMin: Int = 0, val lightMin: Int = 0, val awakeMin: Int = 0,
         val stages: List<SleepStage> = emptyList(),
+        val score: Int = performance,
+        val scoreParts: List<ScorePart> = emptyList(),
     )
+
+    /** One piece of the sleep score: its own 0-100, and its share of the total. */
+    data class ScorePart(val name: String, val value: String, val score: Int, val weight: Double, val about: String)
+
+    /**
+     * SLEEP SCORE (0-100), WHOOP-style: not just hours. Hours vs need 55%,
+     * consistency 15%, efficiency 15%, restorative (deep + REM) 15%; the weights
+     * renormalise over what the Fitbit gave. 85+ optimal, 70-84 sufficient, below 70 poor.
+     */
+    fun sleepScore(performance: Int, consistency: Int?, efficiency: Int?, restorativePct: Int?): Pair<Int, List<ScorePart>> {
+        val parts = listOfNotNull(
+            ScorePart("Hours vs needed", "$performance%", performance.coerceIn(0, 100), 0.55, "asleep compared with what you needed"),
+            consistency?.let { ScorePart("Consistency", "$it%", it.coerceIn(0, 100), 0.15, "bed and wake times vs the last few nights") },
+            efficiency?.let { ScorePart("Efficiency", "$it%", ((it - 70) * 4).coerceIn(0, 100), 0.15, "time asleep while in bed; 95% scores full") },
+            restorativePct?.let { ScorePart("Restorative", "$it%", ((it - 20) * 5).coerceIn(0, 100), 0.15, "deep + REM share; 40%+ scores full") },
+        )
+        val score = (parts.sumOf { it.score * it.weight } / parts.sumOf { it.weight }).roundToInt().coerceIn(0, 100)
+        return score to parts
+    }
+
+    fun sleepZone(score: Int) = when { score >= 85 -> Zone.GREEN; score >= 70 -> Zone.YELLOW; else -> Zone.RED }
 
     /** trimp = heart-rate load + the gym's muscular load (MuscleLoad.TO_TRIMP of it); liftStrain = that day's session score. */
     data class StrainResult(val strain: Double, val target: ClosedFloatingPointRange<Double>?, val trimp: Int, val moderateMin: Int, val vigorousMin: Int,
@@ -181,9 +204,14 @@ object Analysis {
         } else null
         val inBed = Duration.between(s.start, s.end).toMinutes().toInt().coerceAtLeast(1)
         val staged = s.deepMin + s.remMin + s.lightMin > 0
+        val perf = (s.totalMin * 100.0 / need).roundToInt().coerceIn(0, 100)
+        val eff = if (staged) (s.totalMin * 100 / inBed).coerceIn(0, 100) else null
+        val restorative = if (staged && s.totalMin > 0) (s.deepMin + s.remMin) * 100 / s.totalMin else null
+        val (score, parts) = sleepScore(perf, consistency, eff, restorative)
         return SleepResult(
+            score = score, scoreParts = parts,
             needMin = need.roundToInt(), asleepMin = s.totalMin,
-            performance = (s.totalMin * 100.0 / need).roundToInt().coerceIn(0, 100),
+            performance = perf,
             debtMin = debt.roundToInt(), consistency = consistency,
             efficiency = if (staged) (s.totalMin * 100 / inBed).coerceIn(0, 100) else null,
             deepPct = if (staged && s.totalMin > 0) s.deepMin * 100 / s.totalMin else null,

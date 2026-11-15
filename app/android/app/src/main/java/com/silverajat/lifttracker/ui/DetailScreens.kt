@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -406,16 +407,37 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
         if (s == null) { item { Text("No sleep synced for last night yet. Wear the Fitbit to bed and open Google Health in the morning.", color = C.Muted) }; return@DetailPage }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val zc = when (Analysis.sleepZone(s.score)) { Analysis.Zone.GREEN -> Recover; Analysis.Zone.YELLOW -> Yellow; Analysis.Zone.RED -> C.Stop }
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text("${s.performance}", style = MaterialTheme.typography.displayLarge.merge(Tnum), color = SleepPurple)
-                    Text("%", style = MaterialTheme.typography.displaySmall, color = SleepPurple, modifier = Modifier.padding(bottom = 14.dp))
+                    Text("${s.score}", style = MaterialTheme.typography.displayLarge.merge(Tnum), color = SleepPurple)
                     Spacer(Modifier.width(14.dp))
-                    Text("of the sleep\nyou needed", style = MaterialTheme.typography.titleSmall, color = C.Muted, modifier = Modifier.padding(bottom = 18.dp))
+                    Column(Modifier.padding(bottom = 14.dp)) {
+                        Text(when (Analysis.sleepZone(s.score)) { Analysis.Zone.GREEN -> "Optimal"; Analysis.Zone.YELLOW -> "Sufficient"; Analysis.Zone.RED -> "Poor" },
+                            style = MaterialTheme.typography.headlineSmall, color = zc)
+                        Text("sleep score", style = MaterialTheme.typography.titleSmall, color = C.Muted)
+                    }
                 }
+                Text("${s.performance}% of the sleep you needed", style = MaterialTheme.typography.titleMedium)
                 NeedBar(s.asleepMin, s.needMin)
                 Row {
                     Text("${hmin(s.asleepMin)} asleep", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                     Text("${hmin(s.needMin)} needed", style = MaterialTheme.typography.titleSmall, color = C.Muted)
+                }
+            }
+        }
+        if (s.scoreParts.isNotEmpty()) block("What makes the score") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                s.scoreParts.forEach { p ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(p.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            Text(p.value, style = MaterialTheme.typography.titleMedium.merge(Tnum), color = if (p.score >= 85) Recover else if (p.score >= 60) Yellow else C.Stop)
+                        }
+                        Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(C.Raised)) {
+                            Box(Modifier.fillMaxWidth(p.score / 100f).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(SleepPurple))
+                        }
+                        Text("${(p.weight * 100).roundToInt()}% of the score · ${p.about}", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                    }
                 }
             }
         }

@@ -85,6 +85,17 @@ class HubTest {
         assertEquals("normal 52", rhr.vsNormal)
     }
 
+    @Test fun sleepScoreIsMoreThanHours() {
+        val (full, _) = Analysis.sleepScore(100, 95, 95, 45)
+        assertEquals(100, full)
+        // enough hours but messy timing, restless and light: not a great night
+        val (messy, parts) = Analysis.sleepScore(100, 40, 78, 25)
+        assertTrue(messy.toString(), messy in 60..75)
+        assertEquals(4, parts.size)
+        // only hours known: the score is just hours
+        assertEquals(80, Analysis.sleepScore(80, null, null, null).first)
+    }
+
     @Test fun recoveryZones() {
         val start = LocalDate.of(2026, 10, 1)
         val base = (0 until 20).map { i -> day(start.plusDays(i.toLong()), if (i % 2 == 0) 55.0 else 65.0, if (i % 2 == 0) 55 else 57) }

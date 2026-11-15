@@ -329,7 +329,7 @@ private fun Scoreboard(d: Analysis.Day?, onDetail: (Detail) -> Unit) {
                 Text("Sleep", style = MaterialTheme.typography.titleSmall, color = C.Muted)
                 Text(d?.sleep?.let { hmin(it.asleepMin) } ?: "Not yet", style = if (d?.sleep == null) MaterialTheme.typography.headlineSmall
                     else MaterialTheme.typography.displaySmall.merge(Tnum), color = if (d?.sleep == null) C.Muted else SleepPurple)
-                Text(d?.sleep?.let { "${it.performance}% of what you needed" } ?: if (java.time.LocalTime.now().hour in 4..13) "waiting on Fitbit" else "from your Fitbit", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                Text(d?.sleep?.let { "score ${it.score} · ${it.performance}% of need" } ?: if (java.time.LocalTime.now().hour in 4..13) "waiting on Fitbit" else "from your Fitbit", style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
     }

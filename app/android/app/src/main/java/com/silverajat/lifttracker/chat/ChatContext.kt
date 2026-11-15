@@ -104,13 +104,13 @@ object ChatContext {
         appendLine("Load = Banister TRIMP from heart rate (HRmax $hrMax). 7-day load: ${Scores.weekLoad(health)}.")
         appendLine()
         if (analysis != null) {
-            appendLine("## Analysis (formulas: recovery = HRV 0.5 / resting HR 0.2 / sleep performance 0.2 / breathing 0.1 vs his 30-day baseline, zones green>=67 yellow 34-66 red<34; strain 0-21 = 21(1-e^(-TRIMP/110)); sleep need = 7 h baseline + strain + debt)")
+            appendLine("## Analysis (formulas: recovery = HRV 0.5 / resting HR 0.2 / sleep performance 0.2 / breathing 0.1 vs his 30-day baseline, zones green>=67 yellow 34-66 red<34; strain 0-21 = 21(1-e^(-TRIMP/110)); sleep need = 7 h baseline + strain + debt; sleep score = hours vs need 55% + consistency 15% + efficiency 15% + restorative 15%, 85+ optimal, 70-84 sufficient)")
             analysis.headline.forEach { appendLine("- $it") }
             analysis.days.takeLast(14).reversed().forEach { d ->
                 val p = listOfNotNull(
                     d.recovery?.let { r -> "recovery ${r.score}% ${r.zone.label}" + r.contributors.joinToString("; ", " [", "]") { "${it.name} ${it.value} (${it.vsNormal})" } },
                     d.strain?.let { "strain ${"%.1f".format(it.strain)}" + (it.target?.let { t -> " (target ${t.start.toInt()}-${t.endInclusive.toInt()})" } ?: "") },
-                    d.sleep?.let { "sleep ${it.asleepMin} of ${it.needMin} min need (${it.performance}%), debt ${it.debtMin} min" +
+                    d.sleep?.let { "sleep score ${it.score}/100, ${it.asleepMin} of ${it.needMin} min need (${it.performance}%), debt ${it.debtMin} min" +
                         (it.consistency?.let { c -> ", consistency $c%" } ?: "") + (it.efficiency?.let { e -> ", efficiency $e%" } ?: "") },
                     d.muscular?.let { "gym volume ${r(it.volumeKg)} kg in ${it.sets} sets" + (it.vsAvgPct?.let { v -> " ($v% of his average gym day)" } ?: "") },
                     d.food?.let { "ate ${r(it.kcal)} kcal, P ${r(it.protein)}" },
