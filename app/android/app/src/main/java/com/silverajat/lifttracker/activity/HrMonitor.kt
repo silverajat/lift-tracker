@@ -120,6 +120,20 @@ object HrMonitor {
 
         @SuppressLint("MissingPermission")
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+            // battery first if it has one (one Bluetooth request at a time), then heart rate
+            val batt = g.getService(DeviceBattery.SERVICE)?.getCharacteristic(DeviceBattery.LEVEL)
+            if (batt != null && g.readCharacteristic(batt)) return
+            enableHr(g)
+        }
+
+        override fun onCharacteristicRead(g: BluetoothGatt, ch: BluetoothGattCharacteristic, value: ByteArray, status: Int) {
+            if (ch.uuid == DeviceBattery.LEVEL && status == BluetoothGatt.GATT_SUCCESS && value.isNotEmpty())
+                ctx?.let { DeviceBattery.save(it, value[0].toInt() and 0xFF) }
+            enableHr(g)
+        }
+
+        @SuppressLint("MissingPermission")
+        private fun enableHr(g: BluetoothGatt) {
             val ch = g.getService(SERVICE)?.getCharacteristic(MEASUREMENT) ?: return
             g.setCharacteristicNotification(ch, true)
             val d = ch.getDescriptor(CCCD) ?: return
