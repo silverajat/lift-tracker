@@ -381,6 +381,8 @@ private fun DayChip(label: String, on: Boolean, onClick: () -> Unit) {
 private fun Reflect(u: DayUi, page: DayPage, act: DayActions) {
     val night = u.now.hour >= 18 || u.now.hour < 4
     var text by remember(page.date) { mutableStateOf(page.reflection) }
+    var writing by remember(page.date) { mutableStateOf(page.reflection.isBlank()) }
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
     Block("Tonight", progress = null, highlight = night && page.planned && !page.reflected) {
         if (page.planned) {
             val m = page.mains; val s = page.sides
@@ -397,9 +399,26 @@ private fun Reflect(u: DayUi, page: DayPage, act: DayActions) {
                 }
             }
         }
-        OutlinedTextField(text, { text = it; act.reflect(it) }, placeholder = { Text("How did today go?", color = C.Muted) },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp), colors = dayField(),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+        if (!writing && text.isNotBlank()) {
+            // saved: show it, tap to change
+            Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth().clickable { writing = true }.padding(vertical = 4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Saved ✓", style = MaterialTheme.typography.titleSmall, color = C.Done, modifier = Modifier.weight(1f))
+                Text("Edit", style = MaterialTheme.typography.titleSmall, color = C.Accent, modifier = Modifier.clickable { writing = true }.padding(4.dp))
+            }
+        } else {
+            OutlinedTextField(text, { text = it; act.reflect(it) }, placeholder = { Text("How did today go?", color = C.Muted) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp), colors = dayField(),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Saves as you type", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.weight(1f))
+                val ok = text.isNotBlank() || page.mood != null
+                Text("Done", style = MaterialTheme.typography.titleSmall, color = if (ok) C.OnAccent else C.Muted,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (ok) C.Accent else C.Raised)
+                        .clickable(enabled = ok) { act.reflect(text.trim()); text = text.trim(); focus.clearFocus(); writing = false }
+                        .padding(horizontal = 20.dp, vertical = 9.dp))
+            }
+        }
     }
 }
 
