@@ -340,6 +340,7 @@ fun LiveSession(s: RunTracker.State, onFinish: (String) -> Unit) {
         }
         Text(ActivityLog.clock(moving), style = MaterialTheme.typography.displayLarge.merge(Tnum), color = if (s.paused) C.Muted else color)
         if (s.paused) Text("Paused", style = MaterialTheme.typography.titleMedium, color = Yellow)
+        LiveHeart(s, now)
         if (s.usesGps) {
             Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                 BigStat("%.2f".format(s.distanceM / 1000), "km")
@@ -361,6 +362,45 @@ fun LiveSession(s: RunTracker.State, onFinish: (String) -> Unit) {
             Box(Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(32.dp)).background(C.Stop).clickable { confirm = true },
                 contentAlignment = Alignment.Center) {
                 Text("Finish", style = MaterialTheme.typography.titleLarge, color = Color.White)
+            }
+        }
+    }
+}
+
+/** Live heart rate from the Fitbit Air (or any monitor sharing heart rate), coloured by zone. */
+@Composable
+private fun LiveHeart(s: RunTracker.State, now: Long) {
+    val ctx = LocalContext.current
+    val hr by com.silverajat.lifttracker.activity.HrMonitor.state.collectAsStateWithLifecycle()
+    val hrMax = remember { ctx.getSharedPreferences("hub", android.content.Context.MODE_PRIVATE).getInt("hr_max", com.silverajat.lifttracker.health.Scores.DEFAULT_HR_MAX) }
+    val fresh = hr.bpm != null && now - hr.atMs < 6000
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(C.Surface).clickable {
+        if (!fresh) {
+            if (hr.status == com.silverajat.lifttracker.activity.HrMonitor.Status.NO_PERMISSION && android.os.Build.VERSION.SDK_INT >= 31)
+                (ctx as? android.app.Activity)?.requestPermissions(arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT), 41)
+            com.silverajat.lifttracker.activity.HrMonitor.retry(ctx)
+        }
+    }.padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (fresh) {
+            val bpm = hr.bpm!!
+            val zc = hrZoneColor(bpm, hrMax)
+            val zi = com.silverajat.lifttracker.activity.SportAnalysis.zoneOf(bpm, hrMax)
+            Text("♥", style = MaterialTheme.typography.headlineLarge, color = zc, modifier = Modifier.padding(end = 12.dp))
+            Text("$bpm", style = MaterialTheme.typography.displayMedium.merge(Tnum), color = zc)
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text("bpm" + (if (zi >= 0) " · ${com.silverajat.lifttracker.activity.SportAnalysis.ZONES[zi]}" else ""), style = MaterialTheme.typography.titleMedium, color = zc)
+                Text(listOfNotNull(s.avgHr?.let { "avg $it" }, s.maxHr?.let { "max $it" }).joinToString(" · ").ifEmpty { hr.device ?: "" },
+                    style = MaterialTheme.typography.bodyMedium.merge(Tnum), color = C.Muted)
+            }
+        } else {
+            Text("♥", style = MaterialTheme.typography.headlineLarge, color = C.Muted, modifier = Modifier.padding(end = 12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(when (hr.status) {
+                    com.silverajat.lifttracker.activity.HrMonitor.Status.NO_PERMISSION -> "Tap to allow Bluetooth for heart rate"
+                    else -> "Looking for your heart rate…"
+                }, style = MaterialTheme.typography.titleMedium)
+                Text("On the Fitbit Air: Google Health → Connections → Fitbit Air → Share heart rate",
+                    style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
     }

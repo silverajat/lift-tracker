@@ -36,6 +36,9 @@ enum class Sport(val label: String, val emoji: String) {
 data class RoutePoint(val lat: Double, val lng: Double, val t: Long, val alt: Double? = null)
 
 /** Something you logged yourself, or a run you tracked with the phone's GPS. */
+/** One live heart-rate reading. */
+data class HrPoint(val t: Long, val bpm: Int)
+
 data class Activity(
     val id: String,
     val sport: Sport,
@@ -46,6 +49,7 @@ data class Activity(
     val route: List<RoutePoint> = emptyList(),
     val splitsS: List<Int> = emptyList(),   // seconds for each full km
     val elapsedS: Int = durationS,          // wall time, start to finish
+    val hr: List<HrPoint> = emptyList(),    // live heart rate, if a monitor was shared during it
 ) {
     val endMs get() = startMs + elapsedS * 1000L
     val paceSPerKm: Int? get() = distanceKm?.takeIf { it > 0.2 }?.let { (durationS / it).roundToInt() }
@@ -72,6 +76,7 @@ class ActivityStore(root: File) {
             x.distanceKm?.let { put("km", it) }
             put("note", x.note)
             put("splits", JSONArray(x.splitsS))
+            if (x.hr.isNotEmpty()) put("hr", JSONArray().apply { x.hr.forEach { h -> put((h.t - x.startMs) / 1000); put(h.bpm) } })
             // route as a flat array to keep the file small: lat, lng, t(s from start), alt
             put("route", JSONArray().apply {
                 x.route.forEach { p -> put(p.lat); put(p.lng); put((p.t - x.startMs) / 1000.0); put(p.alt ?: Double.NaN.let { 0.0 }) }
@@ -85,10 +90,12 @@ class ActivityStore(root: File) {
                 RoutePoint(r.getDouble(i * 4), r.getDouble(i * 4 + 1), start + (r.getDouble(i * 4 + 2) * 1000).toLong(), r.getDouble(i * 4 + 3))
             }
             val sp = o.optJSONArray("splits") ?: JSONArray()
+            val h = o.optJSONArray("hr") ?: JSONArray()
             return Activity(
                 o.getString("id"), runCatching { Sport.valueOf(o.getString("sport")) }.getOrDefault(Sport.OTHER), start,
                 o.getInt("dur"), if (o.has("km")) o.getDouble("km") else null, o.optString("note"), pts,
                 (0 until sp.length()).map { sp.getInt(it) }, o.optInt("elapsed", o.getInt("dur")),
+                (0 until h.length() / 2).map { i -> HrPoint(start + h.getLong(i * 2) * 1000, h.getInt(i * 2 + 1)) },
             )
         }
     }

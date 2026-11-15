@@ -364,7 +364,11 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         if (_healthState.value != HealthState.OK) return null
         return withContext(Dispatchers.IO) {
             runCatching {
-                val samples = health.hrSamples(item.start.minusSeconds(60), item.end.plusSeconds(240))
+                // live heart rate saved with the run beats the Fitbit's synced samples; the minutes after still come from the Fitbit
+                val own = item.manualId?.let { id -> activityStore.all().firstOrNull { it.id == id } }?.hr.orEmpty()
+                val synced = health.hrSamples(item.start.minusSeconds(60), item.end.plusSeconds(240))
+                val samples = if (own.size >= 10) own.map { com.silverajat.lifttracker.health.HrSample(Instant.ofEpochMilli(it.t), it.bpm) } +
+                    synced.filter { it.time > Instant.ofEpochMilli(own.last().t) } else synced
                 val st = health.activityStats(item.start, item.end)
                 val rest = _days.value.lastOrNull { it.restingHr != null }?.restingHr
                 com.silverajat.lifttracker.activity.SportAnalysis.analyze(item.sport, item.start, item.end, samples, rest, _hrMax.value,

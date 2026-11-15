@@ -26,7 +26,10 @@ object RunTracker {
         val paceSPerKm: Int? = null,      // last ~200 m
         val accuracyM: Float? = null,
         val gpsOk: Boolean = false,
+        val hr: List<HrPoint> = emptyList(),   // live heart rate (every 2 s at most), while not paused
     ) {
+        val avgHr get() = hr.takeIf { it.size >= 5 }?.map { it.bpm }?.average()?.roundToInt()
+        val maxHr get() = hr.maxOfOrNull { it.bpm }
         fun movingMs(now: Long): Long = if (!active) 0 else now - startMs - pausedTotalMs - (pausedAt?.let { now - it } ?: 0L)
         val usesGps get() = sport == Sport.RUN || sport == Sport.WALK
     }
@@ -49,6 +52,7 @@ object RunTracker {
         last = null
         splitStartMoving = 0
         _state.value = State(sport = sport, active = true, startMs = System.currentTimeMillis())
+        listenHr(ctx)
         // a run needs GPS with the screen off (a foreground service); a timed game only needs its start time
         if (sport == Sport.RUN || sport == Sport.WALK) ctx.startForegroundService(Intent(ctx, RunService::class.java)) else persist(ctx)
     }
@@ -72,7 +76,19 @@ object RunTracker {
         val pausedAt = p.getLong("pausedAt", 0).takeIf { it > 0 }
         _state.value = State(sport = sport, active = true, startMs = p.getLong("start", System.currentTimeMillis()),
             pausedTotalMs = p.getLong("pausedTotal", 0), paused = pausedAt != null, pausedAt = pausedAt)
+        listenHr(ctx)
     }
+
+    /** Live heart rate from a shared monitor (the Fitbit Air), kept with the session. */
+    private fun listenHr(ctx: Context) {
+        HrMonitor.onReading = { t, bpm ->
+            val s = _state.value
+            if (s.active && !s.paused && (s.hr.lastOrNull()?.let { t - it.t >= 2000 } != false)) _state.value = s.copy(hr = s.hr + HrPoint(t, bpm))
+        }
+        HrMonitor.start(ctx)
+    }
+
+    private fun stopHr() { HrMonitor.onReading = null; HrMonitor.stop() }
 
     fun pause(ctx: Context) {
         val s = _state.value
@@ -99,9 +115,10 @@ object RunTracker {
         val a = Activity(
             id = "a${s.startMs}", sport = s.sport, startMs = s.startMs, durationS = moving,
             distanceKm = if (s.usesGps && s.distanceM > 50) s.distanceM / 1000 else null,
-            note = note, route = s.points, splitsS = s.splitsS, elapsedS = ((now - s.startMs) / 1000).toInt(),
+            note = note, route = s.points, splitsS = s.splitsS, elapsedS = ((now - s.startMs) / 1000).toInt(), hr = s.hr,
         )
         _state.value = State()
+        stopHr()
         persist(ctx)
         ctx.stopService(Intent(ctx, RunService::class.java))
         if (moving < 60) return null
@@ -112,6 +129,7 @@ object RunTracker {
 
     fun discard(ctx: Context) {
         _state.value = State()
+        stopHr()
         persist(ctx)
         ctx.stopService(Intent(ctx, RunService::class.java))
     }
