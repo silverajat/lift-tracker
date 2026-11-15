@@ -13,6 +13,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.silverajat.lifttracker.R
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
 
 /**
  * "Rubber floor and bumper plates": a slate gym-floor background, chalk
@@ -81,17 +83,10 @@ val BarlowCondensed = FontFamily(
     Font(R.font.barlow_condensed_bold, FontWeight.ExtraBold),
 )
 
-/** Pixel fonts (both SIL Open Font License, see docs/fonts): headings across the app and the garden. */
+/** Pixel fonts (both SIL Open Font License, see docs/fonts): only the garden uses them. */
 val PixelFont = FontFamily(Font(R.font.silkscreen))
 val PixelTitle = FontFamily(Font(R.font.press_start))
 
-/** The pixel touches: screen titles, section headings and the tab labels. Numbers and body text stay in Barlow. */
-object Pix {
-    val screen = TextStyle(fontFamily = PixelTitle, fontSize = 19.sp, lineHeight = 28.sp)
-    val bar = TextStyle(fontFamily = PixelTitle, fontSize = 13.sp, lineHeight = 20.sp)
-    val section = TextStyle(fontFamily = PixelFont, fontSize = 19.sp, lineHeight = 24.sp)
-    val tab = TextStyle(fontFamily = PixelFont, fontSize = 10.sp, lineHeight = 12.sp)
-}
 
 /** Tabular figures so timers and counts don't jitter. */
 val Tnum = TextStyle(fontFeatureSettings = "tnum")
@@ -139,4 +134,27 @@ fun LiftTheme(content: @Composable () -> Unit) {
         // (outside a Surface, Material's default content colour is black).
         CompositionLocalProvider(LocalContentColor provides C.Text, content = content)
     }
+}
+
+/**
+ * A tiny pixel sprite drawn from rows of text ('X' = filled), the app's one small pixel touch per page,
+ * next to each tab's title. Kept tiny on purpose; the garden is where the pixel art lives.
+ */
+@androidx.compose.runtime.Composable
+fun PixelGlyph(rows: List<String>, color: androidx.compose.ui.graphics.Color, px: androidx.compose.ui.unit.Dp = 3.dp,
+               modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
+    val w = rows.maxOf { it.length }
+    androidx.compose.foundation.Canvas(modifier.size(px * w, px * rows.size)) {
+        val p = px.toPx()
+        rows.forEachIndexed { y, row -> row.forEachIndexed { x, c ->
+            if (c == 'X') drawRect(color, androidx.compose.ui.geometry.Offset(x * p, y * p), androidx.compose.ui.geometry.Size(p + 0.5f, p + 0.5f))
+        } }
+    }
+}
+
+object Glyphs {
+    val sprout = listOf("XX...XX", "XXX.XXX", ".XXXXX.", "...X...", "...X...", "..XXX..")
+    val dumbbell = listOf("XX...XX", "XX...XX", "XXXXXXX", "XX...XX", "XX...XX")
+    val apple = listOf("...X...", "..X....", ".XX.XX.", "XXXXXXX", "XXXXXXX", "XXXXXXX", ".XX.XX.")
+    val heart = listOf(".XX.XX.", "XXXXXXX", "XXXXXXX", ".XXXXX.", "..XXX..", "...X...")
 }

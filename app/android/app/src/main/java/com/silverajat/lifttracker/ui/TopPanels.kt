@@ -85,7 +85,7 @@ fun SettingsScreen(hub: HubViewModel) {
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Settings", style = Pix.screen, modifier = Modifier.weight(1f))
+                Text("Settings", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
                 TopActionIcons()
             }
         }
@@ -120,7 +120,7 @@ fun SettingsScreen(hub: HubViewModel) {
 @Composable
 private fun Group(title: String, content: @Composable () -> Unit) {
     Column {
-        Text(title, style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
         Card(Modifier.fillMaxWidth()) { Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { content() } }
     }
 }

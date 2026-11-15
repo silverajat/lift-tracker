@@ -121,7 +121,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                 }
                 Column(Modifier.weight(1f)) {
                     Text(dayFmt.format(Date()), style = MaterialTheme.typography.titleSmall, color = C.Muted)
-                    Text(greeting(), style = Pix.screen)
+                    Text(greeting(), style = MaterialTheme.typography.headlineLarge)
                 }
                 TopActionIcons()
             }
@@ -312,7 +312,7 @@ fun TopBar(title: String, subtitle: String?, onBack: () -> Unit, trailing: @Comp
     ) {
         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = C.Text) }
         Column(Modifier.weight(1f)) {
-            Text(title, style = Pix.bar, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!subtitle.isNullOrEmpty()) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = C.Muted, maxLines = 1)
             }

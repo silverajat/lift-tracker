@@ -76,7 +76,7 @@ private fun DetailPage(title: String, sub: String?, onBack: () -> Unit, content:
 private fun LazyListScope.block(title: String, note: String? = null, content: @Composable () -> Unit) {
     item {
         Column {
-            Text(title, style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
             Card(Modifier.fillMaxWidth()) { content() }
             note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(top = 8.dp, start = 4.dp)) }
         }
@@ -316,7 +316,7 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
         item {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp)) {
-                    Text("Today", style = Pix.section, modifier = Modifier.weight(1f))
+                    Text("Today", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                     Text("Log activity", style = MaterialTheme.typography.titleSmall, color = C.Accent, modifier = Modifier.clickable(onClick = onLog).padding(4.dp))
                 }
                 if (todayItems.isEmpty()) Text("No activities yet today. Runs, games and gym sessions show up here, plus anything your Fitbit picks up.",
@@ -337,7 +337,7 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
         val past = items.filter { it.start.atZone(zone).toLocalDate() < today }.take(20)
         if (past.isNotEmpty()) item {
             Column {
-                Text("Earlier", style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+                Text("Earlier", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { past.forEach { ActivityRow(it, onOpen, showDate = true) } }
             }
         }

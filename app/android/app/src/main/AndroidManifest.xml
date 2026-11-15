@@ -36,6 +36,9 @@
 
     <!-- Summaries, morning brief, rain alerts -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- reminders: on time to the minute, and set again after a restart -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
@@ -68,6 +71,16 @@
             android:name=".activity.RunService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <receiver
+            android:name=".journal.ReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Home-screen widget (3 x 2) -->
         <receiver

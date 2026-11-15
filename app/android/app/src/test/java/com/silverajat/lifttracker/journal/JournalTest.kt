@@ -68,4 +68,44 @@ class JournalTest {
         assertTrue(back.notes().single().pinned)
         assertFalse(back.page(d.plusDays(1)).planned)
     }
+
+    // ---- reminders ----
+    private val now = LocalDateTime.of(2026, 11, 15, 14, 48)
+
+    @Test fun reminderPicksTheNextSensibleTime() {
+        val p = ReminderText.parse("bring umbrella at 3.30", now)
+        assertEquals("Bring umbrella", p.text)
+        assertEquals(LocalDateTime.of(2026, 11, 15, 15, 30), p.at)
+        assertEquals(LocalDateTime.of(2026, 11, 15, 21, 0), ReminderText.parse("remind me to call mum at 9", now).at)
+        assertEquals("Call mum", ReminderText.parse("remind me to call mum at 9", now).text)
+        // already past today: tomorrow
+        assertEquals(LocalDateTime.of(2026, 11, 16, 14, 0), ReminderText.parse("pay rent at 14:00", now).at)
+        assertEquals(LocalDateTime.of(2026, 11, 16, 14, 0), ReminderText.parse("stretch at 2", now).at)
+    }
+
+    @Test fun reminderUnderstandsAmPmTomorrowAndIn() {
+        val a = ReminderText.parse("gym bag tmr 8am", now)
+        assertEquals("Gym bag", a.text)
+        assertEquals(LocalDateTime.of(2026, 11, 16, 8, 0), a.at)
+        assertEquals(LocalDateTime.of(2026, 11, 15, 17, 15), ReminderText.parse("collect parcel 5:15pm", now).at)
+        val b = ReminderText.parse("take out laundry in 20 min", now)
+        assertEquals("Take out laundry", b.text)
+        assertEquals(LocalDateTime.of(2026, 11, 15, 15, 8), b.at)
+        assertEquals(LocalDateTime.of(2026, 11, 15, 16, 48), ReminderText.parse("check oven in 2 hours", now).at)
+    }
+
+    @Test fun reminderWithoutATimeAsksForOne() {
+        val p = ReminderText.parse("buy milk", now)
+        assertEquals("Buy milk", p.text)
+        assertEquals(null, p.at)
+    }
+
+    @Test fun remindersAreSaved() {
+        val dir = Files.createTempDirectory("j").toFile()
+        val st = JournalStore(dir)
+        st.saveReminders(listOf(Reminder(text = "B", at = now.plusHours(2)), Reminder(text = "A", at = now.plusHours(1), fired = true)))
+        val back = JournalStore(dir).reminders()
+        assertEquals(listOf("A", "B"), back.map { it.text })
+        assertTrue(back[0].fired)
+    }
 }

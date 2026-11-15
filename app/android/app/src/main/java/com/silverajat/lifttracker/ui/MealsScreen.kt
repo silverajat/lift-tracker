@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -127,7 +128,10 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous day", tint = C.Text)
                 }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (date == today) "Today" else date.format(dateFmt), style = MaterialTheme.typography.headlineMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PixelGlyph(Glyphs.apple, Color(0xFFE5323D), modifier = Modifier.padding(end = 10.dp))
+                        Text(if (date == today) "Today" else date.format(dateFmt), style = MaterialTheme.typography.headlineMedium)
+                    }
                     if (date == today) Text(date.format(dateFmt), color = C.Muted)
                 }
                 IconButton(onClick = { hub.setDate(date.plusDays(1)) }, enabled = date < today) {

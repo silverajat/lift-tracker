@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -36,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -79,6 +81,9 @@ class DayActions(
     val addShop: (String) -> Unit = {},
     val toggleShop: (String) -> Unit = {},
     val clearBought: () -> Unit = {},
+    val addReminder: (String, java.time.LocalDateTime) -> Unit = { _, _ -> },
+    val moveReminder: (String, java.time.LocalDateTime) -> Unit = { _, _ -> },
+    val removeReminder: (String) -> Unit = {},
     val brainstorm: () -> Unit = {},
 )
 
@@ -89,6 +94,7 @@ data class DayUi(
     val leftovers: List<Task>,
     val now: LocalTime = LocalTime.now(),
     val shopping: List<com.silverajat.lifttracker.journal.ShopItem> = emptyList(),
+    val reminders: List<com.silverajat.lifttracker.journal.Reminder> = emptyList(),
 )
 
 @Composable
@@ -101,6 +107,7 @@ fun DayScreen(
     val pages by j.pages.collectAsStateWithLifecycle()
     val notes by j.notes.collectAsStateWithLifecycle()
     val shopping by j.shopping.collectAsStateWithLifecycle()
+    val reminders by j.reminders.collectAsStateWithLifecycle()
     val focus by g.sessions.collectAsStateWithLifecycle()
     val active by g.active.collectAsStateWithLifecycle()
     val sessions by gym.history.collectAsStateWithLifecycle()
@@ -112,7 +119,7 @@ fun DayScreen(
     val zone = ZoneId.systemDefault()
     val plants = com.silverajat.lifttracker.garden.Garden.plants(
         com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active), today, zone, now)
-    val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() }, shopping = shopping)
+    val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() }, shopping = shopping, reminders = reminders)
     val gIn = com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active)
     val logs = remember(focus, sessions, items, an, pages) { com.silverajat.lifttracker.garden.Area.entries.associateWith { com.silverajat.lifttracker.garden.Garden.log(it, gIn, zone) } }
     val summaries = remember(focus, sessions, items, an, pages, now / 60_000) {
@@ -127,6 +134,7 @@ fun DayScreen(
         bringOver = j::bringOver, drop = j::dropLeftovers, mood = j::setMood, reflect = j::setReflection,
         addNote = j::addNote, editNote = j::editNote, pinNote = j::pinNote, deleteNote = j::deleteNote,
         addShop = j::addShop, toggleShop = j::toggleShop, clearBought = j::clearBought, brainstorm = onBrainstorm,
+        addReminder = j::addReminder, moveReminder = j::moveReminder, removeReminder = j::removeReminder,
     ))
 }
 
@@ -154,7 +162,10 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, gard
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Productivity", style = Pix.screen)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            PixelGlyph(Glyphs.sprout, Color(0xFF6CC24A), modifier = Modifier.padding(end = 10.dp))
+                            Text("Productivity", style = MaterialTheme.typography.headlineLarge)
+                        }
                         Text(u.today.format(dHead), style = MaterialTheme.typography.titleMedium, color = C.Muted)
                     }
                     TopActionIcons()
@@ -211,6 +222,7 @@ private fun LazyListScope.planTab(u: DayUi, page: DayPage, act: DayActions, onEd
             AddField("Add a side thing") { act.add(it, false, null) }
         }
     }
+    item { RemindersBlock(u.reminders, act) }
     item {
         val bought = u.shopping.count { it.bought }
         Block("Shopping", progress = u.shopping.takeIf { it.isNotEmpty() }?.let { "${it.size - bought} to buy" }) {
@@ -247,6 +259,56 @@ private fun LazyListScope.planTab(u: DayUi, page: DayPage, act: DayActions, onEd
     }
 }
 
+/** Reminders: type "umbrella at 3:30" (or just "umbrella" and pick a time); it pops up as a notification then. */
+@Composable
+private fun RemindersBlock(rs: List<com.silverajat.lifttracker.journal.Reminder>, act: DayActions) {
+    var now by remember { mutableStateOf(java.time.LocalDateTime.now()) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); now = java.time.LocalDateTime.now() } }
+    var asking by remember { mutableStateOf<String?>(null) }          // text waiting for a time
+    var moving by remember { mutableStateOf<com.silverajat.lifttracker.journal.Reminder?>(null) }
+    fun upcoming(h: Int, m: Int): java.time.LocalDateTime {
+        val t = now.toLocalDate().atTime(h, m)
+        return if (t.isAfter(now)) t else t.plusDays(1)
+    }
+    asking?.let { text ->
+        val d = now.plusHours(1)
+        TimeDialog(d.hour, 0, onDismiss = { asking = null }, title = "Remind you when?") { h, m ->
+            act.addReminder(text, upcoming(h, m)); asking = null
+        }
+    }
+    moving?.let { r ->
+        TimeDialog(r.at.hour, r.at.minute, onDismiss = { moving = null }, title = "Move to when?") { h, m ->
+            act.moveReminder(r.id, upcoming(h, m)); moving = null
+        }
+    }
+    val next = rs.count { it.at.isAfter(now) }
+    Block("Reminders", progress = next.takeIf { it > 0 }?.let { "$it coming up" }) {
+        rs.forEach { r ->
+            val past = !r.at.isAfter(now)
+            val day = r.at.toLocalDate()
+            val time = (when (day) {
+                now.toLocalDate() -> ""
+                now.toLocalDate().plusDays(1) -> "Tmr "
+                else -> day.format(DateTimeFormatter.ofPattern("d MMM ")) 
+            }) + r.at.format(dTime)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { moving = r }) {
+                Text(time, style = MaterialTheme.typography.titleSmall.merge(Tnum), color = if (past) C.Muted else C.Accent,
+                    modifier = Modifier.width(78.dp).padding(vertical = 6.dp))
+                Text(r.text, style = MaterialTheme.typography.bodyLarge, color = if (past) C.Muted else C.Text,
+                    textDecoration = if (past) TextDecoration.LineThrough else null, modifier = Modifier.weight(1f))
+                Text("✕", color = C.Muted, modifier = Modifier.clickable { act.removeReminder(r.id) }.padding(8.dp))
+            }
+        }
+        AddField("Remind me… e.g. umbrella at 3:30") { s ->
+            val p = com.silverajat.lifttracker.journal.ReminderText.parse(s, now)
+            if (p.text.isBlank()) return@AddField
+            if (p.at != null) act.addReminder(p.text, p.at) else asking = p.text
+        }
+        if (rs.isEmpty()) Text("Just a notification at that time. Try \"call mum at 9\" or \"laundry in 40 min\".",
+            style = MaterialTheme.typography.bodySmall, color = C.Muted)
+    }
+}
+
 @Composable
 private fun Reflect(u: DayUi, page: DayPage, act: DayActions) {
     val night = u.now.hour >= 18 || u.now.hour < 4
@@ -277,7 +339,7 @@ private fun Reflect(u: DayUi, page: DayPage, act: DayActions) {
 private fun Block(title: String, progress: String? = null, highlight: Boolean = false, content: @Composable () -> Unit) {
     Column {
         Row(Modifier.padding(start = 4.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = Pix.section, modifier = Modifier.weight(1f))
+            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
             if (progress != null) Text(progress, style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Muted)
         }
         Card(Modifier.fillMaxWidth(), border = if (highlight) C.Accent.copy(alpha = 0.6f) else androidx.compose.ui.graphics.Color.Transparent) {

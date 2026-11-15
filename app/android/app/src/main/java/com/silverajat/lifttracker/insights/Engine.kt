@@ -312,6 +312,8 @@ object InsightEngine {
 class InsightWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         runCatching { InsightEngine.run(applicationContext) }
+        // backstop: any reminder whose alarm got dropped goes out here
+        runCatching { com.silverajat.lifttracker.journal.Reminders.restore(applicationContext) }
         return Result.success()
     }
 }

@@ -129,7 +129,7 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
             item {
                 val goalWord = when { goalKgPerWeek > 0 -> "gain %.2f".format(goalKgPerWeek); goalKgPerWeek < 0 -> "lose %.2f".format(-goalKgPerWeek); else -> "maintain (recomp)" }
                 Column {
-                    Text("Rate", style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+                    Text("Rate", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
                     Card(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             RateRow("Last 2 weeks", r14, goalKgPerWeek)
@@ -157,7 +157,7 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
             }
             if (weeks.isNotEmpty()) item {
                 Column {
-                    Text("Week by week", style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+                    Text("Week by week", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
                     Card(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             weeks.take(8).forEachIndexed { i, w ->
@@ -182,7 +182,7 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                 val logged14 = all.filter { it.date > today.minusDays(14) }.count { it.scale != null }
                 val scales = last30.mapNotNull { it.scale }
                 Column {
-                    Text("Patterns", style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+                    Text("Patterns", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
                     Card(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             swing?.let {

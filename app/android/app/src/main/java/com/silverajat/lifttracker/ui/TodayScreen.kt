@@ -185,6 +185,7 @@ fun TodayContent(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    PixelGlyph(Glyphs.heart, Color(0xFFE5323D), modifier = Modifier.padding(end = 2.dp))
                     DeviceChip("Fitbit Air", u.health == HealthState.OK, when (u.health) {
                         HealthState.OK -> u.syncedAt?.let { "synced " + Instant.ofEpochMilli(it).atZone(zone).format(hm) } ?: "synced"
                         HealthState.LOADING -> "syncing"
@@ -289,7 +290,7 @@ fun TodayContent(
 private fun LazyListScope.section(title: String, content: @Composable () -> Unit) {
     item {
         Column {
-            Text(title, style = Pix.section, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
             content()
         }
     }
@@ -355,7 +356,7 @@ private fun CoachTake(u: TodayUi, a: Analysis.Result?, onRefresh: () -> Unit, on
         Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(C.Accent))
         Column(Modifier.padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Coach's take", style = Pix.section, modifier = Modifier.weight(1f))
+                Text("Coach's take", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 if (u.hasKey) Text(if (u.taking) "Thinking" else "Refresh", style = MaterialTheme.typography.labelLarge,
                     color = if (u.taking) C.Muted else C.Accent, modifier = Modifier.clickable(enabled = !u.taking, onClick = onRefresh).padding(4.dp))
             }
@@ -504,7 +505,7 @@ private fun PlanGlance(p: com.silverajat.lifttracker.journal.DayPage, now: Local
     Card(Modifier.fillMaxWidth(), onClick = onOpen) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Today's 3", style = Pix.section, modifier = Modifier.weight(1f))
+                Text("Today's 3", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 if (p.mains.isNotEmpty()) Text("${p.mains.count { it.done }}/${p.mains.size}", style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Muted)
             }
             if (p.mains.isEmpty()) Text("Set your 3 main things for today", style = MaterialTheme.typography.bodyMedium, color = C.Accent)

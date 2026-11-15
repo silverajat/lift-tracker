@@ -130,6 +130,8 @@ class MainActivity : ComponentActivity() {
         com.silverajat.lifttracker.activity.RunTracker.restore(this)
         InsightEngine.channels(this)
         InsightEngine.schedule(this)
+        com.silverajat.lifttracker.journal.Reminders.channel(this)
+        Thread { com.silverajat.lifttracker.journal.Reminders.restore(applicationContext) }.start()
         if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED)
             askNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
         intent?.getStringExtra("tab")?.let { openFrom(it) }
@@ -212,7 +214,7 @@ class MainActivity : ComponentActivity() {
                                         Tab.MEALS -> Icons.Filled.Restaurant
                                     }, t.title)
                                 },
-                                label = { Text(t.title, style = com.silverajat.lifttracker.ui.Pix.tab, maxLines = 1) },
+                                label = { Text(t.title, maxLines = 1) },
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = C.Text, selectedTextColor = C.Text, indicatorColor = C.Raised,
                                     unselectedIconColor = C.Muted, unselectedTextColor = C.Muted,

@@ -42,6 +42,69 @@ data class Note(
 /** Something to buy; ticked when bought, then cleared. */
 data class ShopItem(val id: String = UUID.randomUUID().toString().take(8), val text: String, val bought: Boolean = false)
 
+/** A one-off nudge at a set time: just a notification popup (no alarm, no vibration). */
+data class Reminder(
+    val id: String = UUID.randomUUID().toString().take(8),
+    val text: String,
+    val at: LocalDateTime,
+    val fired: Boolean = false,
+)
+
+/** Reads a time out of what you typed: "umbrella at 3:30", "call mum at 9", "gym bag tmr 8am", "laundry in 20 min". */
+object ReminderText {
+    data class Parsed(val text: String, val at: LocalDateTime?)
+
+    private val ic = setOf(RegexOption.IGNORE_CASE)
+    private val inRe = Regex("""\bin\s+(\d{1,3})\s*(m|mins?|minutes?|h|hrs?|hours?)\b""", ic)
+    private val ampmRe = Regex("""\b(?:at\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b""", ic)
+    private val atRe = Regex("""\bat\s+(\d{1,2})(?:[:.](\d{2}))?\b""", ic)
+    private val clockRe = Regex("""\b(\d{1,2})[:.](\d{2})\b""")
+    private val tmrRe = Regex("""\b(tmr|tmrw|tomorrow)\b""", ic)
+    private val leadRe = Regex("""^\s*(remind me( to)?|reminder:?|to)\s+""", ic)
+    private val tailRe = Regex("""[\s,.:;-]*\b(at|by|to|on)?[\s,.:;-]*$""", ic)
+
+    fun parse(s: String, now: LocalDateTime): Parsed {
+        val tmr = tmrRe.containsMatchIn(s)
+        var rest = tmrRe.replace(s, " ")
+        var at: LocalDateTime? = null
+        val inM = inRe.find(rest)
+        if (inM != null) {
+            val n = inM.groupValues[1].toLong()
+            val t = if (inM.groupValues[2].startsWith("h", ignoreCase = true)) now.plusHours(n) else now.plusMinutes(n)
+            at = t.withSecond(0).withNano(0)
+            rest = rest.removeRange(inM.range)
+        } else {
+            val m = ampmRe.find(rest) ?: atRe.find(rest) ?: clockRe.find(rest)
+            if (m != null) {
+                val ampm = if (m.groupValues.size > 3) m.groupValues[3].ifEmpty { null } else null
+                at = resolve(m.groupValues[1].toInt(), m.groupValues[2].ifEmpty { "0" }.toInt(), ampm, tmr, now)
+                if (at != null) rest = rest.removeRange(m.range)
+            }
+        }
+        if (at == null && tmr) at = now.toLocalDate().plusDays(1).atTime(9, 0)
+        var text = leadRe.replace(rest.replace(Regex("\\s+"), " ").trim(), "")
+        text = tailRe.replace(text, "").trim()
+        text = text.replaceFirstChar { it.uppercase() }
+        return Parsed(text, at)
+    }
+
+    /** A clock time to the next sensible moment: "3:30" at 2:48 PM is 3:30 PM, "9" in the evening is 9 PM. */
+    fun resolve(h: Int, m: Int, ampm: String?, tmr: Boolean, now: LocalDateTime): LocalDateTime? {
+        if (h > 23 || m > 59) return null
+        val today = now.toLocalDate()
+        val base = if (tmr) today.plusDays(1) else today
+        fun next(t: LocalDateTime) = if (!tmr && !t.isAfter(now)) t.plusDays(1) else t
+        if (ampm != null) {
+            if (h !in 1..12) return null
+            return next(base.atTime(h % 12 + if (ampm.equals("pm", ignoreCase = true)) 12 else 0, m))
+        }
+        if (h == 0 || h > 12) return next(base.atTime(h, m))
+        // 1..12 with no AM/PM: the sooner of the two today, else tomorrow (1 to 6 meaning the afternoon)
+        if (!tmr) listOf(h % 12, h % 12 + 12).map { today.atTime(it, m) }.firstOrNull { it.isAfter(now) }?.let { return it }
+        return today.plusDays(1).atTime(if (h <= 6) h + 12 else h, m)
+    }
+}
+
 object Journal {
     const val MAINS = 3
 
@@ -158,6 +221,21 @@ class JournalStore(root: File) {
         val a = JSONArray()
         ns.forEach { n -> a.put(JSONObject().put("id", n.id).put("text", n.text).put("created", n.created).put("updated", n.updated).put("pinned", n.pinned)) }
         o.put("notes", a)
+        write(o)
+    }
+
+    fun reminders(): List<Reminder> = runCatching {
+        val a = read().optJSONArray("reminders") ?: return emptyList()
+        (0 until a.length()).map { i ->
+            a.getJSONObject(i).let { Reminder(it.getString("id"), it.getString("text"), LocalDateTime.parse(it.getString("at")), it.optBoolean("fired")) }
+        }.sortedBy { it.at }
+    }.getOrDefault(emptyList())
+
+    fun saveReminders(rs: List<Reminder>) {
+        val o = read()
+        val a = JSONArray()
+        rs.sortedBy { it.at }.forEach { a.put(JSONObject().put("id", it.id).put("text", it.text).put("at", it.at.toString()).put("fired", it.fired)) }
+        o.put("reminders", a)
         write(o)
     }
 }

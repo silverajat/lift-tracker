@@ -21,6 +21,9 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
     private val _shopping = MutableStateFlow<List<ShopItem>>(emptyList())
     val shopping: StateFlow<List<ShopItem>> = _shopping
 
+    private val _reminders = MutableStateFlow<List<Reminder>>(emptyList())
+    val reminders: StateFlow<List<Reminder>> = _reminders
+
     init { refresh() }
 
     /** Re-reads the file and moves to a new day after 4 AM. */
@@ -29,6 +32,11 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         _pages.value = store.pages()
         _notes.value = store.notes()
         _shopping.value = store.shopping()
+        // reminders that went off more than a day ago drop off the list
+        val all = store.reminders()
+        val keep = all.filter { !it.fired || it.at.isAfter(LocalDateTime.now().minusDays(1)) }
+        if (keep.size != all.size) store.saveReminders(keep)
+        _reminders.value = keep
     }
 
     fun page(d: LocalDate = _today.value): DayPage = _pages.value[d] ?: DayPage(d)
@@ -73,6 +81,25 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleShop(id: String) = setShop(_shopping.value.map { if (it.id == id) it.copy(bought = !it.bought) else it })
     fun clearBought() = setShop(_shopping.value.filter { !it.bought })
     private fun setShop(items: List<ShopItem>) { store.saveShopping(items); _shopping.value = items }
+
+    fun addReminder(text: String, at: LocalDateTime) {
+        val t = text.trim()
+        if (t.isEmpty()) return
+        val r = Reminder(text = t, at = at.withSecond(0).withNano(0))
+        setReminders(store.reminders() + r)
+        Reminders.schedule(getApplication<Application>(), r)
+    }
+    fun moveReminder(id: String, at: LocalDateTime) {
+        val rs = store.reminders()
+        val r = rs.firstOrNull { it.id == id }?.copy(at = at.withSecond(0).withNano(0), fired = false) ?: return
+        setReminders(rs.map { if (it.id == id) r else it })
+        Reminders.schedule(getApplication<Application>(), r)
+    }
+    fun removeReminder(id: String) {
+        Reminders.cancel(getApplication<Application>(), id)
+        setReminders(store.reminders().filter { it.id != id })
+    }
+    private fun setReminders(rs: List<Reminder>) { store.saveReminders(rs); _reminders.value = rs.sortedBy { it.at } }
 
     fun addNote(text: String) {
         if (text.isBlank()) return
