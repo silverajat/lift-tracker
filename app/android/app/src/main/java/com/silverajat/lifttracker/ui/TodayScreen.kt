@@ -305,7 +305,7 @@ private fun Note(text: String) {
 private fun Scoreboard(d: Analysis.Day?, onDetail: (Detail) -> Unit) {
     val r = d?.recovery
     val color = zoneColor(r?.zone)
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.Bottom) {
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.Top) {
         Column(Modifier.weight(1.25f).clickable { onDetail(Detail.RECOVERY) }) {
             Text("Recovery", style = MaterialTheme.typography.titleSmall, color = C.Muted)
             if (r != null) Row(verticalAlignment = Alignment.Bottom) {
