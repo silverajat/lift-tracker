@@ -226,6 +226,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _extraRows = MutableStateFlow<Map<Int, Int>>(emptyMap())
     val extraRows: StateFlow<Map<Int, Int>> = _extraRows
 
+    /** Weights you've typed into sets you haven't done yet, so the auto-start uses them. Key: exercise id to set no. */
+    private val typed = HashMap<Pair<Int, Int>, Pair<Double, Int>>()
+
+    fun typeWeight(exerciseId: Int, setNo: Int, weight: Double?, addons: Int) {
+        if (weight == null) typed.remove(exerciseId to setNo) else typed[exerciseId to setNo] = weight to addons
+        val n = _nextUp.value
+        if (weight != null && n != null && n.ex.id == exerciseId && n.setNo == setNo) _nextUp.value = n.copy(weight = weight, addons = addons)
+    }
+
+    fun typedWeight(exerciseId: Int, setNo: Int): Pair<Double, Int>? = typed[exerciseId to setNo]
+
     fun addRow(exerciseId: Int) {
         _extraRows.value = _extraRows.value + (exerciseId to ((_extraRows.value[exerciseId] ?: 0) + 1))
     }
@@ -246,6 +257,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _session.value = updated
         saveSession(updated)
         if (reps != log.reps) retrain()
+        // the next set copies this one's weight: keep the rest panel in step
+        if (_nextUp.value?.ex?.id == log.exerciseId) _nextUp.value = nextSet(log.exerciseId)
     }
 
     /**
@@ -349,7 +362,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val warm = p?.warmup ?: false
             // same weight as the working set you just did ("same sets throughout")
             val prev = done.filter { !it.warmup && it.setNo < n }.maxByOrNull { it.setNo }
-            val (w, add) = if (!warm && prev != null) prev.weight to prev.addons else (p?.weight ?: 0.0) to (p?.addons ?: 0)
+            val (w, add) = typed[ex.id to n]
+                ?: if (!warm && prev != null) prev.weight to prev.addons else (p?.weight ?: 0.0) to (p?.addons ?: 0)
             return NextSet(ex, n, w, add, warm)
         }
         return null
@@ -594,7 +608,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_session.value?.id == id) {
             if (_phase.value != Phase.READY) return
             _session.value = null
-            _extraRows.value = emptyMap()
+            _extraRows.value = emptyMap(); typed.clear()
             restJob?.cancel()
             _restEndsAt.value = null
         }
@@ -659,7 +673,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         _session.value = null
-        _extraRows.value = emptyMap()
+        _extraRows.value = emptyMap(); typed.clear()
         restJob?.cancel()
         _restEndsAt.value = null
         _nextUp.value = null

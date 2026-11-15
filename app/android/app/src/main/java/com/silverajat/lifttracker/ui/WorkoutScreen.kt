@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -60,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -333,6 +335,7 @@ private fun ExerciseCard(
         var working = 0
         val lastDone = done.maxOfOrNull { it.setNo } ?: 0
         var addonEdit by remember { mutableStateOf<androidx.compose.runtime.MutableIntState?>(null) }
+        var addonRow by remember { mutableStateOf(0 to "") }   // which set (and its typed weight) the add-on box is for
         for (i in 0 until rows) key(ex.id, i) {
             val p = plan.getOrNull(i)
             val d = done.firstOrNull { it.setNo == i + 1 }
@@ -350,18 +353,22 @@ private fun ExerciseCard(
             if (kind.intValue == 0) working++
             val label = when (kind.intValue) { 1 -> "W"; 2 -> "C"; else -> "$working" }
             val fallback = p ?: plan.lastOrNull()
+            val typed = if (d == null) vm.typedWeight(ex.id, i + 1) else null
             val weightText = remember(ex.id, i, d) {
-                mutableStateOf(d?.let { kg(it.weight) } ?: fallback?.let { kg(it.weight) } ?: "")
+                mutableStateOf(d?.let { kg(it.weight) } ?: typed?.let { kg(it.first) } ?: fallback?.let { kg(it.weight) } ?: "")
             }
-            val addons = remember(ex.id, i, d) { mutableIntStateOf(d?.addons ?: fallback?.addons ?: 0) }
+            val addons = remember(ex.id, i, d) { mutableIntStateOf(d?.addons ?: typed?.second ?: fallback?.addons ?: 0) }
             SetRow(
                 label = label,
                 kind = kind.intValue,
                 previous = p?.let { compact(it.weight, it.addons, it.reps, ex.bodyweight) } ?: "–",
                 weight = weightText.value,
-                onWeight = { weightText.value = it },
+                onWeight = {
+                    weightText.value = it
+                    vm.typeWeight(ex.id, i + 1, it.replace(',', '.').toDoubleOrNull(), addons.intValue)
+                },
                 addons = addons.intValue,
-                onAddons = { if (d == null && !isActive) addonEdit = addons },
+                onAddons = { if (d == null && !isActive) { addonEdit = addons; addonRow = i + 1 to weightText.value } },
                 reps = d?.reps?.toString(),
                 repsHint = p?.reps?.toString() ?: "",
                 quality = d?.quality,
@@ -397,7 +404,10 @@ private fun ExerciseCard(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { addonEdit = null }) { Text("Done", color = C.Accent, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = {
+                        vm.typeWeight(ex.id, addonRow.first, addonRow.second.replace(',', '.').toDoubleOrNull(), st.intValue)
+                        addonEdit = null
+                    }) { Text("Done", color = C.Accent, fontWeight = FontWeight.Bold) }
                 },
             )
         }
@@ -441,6 +451,7 @@ private fun SetRow(
     onDone: () -> Unit,
     onDelete: (() -> Unit)? = null,
 ) {
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
     val shape = RoundedCornerShape(12.dp)
     val bg = when {
         done -> C.Done.copy(alpha = 0.13f)
@@ -484,7 +495,9 @@ private fun SetRow(
                     value = weight,
                     onValueChange = { v -> onWeight(v.filter { it.isDigit() || it == '.' || it == ',' }.take(6)) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    // the keyboard's Done (or tapping Start) lets go of the box
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
                     textStyle = MaterialTheme.typography.titleMedium.merge(Tnum)
                         .copy(color = C.Text, textAlign = TextAlign.Center),
                     cursorBrush = SolidColor(C.Accent),
@@ -528,7 +541,7 @@ private fun SetRow(
                 else -> Box(
                     Modifier.size(34.dp).clip(CircleShape)
                         .background(if (canStart) C.Accent else C.Raised)
-                        .clickable(enabled = canStart, onClick = onStart),
+                        .clickable(enabled = canStart) { focus.clearFocus(); onStart() },
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Filled.PlayArrow, "Start set", tint = if (canStart) C.OnAccent else C.Muted) }
             }
