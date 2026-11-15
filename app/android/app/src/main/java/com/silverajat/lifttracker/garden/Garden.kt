@@ -127,7 +127,7 @@ object Garden {
         i.focus.filter { day(it.startMs) == date }.forEach { add(it.area, it.minutes) }
         i.active?.takeIf { day(it.startMs) == date }?.let { add(it.area, (it.focusedS(now) / 60).toInt()) }
         i.gym.filter { it.endMs != null && it.sets.isNotEmpty() && day(it.startMs) == date }.forEach { add(Area.GYM, ((it.endMs!! - it.startMs) / 60_000).toInt()) }
-        i.sports.filter { it.sport != Sport.GYM && it.start.atZone(zone).toLocalDate() == date }.forEach { add(Area.SPORTS, it.minutes) }
+        i.sports.filter { it.sport != Sport.GYM && it.sport != Sport.WALK && it.start.atZone(zone).toLocalDate() == date }.forEach { add(Area.SPORTS, it.minutes) }
         val xp = daily(i, zone, now).mapValues { it.value[date] ?: 0 }.filterValues { it > 0 }
         return DaySummary(date, m, xp)
     }

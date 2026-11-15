@@ -75,6 +75,7 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
     val items by hub.items.collectAsStateWithLifecycle()
     val acts by hub.activities.collectAsStateWithLifecycle()
     val live by RunTracker.state.collectAsStateWithLifecycle()
+    val healthDays by hub.days.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     var runOpen by rememberSaveable { mutableStateOf<String?>(null) }
     var logSport by remember { mutableStateOf<Sport?>(null) }
@@ -186,7 +187,11 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
 
         sportSection("Football", Sport.FOOTBALL, football, monthName, { logSport = Sport.FOOTBALL }, ::open)
         sportSection("Badminton", Sport.BADMINTON, badminton, monthName, { logSport = Sport.BADMINTON }, ::open)
-        sportSection("Walks", Sport.WALK, walks, monthName, { logSport = Sport.WALK }, ::open, action = "Log a walk", showKm = true)
+        val today = java.time.LocalDate.now(zone)
+        val week = healthDays.filter { it.date.isBefore(today) && !it.date.isBefore(today.minusDays(7)) }.mapNotNull { it.steps }
+        sportSection("Walks", Sport.WALK, walks, monthName, { logSport = Sport.WALK }, ::open, action = "Log a walk", showKm = true,
+            steps = healthDays.lastOrNull { it.date == today }?.steps ?: 0L,
+            stepsAvg = week.takeIf { it.isNotEmpty() }?.average()?.toLong())
 
         if (other.isNotEmpty()) item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -199,19 +204,26 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
 
 private fun androidx.compose.foundation.lazy.LazyListScope.sportSection(
     title: String, sport: Sport, list: List<ActivityItem>, monthName: String, onLog: () -> Unit, onOpen: (ActivityItem) -> Unit,
-    action: String = "Log a game", showKm: Boolean = false,
+    action: String = "Log a game", showKm: Boolean = false, steps: Long? = null, stepsAvg: Long? = null,
 ) {
     item {
         val month = list          // already just the chosen month
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionHead(title, action, onLog)
             Card(Modifier.fillMaxWidth()) {
+              Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (steps != null) Column {
+                    Text("%,d".format(steps), style = MaterialTheme.typography.displaySmall.merge(Tnum), fontWeight = FontWeight.Bold)
+                    Text("steps today" + (stepsAvg?.let { " · last 7 days avg %,d".format(it) } ?: ""),
+                        style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    BigStat("${month.size}", if (sport == Sport.WALK) "walks" else "games")
+                    BigStat("${month.size}", if (sport == Sport.WALK) "walks in $monthName" else "games")
                     if (showKm) BigStat("%.1f".format(month.sumOf { it.distanceKm ?: 0.0 }), "km")
                     else BigStat("${month.sumOf { it.minutes }}", "minutes")
-                    BigStat(list.mapNotNull { it.strain }.takeIf { it.isNotEmpty() }?.let { "%.1f".format(it.average()) } ?: "–", "average strain", StrainBlue)
+                    if (steps == null) BigStat(list.mapNotNull { it.strain }.takeIf { it.isNotEmpty() }?.let { "%.1f".format(it.average()) } ?: "–", "average strain", StrainBlue)
                 }
+              }
             }
             ShortList(list, onOpen, "No ${title.lowercase()} in $monthName." +
                 (if (sport == Sport.WALK) " Walks your Fitbit detects show up here by themselves." else ""))
