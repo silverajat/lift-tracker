@@ -230,6 +230,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _extraRows.value = _extraRows.value + (exerciseId to ((_extraRows.value[exerciseId] ?: 0) + 1))
     }
 
+    /** Take away a set you haven't done (rows below the done ones only; done sets are removed with deleteSet). */
+    fun removeRow(exerciseId: Int, rowsNow: Int, lastDone: Int) {
+        if (rowsNow <= lastDone || rowsNow <= 0) return
+        _extraRows.value = _extraRows.value + (exerciseId to ((_extraRows.value[exerciseId] ?: 0) - 1))
+        // if the rest timer was pointing at the row that's gone, point it at the next real one
+        if (_nextUp.value?.ex?.id == exerciseId && (_nextUp.value?.setNo ?: 0) >= rowsNow) _nextUp.value = nextSet(exerciseId)
+    }
+
+    /** Fix a set after the fact: the weight, add-ons or reps you actually did. */
+    fun editSet(log: SetLog, weight: Double, addons: Int, reps: Int) {
+        val session = _session.value ?: return
+        val fixed = log.copy(weight = weight, addons = addons, reps = reps)
+        val updated = session.copy(sets = session.sets.map { if (it == log) fixed else it })
+        _session.value = updated
+        saveSession(updated)
+        if (reps != log.reps) retrain()
+    }
+
     /**
      * What 100% ROM is for an exercise (in degrees or cm, matching the set):
      * the median of your last 6 sets' ROM, so it recalibrates after every set.

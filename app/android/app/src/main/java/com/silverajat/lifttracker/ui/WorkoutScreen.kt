@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Share
@@ -40,6 +41,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -114,7 +116,7 @@ fun WorkoutScreen(vm: AppViewModel, day: Day, onShare: (Session) -> Unit) {
     val sets = current?.sets ?: emptyList()
     var confirmFinish by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf<Session?>(null) }
-    var removeSet by remember { mutableStateOf<SetLog?>(null) }
+    var removeSet by remember { mutableStateOf<SetLog?>(null) }   // the done set being edited (or removed)
     val accentA = if (day == Day.UPPER) C.UpperA else C.LowerA
     val accentB = if (day == Day.UPPER) C.UpperB else C.LowerB
 
@@ -225,15 +227,41 @@ fun WorkoutScreen(vm: AppViewModel, day: Day, onShare: (Session) -> Unit) {
         }
     }
     removeSet?.let { s ->
+        var w by remember(s) { mutableStateOf(kg(s.weight)) }
+        var r by remember(s) { mutableStateOf(s.reps.toString()) }
+        var a by remember(s) { mutableIntStateOf(s.addons) }
+        var sure by remember(s) { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { removeSet = null },
             containerColor = C.Surface,
-            title = { Text("Remove set ${s.setNo}?") },
-            text = { Text("${compact(s.weight, s.addons, s.reps, false)} will be taken out of today's log.") },
-            confirmButton = {
-                TextButton(onClick = { vm.deleteSet(s); removeSet = null }) { Text("Remove", color = C.Stop) }
+            title = { Text("Set ${s.setNo}" + if (s.warmup) " · warm-up" else "") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(w, { v -> w = v.filter { it.isDigit() || it == '.' || it == ',' }.take(6) }, label = { Text("kg") },
+                            singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f))
+                        OutlinedTextField(r, { v -> r = v.filter { it.isDigit() }.take(3) }, label = { Text("reps") },
+                            singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Add-ons", color = C.Muted, modifier = Modifier.weight(1f))
+                        RoundBtn(Icons.Filled.Remove) { a = max(0, a - 1) }
+                        Text("$a", style = MaterialTheme.typography.titleLarge.merge(Tnum), textAlign = TextAlign.Center, modifier = Modifier.width(44.dp))
+                        RoundBtn(Icons.Filled.Add) { a = minOf(9, a + 1) }
+                    }
+                    Text(if (sure) "Tap again to remove this set" else "Remove set", color = C.Stop,
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.clickable { if (sure) { vm.deleteSet(s); removeSet = null } else sure = true }.padding(vertical = 4.dp))
+                }
             },
-            dismissButton = { TextButton(onClick = { removeSet = null }) { Text("Keep", color = C.Muted) } },
+            confirmButton = {
+                TextButton(onClick = {
+                    val kgv = w.replace(',', '.').toDoubleOrNull(); val reps = r.toIntOrNull()
+                    if (kgv != null && reps != null && reps > 0) vm.editSet(s, kgv, a, reps)
+                    removeSet = null
+                }) { Text("Save", color = C.Accent, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = { TextButton(onClick = { removeSet = null }) { Text("Cancel", color = C.Muted) } },
         )
     }
 }
@@ -303,6 +331,7 @@ private fun ExerciseCard(
             Spacer(Modifier.width(ACTION))
         }
         var working = 0
+        val lastDone = done.maxOfOrNull { it.setNo } ?: 0
         var addonEdit by remember { mutableStateOf<androidx.compose.runtime.MutableIntState?>(null) }
         for (i in 0 until rows) key(ex.id, i) {
             val p = plan.getOrNull(i)
@@ -347,6 +376,7 @@ private fun ExerciseCard(
                         warmup = kind.intValue >= 1, calibration = kind.intValue == 2)
                 },
                 onDone = { d?.let(onRemove) },
+                onDelete = if (d == null && !isActive && i + 1 > lastDone) ({ vm.removeRow(ex.id, rows, lastDone) }) else null,
             )
         }
         addonEdit?.let { st ->
@@ -409,6 +439,7 @@ private fun SetRow(
     onCopyPrev: () -> Unit,
     onStart: () -> Unit,
     onDone: () -> Unit,
+    onDelete: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(12.dp)
     val bg = when {
@@ -440,7 +471,9 @@ private fun SetRow(
             color = C.Muted, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(W_PREV).clickable(onClick = onCopyPrev).padding(vertical = 6.dp),
         )
-        Column(Modifier.weight(W_KG).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // a done set: tap its weight or reps to fix them
+        Column(Modifier.weight(W_KG).padding(horizontal = 4.dp).then(if (done) Modifier.clickable(onClick = onDone) else Modifier),
+            horizontalAlignment = Alignment.CenterHorizontally) {
             // same height as the add-on line below, so the weight box sits level with the rest of the row
             Text("+ add-on", style = MaterialTheme.typography.labelMedium, maxLines = 1,
                 modifier = Modifier.alpha(0f).padding(bottom = 3.dp).padding(horizontal = 4.dp, vertical = 2.dp))
@@ -470,7 +503,8 @@ private fun SetRow(
                     .padding(horizontal = 4.dp, vertical = 2.dp),
             )
         }
-        Column(Modifier.weight(W_REPS), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.weight(W_REPS).then(if (done) Modifier.clickable(onClick = onDone) else Modifier),
+            horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 reps ?: repsHint,
                 style = MaterialTheme.typography.titleMedium.merge(Tnum),
@@ -478,6 +512,10 @@ private fun SetRow(
             )
             if (quality != null) {
                 Text("Q $quality", style = MaterialTheme.typography.labelMedium.merge(Tnum), color = C.score(quality))
+            }
+            if (onDelete != null) {
+                Icon(Icons.Filled.Close, "Delete set", tint = C.Muted,
+                    modifier = Modifier.padding(top = 2.dp).clip(CircleShape).clickable(onClick = onDelete).padding(6.dp).size(18.dp))
             }
         }
         Box(Modifier.size(ACTION), contentAlignment = Alignment.Center) {
