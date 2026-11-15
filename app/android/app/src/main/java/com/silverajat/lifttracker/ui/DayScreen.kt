@@ -113,7 +113,9 @@ fun DayScreen(
     val plants = com.silverajat.lifttracker.garden.Garden.plants(
         com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active), today, zone, now)
     val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() }, shopping = shopping)
-    DayContent(ui, garden = GardenUi(plants, active, focus, now), gAct = GardenActions(
+    val gIn = com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active)
+    val logs = remember(focus, sessions, items, an, pages) { com.silverajat.lifttracker.garden.Area.entries.associateWith { com.silverajat.lifttracker.garden.Garden.log(it, gIn, zone) } }
+    DayContent(ui, garden = GardenUi(plants, active, focus, now, logs), gAct = GardenActions(
         start = { a, l -> g.start(a, l) }, stop = { g.stop() }, discard = g::discard, delete = g::delete, save = g::save,
     ), act = DayActions(
         add = { t, m, d -> if (d == null) j.add(t, m) else j.add(t, m, d) },
@@ -129,6 +131,12 @@ fun DayScreen(
 fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, garden: GardenUi? = null, gAct: GardenActions = GardenActions()) {
     var tab by rememberSaveable { mutableStateOf(startTab) }
     val page = u.pages[u.today] ?: DayPage(u.today)
+    var plant by rememberSaveable { mutableStateOf<com.silverajat.lifttracker.garden.Area?>(null) }
+    if (plant != null && garden != null) {
+        androidx.activity.compose.BackHandler { plant = null }
+        PlantPage(garden, plant!!, gAct) { plant = null }
+        return
+    }
     var editing by remember { mutableStateOf<Task?>(null) }
     var editingNote by remember { mutableStateOf<Note?>(null) }
     editing?.let { t -> TaskDialog(t, page.mains.size < Journal.MAINS, act, onDone = { editing = null }) }
@@ -159,7 +167,7 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, gard
         }
         when (tab) {
             0 -> planTab(u, page, act) { editing = it }
-            1 -> if (garden != null) gardenTab(garden, gAct)
+            1 -> if (garden != null) gardenTab(garden, gAct) { plant = it }
             2 -> notesTab(u, act) { editingNote = it }
             else -> pastTab(u)
         }

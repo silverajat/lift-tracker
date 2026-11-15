@@ -510,7 +510,7 @@ fun LogActivityDialog(start: Sport, onDismiss: () -> Unit, onSave: (Sport, Long,
     var km by remember { mutableStateOf(if (start == Sport.RUN) "10" else "") }
     var note by remember { mutableStateOf("") }
     var picking by remember { mutableStateOf(false) }
-    if (picking) TimeDialog(hour, minute, onDismiss = { picking = false }) { h, m -> hour = h; minute = m; picking = false }
+    if (picking) TimeDialog(hour, minute, onDismiss = { picking = false }, title = "When did you start?") { h, m -> hour = h; minute = m; picking = false }
     val colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = C.Accent, unfocusedBorderColor = C.Line, focusedTextColor = C.Text, unfocusedTextColor = C.Text)
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = C.Surface,

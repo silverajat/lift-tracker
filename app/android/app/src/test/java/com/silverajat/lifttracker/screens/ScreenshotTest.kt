@@ -254,10 +254,14 @@ class ScreenshotTest {
             if (active) com.silverajat.lifttracker.garden.ActiveFocus(com.silverajat.lifttracker.garden.Area.STUDY, "EE2023 tutorial 6", now - 34 * 60_000L - 12_000) else null),
             java.time.LocalDate.now(), java.time.ZoneId.systemDefault(), now)
             .map { p -> if (p.area == com.silverajat.lifttracker.garden.Area.SLEEP) com.silverajat.lifttracker.garden.Garden.Plant(p.area, 2650, com.silverajat.lifttracker.garden.Garden.level(2650), com.silverajat.lifttracker.garden.Garden.progress(2650), "5/7 good nights", java.time.LocalDate.now(), 0) else p }
+        val gIn = com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, emptyList(), j.pages)
         return com.silverajat.lifttracker.ui.GardenUi(plants,
-            if (active) com.silverajat.lifttracker.garden.ActiveFocus(com.silverajat.lifttracker.garden.Area.STUDY, "EE2023 tutorial 6", now - 34 * 60_000L - 12_000, awayS = 180) else null, focus, now)
+            if (active) com.silverajat.lifttracker.garden.ActiveFocus(com.silverajat.lifttracker.garden.Area.STUDY, "EE2023 tutorial 6", now - 34 * 60_000L - 12_000, awayS = 180) else null, focus, now,
+            com.silverajat.lifttracker.garden.Area.entries.associateWith { com.silverajat.lifttracker.garden.Garden.log(it, gIn, java.time.ZoneId.systemDefault()) })
     }
     @Test fun garden() = shoot("day_garden") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 1, garden = gardenUi(false)) }
+    @Test fun plantPage() = shoot("plant_study") { com.silverajat.lifttracker.ui.PlantPage(gardenUi(false), com.silverajat.lifttracker.garden.Area.STUDY, com.silverajat.lifttracker.ui.GardenActions()) {} }
+    @Test fun plantPageGym() = shoot("plant_gym") { com.silverajat.lifttracker.ui.PlantPage(gardenUi(false), com.silverajat.lifttracker.garden.Area.GYM, com.silverajat.lifttracker.ui.GardenActions()) {} }
     @Test fun gardenFocus() = shoot("day_garden_focus") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 1, garden = gardenUi(true)) }
     @Test fun badmintonDetail() = shoot("activity_badminton") {
         val item = items.first { it.manualId == "b1" }

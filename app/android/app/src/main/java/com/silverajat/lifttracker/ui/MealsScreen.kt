@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.silverajat.lifttracker.HubViewModel
 import com.silverajat.lifttracker.meals.Food
@@ -328,16 +329,19 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
     )
 }
 
-/** Clock picker for when you ate something. */
+/** Clock picker (meals, activities, focus blocks). */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun TimeDialog(hour: Int, minute: Int, onDismiss: () -> Unit, onPick: (Int, Int) -> Unit) {
+fun TimeDialog(hour: Int, minute: Int, onDismiss: () -> Unit, title: String = "When did you eat it?", onPick: (Int, Int) -> Unit) {
     val state = androidx.compose.material3.rememberTimePickerState(hour, minute, is24Hour = true)
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Surface,
-        title = { Text("When did you eat it?") },
+        title = { Text(title) },
         text = {
+            // the picker draws its hours/minutes in displayLarge; the app's is too big for its boxes
+            MaterialTheme(typography = MaterialTheme.typography.copy(
+                displayLarge = MaterialTheme.typography.displayLarge.copy(fontSize = 52.sp, lineHeight = 60.sp))) {
             androidx.compose.material3.TimePicker(
                 state = state,
                 colors = androidx.compose.material3.TimePickerDefaults.colors(
@@ -347,6 +351,7 @@ fun TimeDialog(hour: Int, minute: Int, onDismiss: () -> Unit, onPick: (Int, Int)
                     timeSelectorSelectedContentColor = C.OnAccent, timeSelectorUnselectedContentColor = C.Text,
                 ),
             )
+            }
         },
         confirmButton = { TextButton(onClick = { onPick(state.hour, state.minute) }) { Text("Set time", color = C.Accent, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) } },

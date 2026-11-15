@@ -114,6 +114,49 @@ object Garden {
     }
 
     fun hm(min: Int) = if (min >= 60) "${min / 60}h ${min % 60}m" else "${min}m"
+
+    /** What grew a plant, newest first: one line per session, game, night or day. [focusId] lets a study/work line be edited. */
+    data class Entry(val date: LocalDate, val text: String, val sub: String, val xp: Int, val focusId: String? = null)
+
+    /** How each plant grows, in a line. */
+    fun howItGrows(a: Area) = when (a) {
+        Area.STUDY -> "1 point per focused minute of study (time in other apps doesn't count)"
+        Area.WORK -> "1 point per focused minute of work or projects"
+        Area.GYM -> "60 points per session, plus 3 per working set"
+        Area.SPORTS -> "Points from each game's or run's strain (strain x 6), so hard games count more"
+        Area.SLEEP -> "60 for an 85%+ night, 40 for 70%+, 20 otherwise; +20 for a green recovery"
+        Area.MIND -> "10 for planning the day, 15 per main thing done, 25 for reflecting"
+    }
+
+    fun log(a: Area, i: Inputs, zone: ZoneId): List<Entry> {
+        fun day(ms: Long) = Instant.ofEpochMilli(ms).atZone(zone)
+        val tf = java.time.format.DateTimeFormatter.ofPattern("H:mm")
+        val out = when (a) {
+            Area.STUDY, Area.WORK -> i.focus.filter { it.area == a }.map { f ->
+                Entry(day(f.startMs).toLocalDate(), f.label.ifBlank { a.label }, "${day(f.startMs).format(tf)} · ${hm(f.minutes)}", f.minutes, f.id)
+            }
+            Area.GYM -> i.gym.filter { it.endMs != null && it.sets.isNotEmpty() }.map { s ->
+                val sets = s.sets.count { !it.warmup }
+                Entry(day(s.startMs).toLocalDate(), "${s.day.title} day", "$sets working sets", 60 + 3 * sets)
+            }
+            Area.SPORTS -> i.sports.filter { it.sport != Sport.GYM }.map { x ->
+                Entry(x.start.atZone(zone).toLocalDate(), "${x.sport.emoji} ${x.title}",
+                    "${x.minutes} min" + (x.strain?.let { " · strain %.1f".format(it) } ?: ""), x.strain?.let { (it * 6).toInt() } ?: (x.minutes / 2))
+            }
+            Area.SLEEP -> i.days.mapNotNull { d ->
+                val s = d.sleep ?: return@mapNotNull null
+                val rec = d.recovery?.score
+                Entry(d.date, "Slept ${hm(s.asleepMin)}", "${s.performance}% of need" + (rec?.let { " · recovery $it%" } ?: ""),
+                    (if (s.performance >= 85) 60 else if (s.performance >= 70) 40 else 20) + (if ((rec ?: 0) >= 67) 20 else 0))
+            }
+            Area.MIND -> i.pages.values.filter { it.planned || it.reflected }.map { p ->
+                Entry(p.date, "${p.mains.count { it.done }}/${p.mains.size} main things",
+                    listOfNotNull("planned".takeIf { p.planned }, "reflected".takeIf { p.reflected }).joinToString(" · "),
+                    (if (p.planned) 10 else 0) + 15 * p.mains.count { it.done } + (if (p.reflected) 25 else 0))
+            }
+        }
+        return out.filter { it.xp > 0 }.sortedByDescending { it.date }
+    }
 }
 
 /** Focus sessions and the running one, in the app's private storage. */

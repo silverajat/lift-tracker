@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -73,6 +76,7 @@ data class GardenUi(
     val active: ActiveFocus?,
     val sessions: List<FocusSession>,
     val now: Long,
+    val logs: Map<Area, List<Garden.Entry>> = emptyMap(),
 )
 
 class GardenActions(
@@ -86,19 +90,96 @@ class GardenActions(
 private val dT = DateTimeFormatter.ofPattern("H:mm")
 private val dD = DateTimeFormatter.ofPattern("EEE d MMM")
 
-fun LazyListScope.gardenTab(g: GardenUi, act: GardenActions) {
+fun LazyListScope.gardenTab(g: GardenUi, act: GardenActions, onOpen: (Area) -> Unit = {}) {
     item { FocusCard(g, act) }
     item {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             g.plants.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { p -> PlantCard(p, Modifier.weight(1f)) }
+                    row.forEach { p -> PlantCard(p, Modifier.weight(1f)) { onOpen(p.area) } }
                 }
             }
         }
     }
-    item { FocusLog(g.sessions.take(20), act) }
 }
+
+/** One plant's own page: the plant big, its level, how it grows, and everything that grew it. */
+@Composable
+fun PlantPage(g: GardenUi, area: Area, act: GardenActions, onBack: () -> Unit) {
+    val p = g.plants.first { it.area == area }
+    val entries = g.logs[area].orEmpty()
+    val color = areaColor(area)
+    var editing by remember { mutableStateOf<FocusSession?>(null) }
+    var adding by remember { mutableStateOf(false) }
+    if (adding) FocusLogDialog(null, area, onDismiss = { adding = false }, onDelete = null) { act.save(it); adding = false }
+    editing?.let { s -> FocusLogDialog(s, s.area, onDismiss = { editing = null }, onDelete = { act.delete(s.id); editing = null }) { act.save(it); editing = null } }
+    val focusing = g.active?.area == area
+    androidx.compose.foundation.lazy.LazyColumn(
+        modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 40.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.IconButton(onClick = onBack) {
+                    androidx.compose.material3.Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = C.Text)
+                }
+                Text(area.label.uppercase(), style = pxTitle(18, color), modifier = Modifier.weight(1f).padding(start = 4.dp))
+                Text("LV ${p.level}", style = pxTitle(14))
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    PixelPlantArt(area, p.level, p.progress, dry = p.dryDays >= 4, focusing = focusing, modifier = Modifier.fillMaxWidth().height(250.dp))
+                    PixelBar(p.progress, color, Modifier.fillMaxWidth())
+                    val into = p.xp - Garden.levelStart(p.level); val span = Garden.levelStart(p.level + 1) - Garden.levelStart(p.level)
+                    Text("$into / $span to LV ${p.level + 1}", style = px(13, C.Muted))
+                    Text("This week: ${p.week}", style = MaterialTheme.typography.titleMedium)
+                    if (p.dryDays in 4..98) Text("DRY ${p.dryDays} DAYS", style = px(12, Plate.Yellow))
+                    Text(Garden.howItGrows(area), style = MaterialTheme.typography.bodySmall, color = C.Muted, textAlign = TextAlign.Center)
+                }
+            }
+        }
+        if (area == Area.STUDY || area == Area.WORK) item {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(bottom = 4.dp)) {
+                if (g.active == null) PixelButton(if (area == Area.STUDY) "Study now" else "Work now", color, Modifier.weight(1f)) { act.start(area, "") }
+                else Text(if (focusing) "Focusing now: ${focusClock(g.active.focusedS(g.now))}" else "A ${g.active.area.label.lowercase()} block is running",
+                    style = px(14, color), modifier = Modifier.weight(1f).padding(vertical = 14.dp))
+                PixelButton("+ Add past", C.Muted, Modifier.weight(1f)) { adding = true }
+            }
+        }
+        item { Text("WHAT GREW IT", style = pxTitle(12), modifier = Modifier.padding(start = 4.dp, top = 4.dp)) }
+        if (entries.isEmpty()) item { Text("Nothing yet.", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(start = 4.dp)) }
+        val today = LocalDate.now()
+        entries.take(60).groupBy { it.date }.forEach { (d, es) ->
+            item(key = "$area$d") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(when (d) { today -> "Today"; today.minusDays(1) -> "Yesterday"; else -> d.format(dD) },
+                        style = MaterialTheme.typography.titleSmall, color = C.Muted, modifier = Modifier.padding(start = 4.dp))
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            es.forEach { e ->
+                                val fs = e.focusId?.let { id -> g.sessions.firstOrNull { it.id == id } }
+                                Row(Modifier.fillMaxWidth().then(if (fs != null) Modifier.clickable { editing = fs } else Modifier),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.padding(end = 12.dp).size(8.dp, 26.dp).background(color))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(e.text, style = MaterialTheme.typography.bodyLarge)
+                                        if (e.sub.isNotBlank()) Text(e.sub, style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                                    }
+                                    Text("+${e.xp}", style = px(14, color))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 
 /** A chunky pixel button: flat colour, black border and a hard drop shadow. */
 @Composable
@@ -172,9 +253,9 @@ private fun PixelBar(f: Float, color: Color, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PlantCard(p: Garden.Plant, modifier: Modifier) {
+private fun PlantCard(p: Garden.Plant, modifier: Modifier, onClick: () -> Unit) {
     val dry = p.dryDays >= 4
-    Card(modifier) {
+    Card(modifier, onClick = onClick) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             PixelPlantArt(p.area, p.level, p.progress, dry = dry, focusing = false, modifier = Modifier.fillMaxWidth().height(124.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -188,48 +269,13 @@ private fun PlantCard(p: Garden.Plant, modifier: Modifier) {
     }
 }
 
-@Composable
-private fun FocusLog(ss: List<FocusSession>, act: GardenActions) {
-    var editing by remember { mutableStateOf<FocusSession?>(null) }
-    var adding by remember { mutableStateOf(false) }
-    if (adding) FocusLogDialog(null, onDismiss = { adding = false }, onDelete = null) { act.save(it); adding = false }
-    editing?.let { s ->
-        FocusLogDialog(s, onDismiss = { editing = null }, onDelete = { act.delete(s.id); editing = null }) { act.save(it); editing = null }
-    }
-    val z = ZoneId.systemDefault()
-    val today = LocalDate.now(z)
-    Column {
-        Row(Modifier.padding(start = 4.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("FOCUS LOG", style = pxTitle(13), modifier = Modifier.weight(1f))
-            Text("+ Add past", style = px(14, C.Accent), modifier = Modifier.clickable { adding = true }.padding(4.dp))
-        }
-        Card(Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (ss.isEmpty()) Text("Nothing yet. Start a block above, or add one you already did.", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
-                ss.forEach { s ->
-                    val t = Instant.ofEpochMilli(s.startMs).atZone(z)
-                    Row(Modifier.fillMaxWidth().clickable { editing = s }, verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.padding(end = 12.dp).size(8.dp, 26.dp).background(areaColor(s.area)))
-                        Column(Modifier.weight(1f)) {
-                            Text(s.label.ifBlank { s.area.label }, style = MaterialTheme.typography.bodyLarge)
-                            Text((if (t.toLocalDate() == today) "Today " else t.format(dD) + " ") + t.format(dT),
-                                style = MaterialTheme.typography.bodySmall, color = C.Muted)
-                        }
-                        Text(Garden.hm(s.minutes), style = px(14, areaColor(s.area)))
-                    }
-                }
-            }
-        }
-    }
-}
-
 /** Add a study/work block you already did, or fix one: area, what on, day, start time, minutes. */
 @Composable
-private fun FocusLogDialog(s: FocusSession?, onDismiss: () -> Unit, onDelete: (() -> Unit)?, onSave: (FocusSession) -> Unit) {
+private fun FocusLogDialog(s: FocusSession?, defaultArea: Area, onDismiss: () -> Unit, onDelete: (() -> Unit)?, onSave: (FocusSession) -> Unit) {
     val z = ZoneId.systemDefault()
     val today = LocalDate.now(z)
     val start0 = s?.let { Instant.ofEpochMilli(it.startMs).atZone(z) } ?: java.time.ZonedDateTime.now(z).minusHours(1).withMinute(0)
-    var area by remember { mutableStateOf(s?.area ?: Area.STUDY) }
+    var area by remember { mutableStateOf(s?.area ?: defaultArea) }
     var label by remember { mutableStateOf(s?.label ?: "") }
     var daysAgo by remember { mutableIntStateOf((today.toEpochDay() - start0.toLocalDate().toEpochDay()).toInt().coerceAtLeast(0)) }
     var hour by remember { mutableIntStateOf(start0.hour) }
@@ -237,7 +283,7 @@ private fun FocusLogDialog(s: FocusSession?, onDismiss: () -> Unit, onDelete: ((
     var mins by remember { mutableStateOf(s?.minutes?.toString() ?: "60") }
     var picking by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
-    if (picking) TimeDialog(hour, minute, onDismiss = { picking = false }) { h, m -> hour = h; minute = m; picking = false }
+    if (picking) TimeDialog(hour, minute, onDismiss = { picking = false }, title = "When did you start?") { h, m -> hour = h; minute = m; picking = false }
     if (confirm && onDelete != null) AlertDialog(onDismissRequest = { confirm = false }, containerColor = C.Surface, title = { Text("Delete this block?") },
         confirmButton = { TextButton(onClick = { confirm = false; onDelete() }) { Text("Delete", color = C.Stop) } },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel", color = C.Muted) } })
