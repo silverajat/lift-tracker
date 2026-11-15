@@ -142,16 +142,19 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
             Card(Modifier.fillMaxWidth(), onClick = onWeight) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     SectionLabel("Body weight")
-                    an.weight.lastWeekAvg?.let { w ->
+                    an.weight.trendKg?.let { w ->
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text("%.1f kg".format(w), style = MaterialTheme.typography.displaySmall.merge(Tnum))
-                            (an.weight.rateKgPerWeek?.let { "  ${"%+.2f".format(it)} kg/week trend" }
-                                ?: an.weight.changeKg?.let { "  ${"%+.2f".format(it)} kg on the week before" })?.let {
-                                Text(it, style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 6.dp))
+                            an.weight.rateKgPerWeek?.let {
+                                Text("  ${"%+.2f".format(it)} kg/week", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 6.dp))
                             }
                         }
+                        an.weight.lastWeighIn?.let { l ->
+                            Text("Trend · " + (if (l.date == java.time.LocalDate.now()) "today's weigh-in" else "last weigh-in (${l.date.format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))})") +
+                                " %.1f kg".format(l.kg), style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                        }
                     }
-                    Text(an.weight.verdict + ".", style = MaterialTheme.typography.bodyMedium, color = if (an.weight.lastWeekAvg == null) C.Muted else C.Text)
+                    Text(an.weight.verdict + ".", style = MaterialTheme.typography.bodyMedium, color = if (an.weight.trendKg == null) C.Muted else C.Text)
                     Text("Tap for the graph, your rate and patterns", style = MaterialTheme.typography.titleSmall, color = C.Accent)
                 }
             }

@@ -89,7 +89,7 @@ object Analysis {
     )
 
     data class WeightResult(val lastWeekAvg: Double?, val prevWeekAvg: Double?, val changeKg: Double?, val changePctPerWeek: Double?, val verdict: String,
-                            val rateKgPerWeek: Double? = null)
+                            val rateKgPerWeek: Double? = null, val trendKg: Double? = null, val lastWeighIn: WeightEntry? = null)
 
     data class Effect(val habit: String, val with: Double, val without: Double, val nWith: Int, val nWithout: Int, val clear: Boolean) {
         val delta get() = with - without
@@ -296,7 +296,11 @@ object Analysis {
         return xs.indices.sumOf { (xs[it] - mx) * (ys[it] - my) } / sxx * 7
     }
 
-    fun weight(weights: List<WeightEntry>, today: LocalDate, goalKgPerWeek: Double = 0.0): WeightResult {
+    fun weight(weights: List<WeightEntry>, today: LocalDate, goalKgPerWeek: Double = 0.0): WeightResult =
+        weightVerdict(weights, today, goalKgPerWeek).copy(trendKg = WeightTrend.now(weights.sortedBy { it.date }, today),
+            lastWeighIn = weights.filter { it.date <= today }.maxByOrNull { it.date })
+
+    private fun weightVerdict(weights: List<WeightEntry>, today: LocalDate, goalKgPerWeek: Double): WeightResult {
         val weeks = MealStore.weekAverages(weights, today).filter { it.days >= 3 }
         val last = weeks.getOrNull(0)
         val prev = weeks.getOrNull(1)

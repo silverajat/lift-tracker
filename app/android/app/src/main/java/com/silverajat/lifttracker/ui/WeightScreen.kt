@@ -46,20 +46,8 @@ object WeightStats {
      * Smoothed trend: each day moves 10% of the way towards the scale
      * (the Hacker's Diet method). Days without a weigh-in carry the trend on.
      */
-    fun trend(w: List<WeightEntry>): List<Point> {
-        val byDay = w.associate { it.date to it.kg }
-        val first = w.minOfOrNull { it.date } ?: return emptyList()
-        val last = maxOf(w.maxOf { it.date }, LocalDate.now())
-        var t = byDay.getValue(first)
-        val out = ArrayList<Point>()
-        var d = first
-        while (!d.isAfter(last)) {
-            byDay[d]?.let { t += 0.1 * (it - t) }
-            out += Point(d, byDay[d], t)
-            d = d.plusDays(1)
-        }
-        return out
-    }
+    fun trend(w: List<WeightEntry>): List<Point> =
+        com.silverajat.lifttracker.health.WeightTrend.points(w).map { Point(it.date, it.scale, it.trend) }
 
     /** kg per week from a straight line through the weigh-ins in the last [days]. */
     fun rate(w: List<WeightEntry>, days: Long, today: LocalDate = LocalDate.now()): Double? {
@@ -116,7 +104,7 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                         Text("%.1f".format(now.trend), style = MaterialTheme.typography.displayLarge.merge(Tnum))
                         Text(" kg", style = MaterialTheme.typography.displaySmall, color = C.Muted, modifier = Modifier.padding(bottom = 14.dp))
                     }
-                    weights.lastOrNull()?.let { Text("Trend · last weigh-in %.1f kg on %s".format(it.kg, it.date.format(wFmt)),
+                    weights.maxByOrNull { it.date }?.let { Text("Trend · last weigh-in %.1f kg on %s".format(it.kg, it.date.format(wFmt)),
                         style = MaterialTheme.typography.bodyMedium, color = C.Muted) }
                 }
             }

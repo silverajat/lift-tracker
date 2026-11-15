@@ -187,20 +187,17 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
 
         // ---- weight ----
         item {
-            val weeks = MealStore.weekAverages(weights, today)
             val todays = weights.firstOrNull { it.date == date }
             Card(Modifier.fillMaxWidth(), onClick = { weightDialog = true }) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SectionLabel("Morning weight")
-                    Text(todays?.let { "${"%.1f".format(it.kg)} kg" } ?: "Tap to log (after toilet, before food)",
-                        style = if (todays != null) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge,
-                        color = if (todays != null) C.Text else C.Accent)
-                    weeks.take(3).forEach { w ->
-                        Text("Week of ${w.weekStart.format(dateFmt)}: ${"%.2f".format(w.avgKg)} kg (${w.days} days)", color = C.Muted)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SectionLabel("Morning weight")
+                        Text(todays?.let { "${"%.1f".format(it.kg)} kg" } ?: "Tap to log (after toilet, before food)",
+                            style = if (todays != null) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge,
+                            color = if (todays != null) C.Text else C.Accent)
                     }
-                    if (weeks.size >= 2) {
-                        val d = weeks[0].avgKg - weeks[1].avgKg
-                        Text("Change ${if (d >= 0) "+" else ""}${"%.2f".format(d)} kg week on week", color = C.Text)
+                    com.silverajat.lifttracker.health.WeightTrend.now(weights.sortedBy { it.date })?.let {
+                        Text("trend %.1f".format(it), style = MaterialTheme.typography.bodyMedium.merge(Tnum), color = C.Muted)
                     }
                 }
             }
