@@ -77,7 +77,61 @@ data class GardenUi(
     val sessions: List<FocusSession>,
     val now: Long,
     val logs: Map<Area, List<Garden.Entry>> = emptyMap(),
+    val summaries: Map<LocalDate, Garden.DaySummary> = emptyMap(),
 )
+
+/**
+ * A day at a glance: a donut of where the time went (study, work, gym, sports),
+ * the main 3, and how much each plant grew.
+ */
+@Composable
+fun DaySummaryCard(s: Garden.DaySummary?, mainsDone: Int, mainsSet: Int, title: String) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(title, style = pxTitle(12))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(118.dp), contentAlignment = Alignment.Center) {
+                    val parts = s?.minutes.orEmpty().entries.toList()
+                    val total = parts.sumOf { it.value }.coerceAtLeast(1)
+                    Canvas(Modifier.size(118.dp)) {
+                        val w = 16.dp.toPx()
+                        val inset = w / 2
+                        val arcSize = Size(size.width - w, size.height - w)
+                        if (parts.isEmpty()) drawArc(C.Raised, 0f, 360f, false, Offset(inset, inset), arcSize, style = androidx.compose.ui.graphics.drawscope.Stroke(w))
+                        var a = -90f
+                        parts.forEach { (area, m) ->
+                            val sweep = 360f * m / total
+                            drawArc(areaColor(area), a + 1.5f, (sweep - 3f).coerceAtLeast(1f), false, Offset(inset, inset), arcSize,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(w, cap = androidx.compose.ui.graphics.StrokeCap.Butt))
+                            a += sweep
+                        }
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(Garden.hm(s?.totalMin ?: 0), style = px(15))
+                        Text("tracked", style = MaterialTheme.typography.labelSmall, color = C.Muted)
+                    }
+                }
+                Column(Modifier.weight(1f).padding(start = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(Area.STUDY, Area.WORK, Area.GYM, Area.SPORTS).forEach { a ->
+                        val m = s?.minutes?.get(a) ?: 0
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).background(if (m > 0) areaColor(a) else C.Raised))
+                            Text(a.label, style = MaterialTheme.typography.bodyMedium, color = if (m > 0) C.Text else C.Muted,
+                                modifier = Modifier.weight(1f).padding(start = 8.dp))
+                            Text(if (m > 0) Garden.hm(m) else "–", style = MaterialTheme.typography.bodyMedium.merge(Tnum), color = if (m > 0) C.Text else C.Muted)
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (mainsSet > 0) "Main 3: $mainsDone/$mainsSet" else "No main 3 set", style = MaterialTheme.typography.titleSmall)
+                val grew = s?.xp.orEmpty().filterValues { it > 0 }
+                if (grew.isNotEmpty()) Text(grew.entries.joinToString("  ") { (a, x) -> "${a.label} +$x" },
+                    style = MaterialTheme.typography.bodySmall, color = C.Muted, maxLines = 2, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
 
 class GardenActions(
     val start: (Area, String) -> Unit = { _, _ -> },

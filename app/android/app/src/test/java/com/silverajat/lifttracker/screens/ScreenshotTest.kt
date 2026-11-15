@@ -240,7 +240,7 @@ class ScreenshotTest {
         return com.silverajat.lifttracker.ui.DayUi(today, mapOf(today to p, y.date to y, tm.date to tm), notes, emptyList(), java.time.LocalTime.of(22, 10),
             listOf("Greek yogurt", "Eggs x30", "Isopropyl alcohol 99%", "Bananas").mapIndexed { i, t -> com.silverajat.lifttracker.journal.ShopItem(text = t, bought = i == 0) })
     }
-    @Test fun dayPlan() = shoot("day_plan") { com.silverajat.lifttracker.ui.DayContent(journal()) }
+    @Test fun dayPlan() = shoot("day_plan") { com.silverajat.lifttracker.ui.DayContent(journal(), garden = gardenUi(false)) }
     @Test fun dayNotes() = shoot("day_notes") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 2) }
     @Test fun dayPast() = shoot("day_past") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 3) }
     private fun gardenUi(active: Boolean): com.silverajat.lifttracker.ui.GardenUi {
@@ -255,9 +255,11 @@ class ScreenshotTest {
             java.time.LocalDate.now(), java.time.ZoneId.systemDefault(), now)
             .map { p -> if (p.area == com.silverajat.lifttracker.garden.Area.SLEEP) com.silverajat.lifttracker.garden.Garden.Plant(p.area, 2650, com.silverajat.lifttracker.garden.Garden.level(2650), com.silverajat.lifttracker.garden.Garden.progress(2650), "5/7 good nights", java.time.LocalDate.now(), 0) else p }
         val gIn = com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, emptyList(), j.pages)
+        val sums = (0L..10L).map { java.time.LocalDate.now().minusDays(it) }.associateWith { com.silverajat.lifttracker.garden.Garden.summary(it, gIn, java.time.ZoneId.systemDefault(), now) }
+            .mapValues { (d, v) -> if (d == java.time.LocalDate.now()) v.copy(minutes = linkedMapOf(com.silverajat.lifttracker.garden.Area.STUDY to 130, com.silverajat.lifttracker.garden.Area.WORK to 40, com.silverajat.lifttracker.garden.Area.GYM to 65, com.silverajat.lifttracker.garden.Area.SPORTS to 90)) else v }
         return com.silverajat.lifttracker.ui.GardenUi(plants,
             if (active) com.silverajat.lifttracker.garden.ActiveFocus(com.silverajat.lifttracker.garden.Area.STUDY, "EE2023 tutorial 6", now - 34 * 60_000L - 12_000, awayS = 180) else null, focus, now,
-            com.silverajat.lifttracker.garden.Area.entries.associateWith { com.silverajat.lifttracker.garden.Garden.log(it, gIn, java.time.ZoneId.systemDefault()) })
+            com.silverajat.lifttracker.garden.Area.entries.associateWith { com.silverajat.lifttracker.garden.Garden.log(it, gIn, java.time.ZoneId.systemDefault()) }, sums)
     }
     @Test fun garden() = shoot("day_garden") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 1, garden = gardenUi(false)) }
     @Test fun plantPage() = shoot("plant_study") { com.silverajat.lifttracker.ui.PlantPage(gardenUi(false), com.silverajat.lifttracker.garden.Area.STUDY, com.silverajat.lifttracker.ui.GardenActions()) {} }

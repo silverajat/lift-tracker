@@ -115,7 +115,10 @@ fun DayScreen(
     val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() }, shopping = shopping)
     val gIn = com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active)
     val logs = remember(focus, sessions, items, an, pages) { com.silverajat.lifttracker.garden.Area.entries.associateWith { com.silverajat.lifttracker.garden.Garden.log(it, gIn, zone) } }
-    DayContent(ui, garden = GardenUi(plants, active, focus, now, logs), gAct = GardenActions(
+    val summaries = remember(focus, sessions, items, an, pages, now / 60_000) {
+        (0L..30L).map { today.minusDays(it) }.associateWith { com.silverajat.lifttracker.garden.Garden.summary(it, gIn, zone, now) }
+    }
+    DayContent(ui, garden = GardenUi(plants, active, focus, now, logs, summaries), gAct = GardenActions(
         start = { a, l -> g.start(a, l) }, stop = { g.stop() }, discard = g::discard, delete = g::delete, save = g::save,
     ), act = DayActions(
         add = { t, m, d -> if (d == null) j.add(t, m) else j.add(t, m, d) },
@@ -166,10 +169,13 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, gard
             }
         }
         when (tab) {
-            0 -> planTab(u, page, act) { editing = it }
+            0 -> {
+                item { DaySummaryCard(garden?.summaries?.get(u.today), page.mains.count { it.done }, page.mains.size, "TODAY SO FAR") }
+                planTab(u, page, act) { editing = it }
+            }
             1 -> if (garden != null) gardenTab(garden, gAct) { plant = it }
             2 -> notesTab(u, act) { editingNote = it }
-            else -> pastTab(u)
+            else -> pastTab(u, garden?.summaries.orEmpty())
         }
     }
 }
@@ -425,7 +431,7 @@ private fun whenText(ms: Long): String {
 
 // ---- past -------------------------------------------------------------------------
 
-private fun LazyListScope.pastTab(u: DayUi) {
+private fun LazyListScope.pastTab(u: DayUi, sums: Map<LocalDate, com.silverajat.lifttracker.garden.Garden.DaySummary> = emptyMap()) {
     val w = Journal.week(u.pages, u.today)
     item {
         Card(Modifier.fillMaxWidth()) {
@@ -441,7 +447,7 @@ private fun LazyListScope.pastTab(u: DayUi) {
     }
     val past = u.pages.values.filter { it.date < u.today && (it.planned || it.reflected) }.sortedByDescending { it.date }.take(60)
     if (past.isEmpty()) item { Text("Your past days show up here.", color = C.Muted, modifier = Modifier.padding(start = 4.dp)) }
-    items(past, key = { it.date.toString() }) { p -> PastDay(p) }
+    items(past, key = { it.date.toString() }) { p -> PastDay(p, sums[p.date]) }
 }
 
 @Composable
@@ -453,13 +459,17 @@ private fun PastStat(v: String, label: String) {
 }
 
 @Composable
-private fun PastDay(p: DayPage) {
+private fun PastDay(p: DayPage, sum: com.silverajat.lifttracker.garden.Garden.DaySummary? = null) {
     var open by remember { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth(), onClick = { open = !open }) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p.date.format(dShort), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 p.mood?.let { Text(MOODS[it - 1], style = MaterialTheme.typography.titleLarge) }
+            }
+            sum?.minutes?.takeIf { it.isNotEmpty() }?.let { m ->
+                Text(m.entries.joinToString(" · ") { (a, v) -> "${a.label} ${com.silverajat.lifttracker.garden.Garden.hm(v)}" },
+                    style = MaterialTheme.typography.bodyMedium.merge(Tnum), color = C.Muted)
             }
             if (p.planned) Text("${p.mains.count { it.done }}/${p.mains.size} main" +
                 (if (p.sides.isNotEmpty()) " · ${p.sides.count { it.done }}/${p.sides.size} side" else ""),

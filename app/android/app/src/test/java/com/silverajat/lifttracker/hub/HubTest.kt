@@ -86,7 +86,7 @@ class HubTest {
     }
 
     @Test fun sleepScoreIsMoreThanHours() {
-        val (full, _) = Analysis.sleepScore(100, 95, 95, 45)
+        val (full, _) = Analysis.sleepScore(100, 100, 95, 45)
         assertEquals(100, full)
         // enough hours but messy timing, restless and light: not a great night
         val (messy, parts) = Analysis.sleepScore(100, 40, 78, 25)

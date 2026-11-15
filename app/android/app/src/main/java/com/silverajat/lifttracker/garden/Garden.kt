@@ -115,6 +115,23 @@ object Garden {
 
     fun hm(min: Int) = if (min >= 60) "${min / 60}h ${min % 60}m" else "${min}m"
 
+    /** Where a day's time went (minutes) and what each plant earned that day. */
+    data class DaySummary(val date: LocalDate, val minutes: Map<Area, Int>, val xp: Map<Area, Int>) {
+        val totalMin get() = minutes.values.sum()
+    }
+
+    fun summary(date: LocalDate, i: Inputs, zone: ZoneId, now: Long = System.currentTimeMillis()): DaySummary {
+        fun day(ms: Long) = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+        val m = LinkedHashMap<Area, Int>()
+        fun add(a: Area, v: Int) { if (v > 0) m[a] = (m[a] ?: 0) + v }
+        i.focus.filter { day(it.startMs) == date }.forEach { add(it.area, it.minutes) }
+        i.active?.takeIf { day(it.startMs) == date }?.let { add(it.area, (it.focusedS(now) / 60).toInt()) }
+        i.gym.filter { it.endMs != null && it.sets.isNotEmpty() && day(it.startMs) == date }.forEach { add(Area.GYM, ((it.endMs!! - it.startMs) / 60_000).toInt()) }
+        i.sports.filter { it.sport != Sport.GYM && it.start.atZone(zone).toLocalDate() == date }.forEach { add(Area.SPORTS, it.minutes) }
+        val xp = daily(i, zone, now).mapValues { it.value[date] ?: 0 }.filterValues { it > 0 }
+        return DaySummary(date, m, xp)
+    }
+
     /** What grew a plant, newest first: one line per session, game, night or day. [focusId] lets a study/work line be edited. */
     data class Entry(val date: LocalDate, val text: String, val sub: String, val xp: Int, val focusId: String? = null)
 

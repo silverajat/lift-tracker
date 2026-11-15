@@ -256,7 +256,15 @@ object InsightEngine {
         val tNow = now.toLocalTime()
         if (tNow >= LocalTime.of(21, 30) && "plan-pm-$jDay" !in sent && !jPage.reflected) {
             val m = jPage.mains
+            // the day in a line: focus time, then the main 3
+            val focus = com.silverajat.lifttracker.garden.FocusStore(ctx.filesDir).sessions()
+                .filter { com.silverajat.lifttracker.journal.Journal.dayOf(java.time.Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDateTime()) == jDay }
+            val study = focus.filter { it.area == com.silverajat.lifttracker.garden.Area.STUDY }.sumOf { it.minutes }
+            val work = focus.filter { it.area == com.silverajat.lifttracker.garden.Area.WORK }.sumOf { it.minutes }
+            val time = listOfNotNull(study.takeIf { it > 0 }?.let { "${com.silverajat.lifttracker.garden.Garden.hm(it)} study" },
+                work.takeIf { it > 0 }?.let { "${com.silverajat.lifttracker.garden.Garden.hm(it)} work" }).joinToString(", ")
             post(ctx, Insight("plan-pm-$jDay", Kind.PLAN, "Tick off and reflect",
+                (if (time.isNotEmpty()) "Today: $time. " else "") +
                 (if (m.isNotEmpty()) "${m.count { it.done }} of ${m.size} main things done. " else "") + "Write a line about today.", nowMs), tab = "DAY")
         }
 
