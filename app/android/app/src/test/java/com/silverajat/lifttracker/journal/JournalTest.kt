@@ -108,4 +108,25 @@ class JournalTest {
         assertEquals(listOf("A", "B"), back.map { it.text })
         assertTrue(back[0].fired)
     }
+
+    @Test fun reminderForOtherDays() {   // 15 Nov 2026 is a Sunday
+        val a = ReminderText.parse("dentist fri 3pm", now)
+        assertEquals("Dentist", a.text)
+        assertEquals(LocalDateTime.of(2026, 11, 20, 15, 0), a.at)
+        assertEquals(LocalDateTime.of(2026, 11, 20, 9, 0), ReminderText.parse("submit lab on 20 nov at 9", now).at)
+        assertEquals("Submit lab", ReminderText.parse("submit lab on 20 nov at 9", now).text)
+        assertEquals(LocalDateTime.of(2026, 11, 18, 7, 0), ReminderText.parse("call papa in 3 days at 7", now).at)
+        assertEquals(LocalDateTime.of(2026, 12, 25, 10, 0), ReminderText.parse("buy flowers 25/12 10am", now).at)
+        assertEquals(LocalDateTime.of(2026, 11, 16, 15, 0), ReminderText.parse("tmr at 3 return book", now).at)
+    }
+
+    @Test fun reminderWithADayButNoTimeKeepsTheDay() {
+        val p = ReminderText.parse("pay bills next sunday", now)
+        assertEquals("Pay bills", p.text)
+        assertEquals(null, p.at)
+        assertEquals(LocalDate.of(2026, 11, 22), p.day)
+        val q = ReminderText.parse("sun cream", now)   // not a day
+        assertEquals("Sun cream", q.text)
+        assertEquals(null, q.day)
+    }
 }

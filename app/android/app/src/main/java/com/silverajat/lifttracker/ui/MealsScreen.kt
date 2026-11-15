@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -336,13 +337,16 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
 /** Clock picker (meals, activities, focus blocks). */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun TimeDialog(hour: Int, minute: Int, onDismiss: () -> Unit, title: String = "When did you eat it?", onPick: (Int, Int) -> Unit) {
+fun TimeDialog(hour: Int, minute: Int, onDismiss: () -> Unit, title: String = "When did you eat it?",
+               header: (@Composable () -> Unit)? = null, onPick: (Int, Int) -> Unit) {
     val state = androidx.compose.material3.rememberTimePickerState(hour, minute, is24Hour = true)
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Surface,
         title = { Text(title) },
         text = {
+          Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            header?.invoke()
             // the picker draws its hours/minutes in displayLarge; the app's is too big for its boxes
             MaterialTheme(typography = MaterialTheme.typography.copy(
                 displayLarge = MaterialTheme.typography.displayLarge.copy(fontSize = 52.sp, lineHeight = 60.sp))) {
@@ -356,6 +360,7 @@ fun TimeDialog(hour: Int, minute: Int, onDismiss: () -> Unit, title: String = "W
                 ),
             )
             }
+          }
         },
         confirmButton = { TextButton(onClick = { onPick(state.hour, state.minute) }) { Text("Set time", color = C.Accent, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) } },

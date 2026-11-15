@@ -52,7 +52,8 @@ data class Reminder(
 
 /** Reads a time out of what you typed: "umbrella at 3:30", "call mum at 9", "gym bag tmr 8am", "laundry in 20 min". */
 object ReminderText {
-    data class Parsed(val text: String, val at: LocalDateTime?)
+    /** [day] is set when you named a day but no time (the app then asks for the time on that day). */
+    data class Parsed(val text: String, val at: LocalDateTime?, val day: LocalDate? = null)
 
     private val ic = setOf(RegexOption.IGNORE_CASE)
     private val inRe = Regex("""\bin\s+(\d{1,3})\s*(m|mins?|minutes?|h|hrs?|hours?)\b""", ic)
@@ -60,14 +61,50 @@ object ReminderText {
     private val atRe = Regex("""\bat\s+(\d{1,2})(?:[:.](\d{2}))?\b""", ic)
     private val clockRe = Regex("""\b(\d{1,2})[:.](\d{2})\b""")
     private val tmrRe = Regex("""\b(tmr|tmrw|tomorrow)\b""", ic)
+    private val todayRe = Regex("""\b(today|tonight)\b""", ic)
+    private val inDaysRe = Regex("""\bin\s+(\d{1,2})\s*days?\b""", ic)
+    private val monthRe = Regex("""\b(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b""", ic)
+    private val slashRe = Regex("""\b(?:on\s+)?(\d{1,2})/(\d{1,2})\b""")
+    private val weekRe = Regex("""\b(on\s+|next\s+|this\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues|tue|wed|thurs|thur|thu|fri|sat|sun)\b""", ic)
     private val leadRe = Regex("""^\s*(remind me( to)?|reminder:?|to)\s+""", ic)
     private val tailRe = Regex("""[\s,.:;-]*\b(at|by|to|on)?[\s,.:;-]*$""", ic)
+    private val months = listOf("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+    private val days = listOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+    /** The day you named, if any: tmr, today, in 3 days, 20 nov, 20/11, fri / on saturday / next sunday. */
+    private fun dayIn(s: String, today: LocalDate): Pair<LocalDate, IntRange>? {
+        tmrRe.find(s)?.let { return today.plusDays(1) to it.range }
+        todayRe.find(s)?.let { return today to it.range }
+        inDaysRe.find(s)?.let { return today.plusDays(it.groupValues[1].toLong()) to it.range }
+        fun future(d: LocalDate) = if (d.isBefore(today)) d.plusYears(1) else d
+        monthRe.find(s)?.let { m ->
+            runCatching { LocalDate.of(today.year, months.indexOf(m.groupValues[2].lowercase().take(3)) + 1, m.groupValues[1].toInt()) }
+                .getOrNull()?.let { return future(it) to m.range }
+        }
+        slashRe.find(s)?.let { m ->
+            runCatching { LocalDate.of(today.year, m.groupValues[2].toInt(), m.groupValues[1].toInt()) }
+                .getOrNull()?.let { return future(it) to m.range }
+        }
+        for (m in weekRe.findAll(s)) {
+            val name = m.groupValues[2].lowercase()
+            // "wed", "sat" and "sun" are words too ("sun cream"), so only with on/next/this in front
+            if (name in setOf("wed", "sat", "sun") && m.groupValues[1].isEmpty()) continue
+            val target = days.indexOf(name.take(3)) + 1
+            var diff = (target - today.dayOfWeek.value + 7) % 7
+            if (diff == 0) diff = 7       // naming today's weekday means next week's
+            return today.plusDays(diff.toLong()) to m.range
+        }
+        return null
+    }
 
     fun parse(s: String, now: LocalDateTime): Parsed {
-        val tmr = tmrRe.containsMatchIn(s)
-        var rest = tmrRe.replace(s, " ")
+        val today = now.toLocalDate()
+        var rest = s
+        val found = dayIn(rest, today)
+        val day = found?.first
+        if (found != null) rest = rest.removeRange(found.second)
         var at: LocalDateTime? = null
-        val inM = inRe.find(rest)
+        val inM = if (day == null) inRe.find(rest) else null
         if (inM != null) {
             val n = inM.groupValues[1].toLong()
             val t = if (inM.groupValues[2].startsWith("h", ignoreCase = true)) now.plusHours(n) else now.plusMinutes(n)
@@ -77,30 +114,31 @@ object ReminderText {
             val m = ampmRe.find(rest) ?: atRe.find(rest) ?: clockRe.find(rest)
             if (m != null) {
                 val ampm = if (m.groupValues.size > 3) m.groupValues[3].ifEmpty { null } else null
-                at = resolve(m.groupValues[1].toInt(), m.groupValues[2].ifEmpty { "0" }.toInt(), ampm, tmr, now)
+                at = resolve(m.groupValues[1].toInt(), m.groupValues[2].ifEmpty { "0" }.toInt(), ampm, day, now)
                 if (at != null) rest = rest.removeRange(m.range)
             }
         }
-        if (at == null && tmr) at = now.toLocalDate().plusDays(1).atTime(9, 0)
         var text = leadRe.replace(rest.replace(Regex("\\s+"), " ").trim(), "")
         text = tailRe.replace(text, "").trim()
         text = text.replaceFirstChar { it.uppercase() }
-        return Parsed(text, at)
+        return Parsed(text, at, if (at == null) day else null)
     }
 
-    /** A clock time to the next sensible moment: "3:30" at 2:48 PM is 3:30 PM, "9" in the evening is 9 PM. */
-    fun resolve(h: Int, m: Int, ampm: String?, tmr: Boolean, now: LocalDateTime): LocalDateTime? {
+    /**
+     * A clock time to a moment. With no day: the next sensible one ("3:30" at 2:48 PM is 3:30 PM, "9" in the evening is 9 PM).
+     * On a named later day without AM/PM, 1 to 6 means the afternoon.
+     */
+    fun resolve(h: Int, m: Int, ampm: String?, day: LocalDate?, now: LocalDateTime): LocalDateTime? {
         if (h > 23 || m > 59) return null
         val today = now.toLocalDate()
-        val base = if (tmr) today.plusDays(1) else today
-        fun next(t: LocalDateTime) = if (!tmr && !t.isAfter(now)) t.plusDays(1) else t
-        if (ampm != null) {
-            if (h !in 1..12) return null
-            return next(base.atTime(h % 12 + if (ampm.equals("pm", ignoreCase = true)) 12 else 0, m))
-        }
-        if (h == 0 || h > 12) return next(base.atTime(h, m))
+        if (ampm != null && h !in 1..12) return null
+        val h24 = ampm?.let { h % 12 + if (it.equals("pm", ignoreCase = true)) 12 else 0 }
+        if (day != null && day.isAfter(today)) return day.atTime(h24 ?: if (h in 1..6) h + 12 else h, m)
+        fun next(t: LocalDateTime) = if (!t.isAfter(now)) t.plusDays(1) else t
+        if (h24 != null) return next(today.atTime(h24, m))
+        if (h == 0 || h > 12) return next(today.atTime(h, m))
         // 1..12 with no AM/PM: the sooner of the two today, else tomorrow (1 to 6 meaning the afternoon)
-        if (!tmr) listOf(h % 12, h % 12 + 12).map { today.atTime(it, m) }.firstOrNull { it.isAfter(now) }?.let { return it }
+        listOf(h % 12, h % 12 + 12).map { today.atTime(it, m) }.firstOrNull { it.isAfter(now) }?.let { return it }
         return today.plusDays(1).atTime(if (h <= 6) h + 12 else h, m)
     }
 }

@@ -1,5 +1,7 @@
 package com.silverajat.lifttracker.ui
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -264,22 +266,16 @@ private fun LazyListScope.planTab(u: DayUi, page: DayPage, act: DayActions, onEd
 private fun RemindersBlock(rs: List<com.silverajat.lifttracker.journal.Reminder>, act: DayActions) {
     var now by remember { mutableStateOf(java.time.LocalDateTime.now()) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); now = java.time.LocalDateTime.now() } }
-    var asking by remember { mutableStateOf<String?>(null) }          // text waiting for a time
+    // text waiting for a day and time (and the day, if you named one)
+    var asking by remember { mutableStateOf<Pair<String, java.time.LocalDate?>?>(null) }
     var moving by remember { mutableStateOf<com.silverajat.lifttracker.journal.Reminder?>(null) }
-    fun upcoming(h: Int, m: Int): java.time.LocalDateTime {
-        val t = now.toLocalDate().atTime(h, m)
-        return if (t.isAfter(now)) t else t.plusDays(1)
-    }
-    asking?.let { text ->
-        val d = now.plusHours(1)
-        TimeDialog(d.hour, 0, onDismiss = { asking = null }, title = "Remind you when?") { h, m ->
-            act.addReminder(text, upcoming(h, m)); asking = null
-        }
+    asking?.let { (text, day) ->
+        val h = now.plusHours(1).hour
+        val start = (day ?: now.toLocalDate()).atTime(if (day != null && day.isAfter(now.toLocalDate())) 9 else h, 0)
+        ReminderWhenDialog("Remind you when?", start, now, onDismiss = { asking = null }) { act.addReminder(text, it); asking = null }
     }
     moving?.let { r ->
-        TimeDialog(r.at.hour, r.at.minute, onDismiss = { moving = null }, title = "Move to when?") { h, m ->
-            act.moveReminder(r.id, upcoming(h, m)); moving = null
-        }
+        ReminderWhenDialog("Move to when?", r.at, now, onDismiss = { moving = null }) { act.moveReminder(r.id, it); moving = null }
     }
     val next = rs.count { it.at.isAfter(now) }
     Block("Reminders", progress = next.takeIf { it > 0 }?.let { "$it coming up" }) {
@@ -289,7 +285,8 @@ private fun RemindersBlock(rs: List<com.silverajat.lifttracker.journal.Reminder>
             val time = (when (day) {
                 now.toLocalDate() -> ""
                 now.toLocalDate().plusDays(1) -> "Tmr "
-                else -> day.format(DateTimeFormatter.ofPattern("d MMM ")) 
+                in now.toLocalDate()..now.toLocalDate().plusDays(6) -> day.format(DateTimeFormatter.ofPattern("EEE "))
+            else -> day.format(DateTimeFormatter.ofPattern("d MMM "))
             }) + r.at.format(dTime)
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { moving = r }) {
                 Text(time, style = MaterialTheme.typography.titleSmall.merge(Tnum), color = if (past) C.Muted else C.Accent,
@@ -299,14 +296,71 @@ private fun RemindersBlock(rs: List<com.silverajat.lifttracker.journal.Reminder>
                 Text("✕", color = C.Muted, modifier = Modifier.clickable { act.removeReminder(r.id) }.padding(8.dp))
             }
         }
-        AddField("Remind me… e.g. umbrella at 3:30") { s ->
+        AddField("Remind me… e.g. umbrella tmr 8am") { s ->
             val p = com.silverajat.lifttracker.journal.ReminderText.parse(s, now)
             if (p.text.isBlank()) return@AddField
-            if (p.at != null) act.addReminder(p.text, p.at) else asking = p.text
+            if (p.at != null) act.addReminder(p.text, p.at) else asking = p.text to p.day
         }
-        if (rs.isEmpty()) Text("Just a notification at that time. Try \"call mum at 9\" or \"laundry in 40 min\".",
+        if (rs.isEmpty()) Text("Just a notification at that time. Try \"call mum at 9\", \"gym bag tmr 8am\", " +
+            "\"dentist fri 3pm\" or \"laundry in 40 min\". No time? You'll pick a day and time.",
             style = MaterialTheme.typography.bodySmall, color = C.Muted)
     }
+}
+
+/** Day chips (today, tomorrow, the rest of the week, or any date) above the clock. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderWhenDialog(title: String, start: java.time.LocalDateTime, now: java.time.LocalDateTime,
+                               onDismiss: () -> Unit, onPick: (java.time.LocalDateTime) -> Unit) {
+    val today = now.toLocalDate()
+    var day by remember { mutableStateOf(if (start.toLocalDate().isBefore(today)) today else start.toLocalDate()) }
+    var picking by remember { mutableStateOf(false) }
+    if (picking) {
+        val utc = java.time.ZoneOffset.UTC
+        val first = today.atStartOfDay(utc).toInstant().toEpochMilli()
+        val ds = androidx.compose.material3.rememberDatePickerState(
+            initialSelectedDateMillis = day.atStartOfDay(utc).toInstant().toEpochMilli(),
+            selectableDates = object : androidx.compose.material3.SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis >= first
+            })
+        androidx.compose.material3.DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                ds.selectedDateMillis?.let { day = java.time.Instant.ofEpochMilli(it).atZone(utc).toLocalDate() }; picking = false
+            }) { Text("OK", color = C.Accent) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { picking = false }) { Text("Cancel", color = C.Muted) } },
+            colors = androidx.compose.material3.DatePickerDefaults.colors(containerColor = C.Surface),
+        ) {
+            androidx.compose.material3.DatePicker(ds, colors = androidx.compose.material3.DatePickerDefaults.colors(
+                containerColor = C.Surface, selectedDayContainerColor = C.Accent, selectedDayContentColor = C.OnAccent,
+                todayDateBorderColor = C.Accent, todayContentColor = C.Accent))
+        }
+    }
+    TimeDialog(start.hour, start.minute, onDismiss, title, header = {
+        val week = (0L..6L).map { today.plusDays(it) }
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            (week + listOfNotNull(day.takeIf { it !in week })).forEach { d ->
+                DayChip(when (d) {
+                    today -> "Today"
+                    today.plusDays(1) -> "Tmr"
+                    in week -> d.format(DateTimeFormatter.ofPattern("EEE d"))
+                    else -> d.format(DateTimeFormatter.ofPattern("d MMM"))
+                }, d == day) { day = d }
+            }
+            DayChip("Other date", false) { picking = true }
+        }
+    }) { h, m ->
+        val t = day.atTime(h, m)
+        // a time that's already gone today means tomorrow
+        onPick(if (day == today && !t.isAfter(now)) t.plusDays(1) else t)
+    }
+}
+
+@Composable
+private fun DayChip(label: String, on: Boolean, onClick: () -> Unit) {
+    Text(label, style = MaterialTheme.typography.titleSmall, color = if (on) C.OnAccent else C.Text,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) C.Accent else C.Raised)
+            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp))
 }
 
 @Composable
