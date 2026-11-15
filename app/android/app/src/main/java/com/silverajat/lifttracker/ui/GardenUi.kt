@@ -109,11 +109,11 @@ fun DaySummaryCard(s: Garden.DaySummary?, mainsDone: Int, mainsSet: Int, title: 
                     }
                 }
                 Column(Modifier.weight(1f).padding(start = 18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(Area.STUDY, Area.WORK, Area.GYM, Area.SPORTS).forEach { a ->
+                    listOf(Area.STUDY, Area.WORK, Area.GYM, Area.SPORTS, Area.MIND).forEach { a ->
                         val m = s?.minutes?.get(a) ?: 0
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(10.dp).background(if (m > 0) areaColor(a) else C.Raised))
-                            Text(a.label, style = MaterialTheme.typography.bodyMedium, color = if (m > 0) C.Text else C.Muted,
+                            Text(if (a == Area.MIND) "Reading" else a.label, style = MaterialTheme.typography.bodyMedium, color = if (m > 0) C.Text else C.Muted,
                                 modifier = Modifier.weight(1f).padding(start = 8.dp))
                             Text(if (m > 0) Garden.hm(m) else "–", style = MaterialTheme.typography.bodyMedium.merge(Tnum), color = if (m > 0) C.Text else C.Muted)
                         }

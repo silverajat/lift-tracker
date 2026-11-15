@@ -24,6 +24,12 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
     private val _reminders = MutableStateFlow<List<Reminder>>(emptyList())
     val reminders: StateFlow<List<Reminder>> = _reminders
 
+    private val reading = ReadingStore(app.filesDir)
+    private val _books = MutableStateFlow<List<Book>>(emptyList())
+    val books: StateFlow<List<Book>> = _books
+    private val _reads = MutableStateFlow<List<ReadSession>>(emptyList())
+    val reads: StateFlow<List<ReadSession>> = _reads
+
     init { refresh() }
 
     /** Re-reads the file and moves to a new day after 4 AM. */
@@ -37,7 +43,40 @@ class JournalViewModel(app: Application) : AndroidViewModel(app) {
         val keep = all.filter { !it.fired || it.at.isAfter(LocalDateTime.now().minusDays(1)) }
         if (keep.size != all.size) store.saveReminders(keep)
         _reminders.value = keep
+        _books.value = reading.books()
+        _reads.value = reading.sessions()
     }
+
+    // ---- reading ----
+    fun addBook(text: String) {
+        val (title, author, pages) = Reading.parseBook(text)
+        if (title.isBlank()) return
+        setBooks(reading.books() + Book(title = title, author = author, pages = pages, started = _today.value))
+    }
+    fun editBook(id: String, title: String, author: String, pages: Int?) {
+        if (title.isBlank()) return
+        setBooks(reading.books().map { if (it.id == id) it.copy(title = title.trim(), author = author.trim(), pages = pages) else it })
+    }
+    /** Log a sitting: minutes, and optionally the page you're now on. Reaching the last page finishes the book. */
+    fun logReading(bookId: String, minutes: Int, toPage: Int?, date: LocalDate = _today.value) {
+        val book = reading.books().firstOrNull { it.id == bookId } ?: return
+        if (minutes <= 0 && toPage == null) return
+        val read = toPage?.let { (it - book.page).coerceAtLeast(0) } ?: 0
+        setReads(reading.sessions() + ReadSession(bookId = bookId, date = date, minutes = minutes.coerceAtLeast(0), toPage = toPage, pagesRead = read))
+        val done = toPage != null && book.pages != null && toPage >= book.pages
+        setBooks(reading.books().map {
+            if (it.id != bookId) it else it.copy(page = toPage ?: it.page, finished = if (done) (it.finished ?: date) else it.finished)
+        })
+    }
+    fun finishBook(id: String, done: Boolean = true) =
+        setBooks(reading.books().map { if (it.id == id) it.copy(finished = if (done) _today.value else null, page = if (done) (it.pages ?: it.page) else it.page) else it })
+    fun removeBook(id: String) {
+        setBooks(reading.books().filter { it.id != id })
+        setReads(reading.sessions().filter { it.bookId != id })
+    }
+    fun removeRead(id: String) = setReads(reading.sessions().filter { it.id != id })
+    private fun setBooks(bs: List<Book>) { reading.saveBooks(bs); _books.value = bs }
+    private fun setReads(rs: List<ReadSession>) { reading.saveSessions(rs); _reads.value = rs.sortedByDescending { it.date } }
 
     fun page(d: LocalDate = _today.value): DayPage = _pages.value[d] ?: DayPage(d)
 

@@ -86,6 +86,12 @@ class DayActions(
     val addReminder: (String, java.time.LocalDateTime) -> Unit = { _, _ -> },
     val moveReminder: (String, java.time.LocalDateTime) -> Unit = { _, _ -> },
     val removeReminder: (String) -> Unit = {},
+    val addBook: (String) -> Unit = {},
+    val editBook: (String, String, String, Int?) -> Unit = { _, _, _, _ -> },
+    val logReading: (String, Int, Int?, LocalDate) -> Unit = { _, _, _, _ -> },
+    val finishBook: (String, Boolean) -> Unit = { _, _ -> },
+    val removeBook: (String) -> Unit = {},
+    val removeRead: (String) -> Unit = {},
     val brainstorm: () -> Unit = {},
 )
 
@@ -97,6 +103,8 @@ data class DayUi(
     val now: LocalTime = LocalTime.now(),
     val shopping: List<com.silverajat.lifttracker.journal.ShopItem> = emptyList(),
     val reminders: List<com.silverajat.lifttracker.journal.Reminder> = emptyList(),
+    val books: List<com.silverajat.lifttracker.journal.Book> = emptyList(),
+    val reads: List<com.silverajat.lifttracker.journal.ReadSession> = emptyList(),
 )
 
 @Composable
@@ -110,6 +118,8 @@ fun DayScreen(
     val notes by j.notes.collectAsStateWithLifecycle()
     val shopping by j.shopping.collectAsStateWithLifecycle()
     val reminders by j.reminders.collectAsStateWithLifecycle()
+    val books by j.books.collectAsStateWithLifecycle()
+    val reads by j.reads.collectAsStateWithLifecycle()
     val focus by g.sessions.collectAsStateWithLifecycle()
     val active by g.active.collectAsStateWithLifecycle()
     val sessions by gym.history.collectAsStateWithLifecycle()
@@ -120,11 +130,12 @@ fun DayScreen(
     LaunchedEffect(Unit) { j.refresh() }
     val zone = ZoneId.systemDefault()
     val plants = com.silverajat.lifttracker.garden.Garden.plants(
-        com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active), today, zone, now)
-    val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() }, shopping = shopping, reminders = reminders)
-    val gIn = com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active)
-    val logs = remember(focus, sessions, items, an, pages) { com.silverajat.lifttracker.garden.Area.entries.associateWith { com.silverajat.lifttracker.garden.Garden.log(it, gIn, zone) } }
-    val summaries = remember(focus, sessions, items, an, pages, now / 60_000) {
+        com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active, reads, books), today, zone, now)
+    val ui = DayUi(today, pages, notes, remember(pages, today) { j.leftovers() }, shopping = shopping, reminders = reminders,
+        books = books, reads = reads)
+    val gIn = com.silverajat.lifttracker.garden.Garden.Inputs(focus, sessions, items, an?.days.orEmpty(), pages, active, reads, books)
+    val logs = remember(focus, sessions, items, an, pages, reads, books) { com.silverajat.lifttracker.garden.Area.entries.associateWith { com.silverajat.lifttracker.garden.Garden.log(it, gIn, zone) } }
+    val summaries = remember(focus, sessions, items, an, pages, reads, books, now / 60_000) {
         (0L..30L).map { today.minusDays(it) }.associateWith { com.silverajat.lifttracker.garden.Garden.summary(it, gIn, zone, now) }
     }
     DayContent(ui, garden = GardenUi(plants, active, focus, now, logs, summaries), gAct = GardenActions(
@@ -137,6 +148,8 @@ fun DayScreen(
         addNote = j::addNote, editNote = j::editNote, pinNote = j::pinNote, deleteNote = j::deleteNote,
         addShop = j::addShop, toggleShop = j::toggleShop, clearBought = j::clearBought, brainstorm = onBrainstorm,
         addReminder = j::addReminder, moveReminder = j::moveReminder, removeReminder = j::removeReminder,
+        addBook = j::addBook, editBook = j::editBook, logReading = { b, m, p, d -> j.logReading(b, m, p, d) },
+        finishBook = { id, done -> j.finishBook(id, done) }, removeBook = j::removeBook, removeRead = { j.removeRead(it) },
     ))
 }
 
@@ -172,11 +185,11 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, gard
                     }
                     TopActionIcons()
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Plan", "Garden", "Notes", "Past").forEachIndexed { i, s ->
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("Plan", "Garden", "Reading", "Notes", "Past").forEachIndexed { i, s ->
                         Text(s, style = MaterialTheme.typography.titleSmall, color = if (tab == i) C.Text else C.Muted,
                             modifier = Modifier.clip(RoundedCornerShape(50)).background(if (tab == i) C.Raised else C.Bg)
-                                .clickable { tab = i }.padding(horizontal = 16.dp, vertical = 8.dp))
+                                .clickable { tab = i }.padding(horizontal = 14.dp, vertical = 8.dp))
                     }
                 }
             }
@@ -187,7 +200,8 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, gard
                 planTab(u, page, act) { editing = it }
             }
             1 -> if (garden != null) gardenTab(garden, gAct) { plant = it }
-            2 -> notesTab(u, act) { editingNote = it }
+            2 -> readingTab(u, act)
+            3 -> notesTab(u, act) { editingNote = it }
             else -> pastTab(u, garden?.summaries.orEmpty())
         }
     }
@@ -390,7 +404,7 @@ private fun Reflect(u: DayUi, page: DayPage, act: DayActions) {
 }
 
 @Composable
-private fun Block(title: String, progress: String? = null, highlight: Boolean = false, content: @Composable () -> Unit) {
+internal fun Block(title: String, progress: String? = null, highlight: Boolean = false, content: @Composable () -> Unit) {
     Column {
         Row(Modifier.padding(start = 4.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
@@ -420,7 +434,7 @@ private fun TaskRow(t: Task, act: DayActions, onEdit: (Task) -> Unit) {
 }
 
 @Composable
-private fun AddField(hint: String, onAdd: (String) -> Unit) {
+internal fun AddField(hint: String, onAdd: (String) -> Unit) {
     var s by remember { mutableStateOf("") }
     fun go() { if (s.isNotBlank()) { onAdd(s); s = "" } }
     OutlinedTextField(s, { s = it }, placeholder = { Text(hint, color = C.Muted) }, singleLine = true,
@@ -585,7 +599,7 @@ private fun PastDay(p: DayPage, sum: com.silverajat.lifttracker.garden.Garden.Da
                 p.mood?.let { Text(MOODS[it - 1], style = MaterialTheme.typography.titleLarge) }
             }
             sum?.minutes?.takeIf { it.isNotEmpty() }?.let { m ->
-                Text(m.entries.joinToString(" · ") { (a, v) -> "${a.label} ${com.silverajat.lifttracker.garden.Garden.hm(v)}" },
+                Text(m.entries.joinToString(" · ") { (a, v) -> "${if (a == com.silverajat.lifttracker.garden.Area.MIND) "Reading" else a.label} ${com.silverajat.lifttracker.garden.Garden.hm(v)}" },
                     style = MaterialTheme.typography.bodyMedium.merge(Tnum), color = C.Muted)
             }
             if (p.planned) Text("${p.mains.count { it.done }}/${p.mains.size} main" +

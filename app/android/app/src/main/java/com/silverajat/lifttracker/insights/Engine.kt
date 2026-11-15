@@ -265,7 +265,9 @@ object InsightEngine {
             val study = focus.filter { it.area == com.silverajat.lifttracker.garden.Area.STUDY }.sumOf { it.minutes }
             val work = focus.filter { it.area == com.silverajat.lifttracker.garden.Area.WORK }.sumOf { it.minutes }
             val time = listOfNotNull(study.takeIf { it > 0 }?.let { "${com.silverajat.lifttracker.garden.Garden.hm(it)} study" },
-                work.takeIf { it > 0 }?.let { "${com.silverajat.lifttracker.garden.Garden.hm(it)} work" }).joinToString(", ")
+                work.takeIf { it > 0 }?.let { "${com.silverajat.lifttracker.garden.Garden.hm(it)} work" },
+                com.silverajat.lifttracker.journal.ReadingStore(ctx.filesDir).sessions().filter { it.date == jDay }.sumOf { it.minutes }
+                    .takeIf { it > 0 }?.let { "${com.silverajat.lifttracker.garden.Garden.hm(it)} reading" }).joinToString(", ")
             post(ctx, Insight("plan-pm-$jDay", Kind.PLAN, "Tick off and reflect",
                 (if (time.isNotEmpty()) "Today: $time. " else "") +
                 (if (m.isNotEmpty()) "${m.count { it.done }} of ${m.size} main things done. " else "") + "Write a line about today.", nowMs), tab = "DAY")

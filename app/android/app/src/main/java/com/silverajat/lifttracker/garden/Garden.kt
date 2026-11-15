@@ -57,6 +57,8 @@ object Garden {
         val days: List<Analysis.Day> = emptyList(),
         val pages: Map<LocalDate, DayPage> = emptyMap(),
         val active: ActiveFocus? = null,
+        val reads: List<com.silverajat.lifttracker.journal.ReadSession> = emptyList(),
+        val books: List<com.silverajat.lifttracker.journal.Book> = emptyList(),
     )
 
     /** XP earned per day for each area. */
@@ -81,6 +83,9 @@ object Garden {
         i.pages.values.forEach { p ->
             add(Area.MIND, p.date, (if (p.planned) 10 else 0) + 15 * p.mains.count { it.done } + (if (p.reflected) 25 else 0))
         }
+        // and reading: a point a minute (capped a day), a bonus per book finished
+        com.silverajat.lifttracker.journal.Reading.xp(i.reads).forEach { (s, x) -> add(Area.MIND, s.date, x) }
+        i.books.forEach { b -> b.finished?.let { add(Area.MIND, it, com.silverajat.lifttracker.journal.Reading.FINISH_BONUS) } }
         return out
     }
 
@@ -107,7 +112,8 @@ object Garden {
             Area.GYM -> "${i.gym.count { it.endMs != null && it.sets.isNotEmpty() && inWeek(day(it.startMs)) }} sessions"
             Area.SPORTS -> i.sports.filter { it.sport != Sport.GYM && inWeek(it.start.atZone(zone).toLocalDate()) }.let { "${it.size} · ${hm(it.sumOf { s -> s.minutes })}" }
             Area.SLEEP -> "${i.days.count { inWeek(it.date) && (it.sleep?.performance ?: 0) >= 80 }}/7 good nights"
-            Area.MIND -> i.pages.values.filter { inWeek(it.date) }.let { ps -> "${ps.sumOf { p -> p.mains.count { it.done } }}/${ps.sumOf { it.mains.size }} main" }
+            Area.MIND -> i.pages.values.filter { inWeek(it.date) }.let { ps -> "${ps.sumOf { p -> p.mains.count { it.done } }}/${ps.sumOf { it.mains.size }} main" } +
+                (i.reads.filter { inWeek(it.date) }.sumOf { it.minutes }.takeIf { it > 0 }?.let { " · ${hm(it)} read" } ?: "")
         }
     }
 
@@ -126,6 +132,7 @@ object Garden {
         i.active?.takeIf { day(it.startMs) == date }?.let { add(it.area, (it.focusedS(now) / 60).toInt()) }
         i.gym.filter { it.endMs != null && it.sets.isNotEmpty() && day(it.startMs) == date }.forEach { add(Area.GYM, ((it.endMs!! - it.startMs) / 60_000).toInt()) }
         i.sports.filter { it.sport != Sport.GYM && it.sport != Sport.WALK && it.start.atZone(zone).toLocalDate() == date }.forEach { add(Area.SPORTS, it.minutes) }
+        i.reads.filter { it.date == date }.forEach { add(Area.MIND, it.minutes) }
         val xp = daily(i, zone, now).mapValues { it.value[date] ?: 0 }.filterValues { it > 0 }
         return DaySummary(date, m, xp)
     }
@@ -157,7 +164,8 @@ object Garden {
         Area.GYM -> "60 points per session, plus 3 per working set"
         Area.SPORTS -> "Points from each game's or run's strain (strain x 6), so hard games count more. Walks add a little, at most $WALK_CAP a day"
         Area.SLEEP -> "60 for an 85%+ night, 40 for 70%+, 20 otherwise; +20 for a green recovery"
-        Area.MIND -> "10 for planning the day, 15 per main thing done, 25 for reflecting"
+        Area.MIND -> "10 for planning the day, 15 per main thing done, 25 for reflecting; reading gives 1 per minute " +
+            "(up to ${com.silverajat.lifttracker.journal.Reading.DAILY_CAP} a day) and ${com.silverajat.lifttracker.journal.Reading.FINISH_BONUS} for finishing a book"
     }
 
     fun log(a: Area, i: Inputs, zone: ZoneId): List<Entry> {
@@ -185,7 +193,10 @@ object Garden {
                 Entry(p.date, "${p.mains.count { it.done }}/${p.mains.size} main things",
                     listOfNotNull("planned".takeIf { p.planned }, "reflected".takeIf { p.reflected }).joinToString(" · "),
                     (if (p.planned) 10 else 0) + 15 * p.mains.count { it.done } + (if (p.reflected) 25 else 0))
-            }
+            } + com.silverajat.lifttracker.journal.Reading.xp(i.reads).map { (s, x) ->
+                val b = i.books.firstOrNull { it.id == s.bookId }
+                Entry(s.date, "📖 ${b?.title ?: "Reading"}", "${hm(s.minutes)}" + (s.toPage?.let { " · to p. $it" } ?: ""), x)
+            } + i.books.mapNotNull { b -> b.finished?.let { Entry(it, "Finished ${b.title}", "book done", com.silverajat.lifttracker.journal.Reading.FINISH_BONUS) } }
         }
         return out.filter { it.xp > 0 }.sortedByDescending { it.date }
     }

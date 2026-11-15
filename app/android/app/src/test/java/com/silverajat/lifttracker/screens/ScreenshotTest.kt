@@ -244,11 +244,23 @@ class ScreenshotTest {
                 listOf(com.silverajat.lifttracker.journal.Reminder(text = "Bring umbrella", at = n.minusHours(1)),
                     com.silverajat.lifttracker.journal.Reminder(text = "Call mum", at = n.plusHours(2)),
                     com.silverajat.lifttracker.journal.Reminder(text = "Gym bag", at = n.toLocalDate().plusDays(1).atTime(8, 0)))
-            })
+            }, books, reads(today))
     }
+    private val books = run {
+        val t = java.time.LocalDate.now()
+        listOf(com.silverajat.lifttracker.journal.Book("b1", "Atomic Habits", "James Clear", 320, 142, t.minusDays(9)),
+            com.silverajat.lifttracker.journal.Book("b2", "The Art of Electronics", "Horowitz & Hill", 1220, 87, t.minusDays(30)),
+            com.silverajat.lifttracker.journal.Book("b3", "Project Hail Mary", "Andy Weir", 476, 476, t.minusDays(40), t.minusDays(12)))
+    }
+    private fun reads(t: java.time.LocalDate) = listOf(
+        com.silverajat.lifttracker.journal.ReadSession("r1", "b1", t, 35, 142, 24),
+        com.silverajat.lifttracker.journal.ReadSession("r2", "b1", t.minusDays(1), 20, 118, 15),
+        com.silverajat.lifttracker.journal.ReadSession("r3", "b2", t.minusDays(2), 45, 87, 12),
+        com.silverajat.lifttracker.journal.ReadSession("r4", "b1", t.minusDays(3), 25, 103, 18))
+    @Test fun dayReading() = shoot("day_reading") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 2) }
     @Test fun dayPlan() = shoot("day_plan") { com.silverajat.lifttracker.ui.DayContent(journal(), garden = gardenUi(false)) }
-    @Test fun dayNotes() = shoot("day_notes") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 2) }
-    @Test fun dayPast() = shoot("day_past") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 3) }
+    @Test fun dayNotes() = shoot("day_notes") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 3) }
+    @Test fun dayPast() = shoot("day_past") { com.silverajat.lifttracker.ui.DayContent(journal(), startTab = 4) }
     private fun gardenUi(active: Boolean): com.silverajat.lifttracker.ui.GardenUi {
         val now = System.currentTimeMillis()
         val focus = (1..20).map { i ->

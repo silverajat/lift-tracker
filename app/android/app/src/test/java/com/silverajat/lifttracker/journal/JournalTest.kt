@@ -129,4 +129,34 @@ class JournalTest {
         assertEquals("Sun cream", q.text)
         assertEquals(null, q.day)
     }
+
+    // ---- reading ----
+    @Test fun readingParsesBooks() {
+        assertEquals(Triple("Dune", "Frank Herbert", 600), Reading.parseBook("dune by Frank Herbert, 600"))
+        assertEquals(Triple("Atomic Habits", "", 320), Reading.parseBook("Atomic Habits 320 pages"))
+        assertEquals(Triple("Catch 22", "", null), Reading.parseBook("Catch 22"))
+    }
+
+    @Test fun readingXpIsCappedPerDay() {
+        val d = LocalDate.of(2026, 11, 15)
+        val xp = Reading.xp(listOf(ReadSession(bookId = "a", date = d, minutes = 60), ReadSession(bookId = "a", date = d, minutes = 60),
+            ReadSession(bookId = "a", date = d.minusDays(1), minutes = 20)))
+        assertEquals(listOf(20, 60, 30), xp.map { it.second })
+        assertEquals(2, Reading.streak(xp.map { it.first }, d))
+        assertEquals(2, Reading.streak(xp.map { it.first }, d.plusDays(1)))   // nothing yet today: still counts to yesterday
+    }
+
+    @Test fun readingIsSaved() {
+        val dir = Files.createTempDirectory("r").toFile()
+        val st = ReadingStore(dir)
+        val d = LocalDate.of(2026, 11, 15)
+        st.saveBooks(listOf(Book("x", "Dune", "Frank Herbert", 600, 120, d), Book("y", "Ender", "", null, 0, d, d)))
+        st.saveSessions(listOf(ReadSession("s", "x", d, 30, 120, 20)))
+        val r = ReadingStore(dir)
+        assertEquals(listOf("Dune", "Ender"), r.books().map { it.title })
+        assertEquals(600, r.books()[0].pages)
+        assertEquals(d, r.books()[1].finished)
+        assertEquals(null, r.books()[1].pages)
+        assertEquals(20, r.sessions()[0].pagesRead)
+    }
 }
