@@ -85,7 +85,7 @@ data class GardenUi(
 fun DaySummaryCard(s: Garden.DaySummary?, mainsDone: Int, mainsSet: Int, title: String) {
     Card(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(title, style = pxTitle(12))
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(118.dp), contentAlignment = Alignment.Center) {
                     val parts = s?.minutes.orEmpty().entries.toList()
@@ -104,7 +104,7 @@ fun DaySummaryCard(s: Garden.DaySummary?, mainsDone: Int, mainsSet: Int, title: 
                         }
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(Garden.hm(s?.totalMin ?: 0), style = px(15))
+                        Text(Garden.hm(s?.totalMin ?: 0), style = MaterialTheme.typography.titleLarge.merge(Tnum))
                         Text("tracked", style = MaterialTheme.typography.labelSmall, color = C.Muted)
                     }
                 }

@@ -181,7 +181,7 @@ fun DayContent(u: DayUi, act: DayActions = DayActions(), startTab: Int = 0, gard
         }
         when (tab) {
             0 -> {
-                item { DaySummaryCard(garden?.summaries?.get(u.today), page.mains.count { it.done }, page.mains.size, "TODAY SO FAR") }
+                item { DaySummaryCard(garden?.summaries?.get(u.today), page.mains.count { it.done }, page.mains.size, "Today so far") }
                 planTab(u, page, act) { editing = it }
             }
             1 -> if (garden != null) gardenTab(garden, gAct) { plant = it }
