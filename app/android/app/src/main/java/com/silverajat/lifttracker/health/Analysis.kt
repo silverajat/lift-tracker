@@ -88,7 +88,8 @@ object Analysis {
         val proteinPerKg: Double?, val avgBalance: Int?, val predictedKgPerWeek: Double?,
     )
 
-    data class WeightResult(val lastWeekAvg: Double?, val prevWeekAvg: Double?, val changeKg: Double?, val changePctPerWeek: Double?, val verdict: String)
+    data class WeightResult(val lastWeekAvg: Double?, val prevWeekAvg: Double?, val changeKg: Double?, val changePctPerWeek: Double?, val verdict: String,
+                            val rateKgPerWeek: Double? = null)
 
     data class Effect(val habit: String, val with: Double, val without: Double, val nWith: Int, val nWithout: Int, val clear: Boolean) {
         val delta get() = with - without
@@ -281,25 +282,43 @@ object Analysis {
 
     // ---- food, weight ------------------------------------------------------------------------
 
+    /**
+     * Rate of change from every weigh-in in the last 3 weeks (a straight-line fit), so one
+     * salty or dehydrated morning can't swing it. Needs 8+ weigh-ins over 10+ days.
+     */
+    fun weightRate(weights: List<WeightEntry>, today: LocalDate): Double? {
+        val w = weights.filter { it.date <= today && it.date > today.minusDays(21) }
+        if (w.size < 8 || w.maxOf { it.date }.toEpochDay() - w.minOf { it.date }.toEpochDay() < 10) return null
+        val xs = w.map { it.date.toEpochDay().toDouble() }; val ys = w.map { it.kg }
+        val mx = xs.average(); val my = ys.average()
+        val sxx = xs.sumOf { (it - mx) * (it - mx) }
+        if (sxx == 0.0) return null
+        return xs.indices.sumOf { (xs[it] - mx) * (ys[it] - my) } / sxx * 7
+    }
+
     fun weight(weights: List<WeightEntry>, today: LocalDate, goalKgPerWeek: Double = 0.0): WeightResult {
         val weeks = MealStore.weekAverages(weights, today).filter { it.days >= 3 }
         val last = weeks.getOrNull(0)
         val prev = weeks.getOrNull(1)
-        if (last == null) return WeightResult(null, null, null, null, "Weigh in each morning: needs a full week (3+ weigh-ins) to compare")
-        if (prev == null) return WeightResult(last.avgKg, null, null, null, "One full week so far: next week gives the first comparison")
-        val ch = last.avgKg - prev.avgKg
-        val pct = ch / prev.avgKg * 100
-        // judged against your goal (maintain = 0); within 0.15 kg a week counts as on target
-        val off = ch - goalKgPerWeek
+        val rate = weightRate(weights, today)
+        if (last == null) return WeightResult(null, null, null, null, "Weigh in each morning: needs a full week (3+ weigh-ins) to compare", rate)
+        if (prev == null && rate == null) return WeightResult(last.avgKg, null, null, null, "One full week so far: next week gives the first comparison")
+        val ch = prev?.let { last.avgKg - it.avgKg }
+        val pct = ch?.let { it / prev.avgKg * 100 }
+        // judged on the 3-week trend when there is one (week-to-week averages jump with water and salt);
+        // within 0.15 kg a week of the goal counts as on target
+        val r = rate ?: ch!!
+        val off = r - goalKgPerWeek
         val kcal = (kotlin.math.abs(off) * 7700 / 7 / 50).roundToInt() * 50
-        val goalWord = if (goalKgPerWeek == 0.0) "maintain" else if (goalKgPerWeek > 0) "gain goal" else "cut"
+        val goalWord = if (goalKgPerWeek == 0.0) "maintenance" else if (goalKgPerWeek > 0) "gain goal" else "cut"
+        val what = if (rate != null) "trend" else "week"
         val verdict = when {
-            kotlin.math.abs(off) <= 0.15 -> if (goalKgPerWeek == 0.0) "Holding steady (%+.2f kg on the week): right on maintenance".format(ch)
-                else "%+.2f kg on the week: right on your $goalWord".format(ch)
-            off > 0 -> "Up %.2f kg on the week, above your $goalWord: trim about $kcal kcal a day (peanut butter first)".format(ch)
-            else -> "Down %.2f kg on the week, below your $goalWord: about $kcal kcal a day more".format(-ch)
+            kotlin.math.abs(off) <= 0.15 -> if (goalKgPerWeek == 0.0) "Holding steady (%+.2f kg a week, $what): right on maintenance".format(r)
+                else "%+.2f kg a week: right on your $goalWord".format(r)
+            off > 0 -> "Gaining %.2f kg a week ($what), above $goalWord: trim about $kcal kcal a day (peanut butter first)".format(r)
+            else -> "Losing %.2f kg a week ($what), below $goalWord: about $kcal kcal a day more".format(-r)
         }
-        return WeightResult(last.avgKg, prev.avgKg, ch, pct, verdict)
+        return WeightResult(last.avgKg, prev?.avgKg, ch, pct, verdict, rate)
     }
 
     fun nutrition(meals: Map<LocalDate, List<MealEntry>>, health: Map<LocalDate, HealthDay>, today: LocalDate, kg: Double?): NutritionResult? {

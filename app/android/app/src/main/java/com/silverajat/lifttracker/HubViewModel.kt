@@ -148,6 +148,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             // weigh-ins from a smart scale (via Google Health), one per day
             scaleWeights = withContext(Dispatchers.IO) { health.weights(70) }
                 .groupBy { it.first.atZone(zone).toLocalDate() }.map { (day, v) -> WeightEntry(day, v.minBy { it.first }.second, 0) }
+            _weights.value = allWeights()
             refreshAnalysis()
             _syncedAt.value = System.currentTimeMillis()
             _healthState.value = HealthState.OK
@@ -276,11 +277,11 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setWeight(kg: Double, d: LocalDate = LocalDate.now(zone)) {
         meals.setWeight(WeightEntry(d, kg, System.currentTimeMillis()))
-        _weights.value = meals.weights()
+        _weights.value = allWeights()
         refreshAnalysis()
     }
 
-    fun deleteWeight(d: LocalDate) { meals.deleteWeight(d); _weights.value = meals.weights(); refreshAnalysis() }
+    fun deleteWeight(d: LocalDate) { meals.deleteWeight(d); _weights.value = allWeights(); refreshAnalysis() }
 
     private val mains = setOf("salad_egg", "salad_carrot", "chicken_rice", "mixed_rice")
 
@@ -439,7 +440,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             health = overrides.apply(_days.value.takeLast(14)),
             analysis = _analysis.value,
             meals = meals.days(today.minusDays(13), today),
-            weights = meals.weights(),
+            weights = allWeights(),
             hrMax = _hrMax.value,
             healthNote = when (_healthState.value) {
                 HealthState.OK -> "synced this session"

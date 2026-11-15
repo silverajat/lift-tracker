@@ -145,9 +145,9 @@ fun LazyListScope.netItems(a: Analysis.Result?, todayEntries: List<MealEntry>, g
                     an.weight.lastWeekAvg?.let { w ->
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text("%.1f kg".format(w), style = MaterialTheme.typography.displaySmall.merge(Tnum))
-                            an.weight.changeKg?.let {
-                                Text("  ${"%+.2f".format(it)} kg on the week before", style = MaterialTheme.typography.bodyMedium, color = C.Muted,
-                                    modifier = Modifier.padding(bottom = 6.dp))
+                            (an.weight.rateKgPerWeek?.let { "  ${"%+.2f".format(it)} kg/week trend" }
+                                ?: an.weight.changeKg?.let { "  ${"%+.2f".format(it)} kg on the week before" })?.let {
+                                Text(it, style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 6.dp))
                             }
                         }
                     }
