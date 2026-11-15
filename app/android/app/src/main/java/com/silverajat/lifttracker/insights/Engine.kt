@@ -127,6 +127,9 @@ object InsightEngine {
         }
     }
 
+    /** When the "tick off and reflect" notification comes. */
+    val REFLECT_AT: LocalTime = LocalTime.of(22, 45)
+
     fun schedule(ctx: Context) {
         WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
             "insights", ExistingPeriodicWorkPolicy.UPDATE,
@@ -244,7 +247,7 @@ object InsightEngine {
             }
         }
 
-        // Day tab: set today's 3 once you're up; tick off and reflect at 9:30 PM
+        // Day tab: set today's 3 once you're up; tick off and reflect at 10:45 PM (an exact alarm wakes this up then)
         val jStore = com.silverajat.lifttracker.journal.JournalStore(ctx.filesDir)
         val jDay = com.silverajat.lifttracker.journal.Journal.dayOf(now)
         val jPage = jStore.page(jDay)
@@ -254,7 +257,7 @@ object InsightEngine {
                 "What are the 3 main things today?" + if (left > 0) " $left left over from yesterday." else "", nowMs), tab = "DAY")
         }
         val tNow = now.toLocalTime()
-        if (tNow >= LocalTime.of(21, 30) && "plan-pm-$jDay" !in sent && !jPage.reflected) {
+        if (tNow >= REFLECT_AT && "plan-pm-$jDay" !in sent && !jPage.reflected) {
             val m = jPage.mains
             // the day in a line: focus time, then the main 3
             val focus = com.silverajat.lifttracker.garden.FocusStore(ctx.filesDir).sessions()

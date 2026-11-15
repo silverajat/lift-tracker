@@ -25,6 +25,7 @@ object Reminders {
     const val CHANNEL = "REMINDER"
     private const val ACTION_FIRE = "com.silverajat.lifttracker.REMIND"
     private const val ACTION_SNOOZE = "com.silverajat.lifttracker.REMIND_SNOOZE"
+    private const val ACTION_NIGHT = "com.silverajat.lifttracker.REFLECT_TIME"
     private const val SNOOZE_MIN = 10L
 
     fun channel(ctx: Context) {
@@ -58,8 +59,31 @@ object Reminders {
         NotificationManagerCompat.from(ctx).cancel(id.hashCode())
     }
 
+    /**
+     * The 30-minute background check could leave the night "tick off and reflect" notification up to half an hour late,
+     * so an exact alarm runs the check right at that time each night.
+     */
+    fun scheduleNight(ctx: Context) {
+        val am = ctx.getSystemService(AlarmManager::class.java) ?: return
+        val now = LocalDateTime.now()
+        var t = now.toLocalDate().atTime(com.silverajat.lifttracker.insights.InsightEngine.REFLECT_AT).plusSeconds(20)
+        if (!t.isAfter(now)) t = t.plusDays(1)
+        val pi = pending(ctx, ACTION_NIGHT, "night")
+        runCatching {
+            if (am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis(t), pi)
+            else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis(t), pi)
+        }
+    }
+
+    private fun runChecksNow(ctx: Context) {
+        val req = androidx.work.OneTimeWorkRequestBuilder<com.silverajat.lifttracker.insights.InsightWorker>()
+            .setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST).build()
+        androidx.work.WorkManager.getInstance(ctx).enqueueUniqueWork("reflect-now", androidx.work.ExistingWorkPolicy.REPLACE, req)
+    }
+
     /** After a reboot, an update or opening the app: set every alarm again, and send any that were missed. */
     fun restore(ctx: Context) {
+        scheduleNight(ctx)
         val store = JournalStore(ctx.filesDir)
         val now = LocalDateTime.now()
         val rs = store.reminders()
@@ -120,6 +144,7 @@ object Reminders {
         when (i.action) {
             ACTION_FIRE -> if (id != null) fire(ctx, id)
             ACTION_SNOOZE -> if (id != null) snooze(ctx, id)
+            ACTION_NIGHT -> { runChecksNow(ctx); scheduleNight(ctx) }
             else -> restore(ctx)   // boot / app updated / time zone changed
         }
     }
