@@ -93,8 +93,6 @@ data class TodayUi(
     val now: LocalTime = LocalTime.now(),
     val items: List<com.silverajat.lifttracker.activity.ActivityItem> = emptyList(),
     val plan: com.silverajat.lifttracker.journal.DayPage? = null,
-    /** The Fitbit's battery over Bluetooth, if it's been read (needs heart-rate sharing on). */
-    val fitbitBattery: com.silverajat.lifttracker.activity.DeviceBattery.Reading? = null,
 )
 
 @Composable
@@ -149,7 +147,6 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
     var dataDialog by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     if (dataDialog) FitbitDataDialog(hub) { dataDialog = false }
     val ready = conn == PodConn.READY
-    val batt by com.silverajat.lifttracker.activity.DeviceBattery.state.collectAsStateWithLifecycle()
     TodayContent(
         TodayUi(
             health = state, analysis = a, todayHealth = days.lastOrNull { it.date == LocalDate.now() }, syncedAt = synced,
@@ -158,7 +155,6 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
             food = food, goalKg = goal, take = take, taking = taking, takeError = takeError, hasKey = key.isNotEmpty(),
             items = items,
             plan = jToday?.let { d -> jPages?.get(d) ?: com.silverajat.lifttracker.journal.DayPage(d) },
-            fitbitBattery = batt,
         ),
         onOpenDay = onOpenDay, onTogglePlan = { id -> journal?.toggle(id) },
         onDetail = { detail = it },
@@ -190,9 +186,7 @@ fun TodayContent(
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     PixelGlyph(Glyphs.heart, Color(0xFFE5323D), modifier = Modifier.padding(end = 2.dp))
-                    // battery read in the last day, in front of the sync time like the pod's
-                    val batt = u.fitbitBattery?.takeIf { System.currentTimeMillis() - it.atMs < 24 * 3_600_000L }?.let { "${it.pct}% · " } ?: ""
-                    DeviceChip("Fitbit Air", u.health == HealthState.OK, batt + when (u.health) {
+                    DeviceChip("Fitbit Air", u.health == HealthState.OK, when (u.health) {
                         HealthState.OK -> u.syncedAt?.let { "synced " + Instant.ofEpochMilli(it).atZone(zone).format(hm) } ?: "synced"
                         HealthState.LOADING -> "syncing"
                         HealthState.NEEDS_PERMISSION -> "tap to connect"

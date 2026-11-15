@@ -240,7 +240,6 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         garden.cameBack()
-        runCatching { com.silverajat.lifttracker.activity.DeviceBattery.peek(this) }
     }
 
     override fun onResume() {
