@@ -45,7 +45,7 @@ object HrMonitor {
     private var ctx: Context? = null
     private var gatt: BluetoothGatt? = null
     private var wanted = false
-    private val main = Handler(Looper.getMainLooper())
+    private val main by lazy { Handler(Looper.getMainLooper()) }
 
     /** Heart Rate Measurement: flags byte, then bpm as uint8 or uint16 (bit 0). */
     fun parse(v: ByteArray): Int? {
