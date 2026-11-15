@@ -71,9 +71,7 @@ object Garden {
         // gym: 60 per finished session + 3 per working set
         i.gym.filter { it.endMs != null && it.sets.isNotEmpty() }.forEach { s -> add(Area.GYM, day(s.startMs), 60 + 3 * s.sets.count { !it.warmup }) }
         // sports: from strain, so a hard badminton game counts more than a stroll
-        i.sports.filter { it.sport != Sport.GYM }.forEach { a ->
-            add(Area.SPORTS, a.start.atZone(zone).toLocalDate(), a.strain?.let { (it * 6).toInt() } ?: (a.minutes / 2))
-        }
+        sportsXp(i.sports, zone).forEach { (a, xp) -> add(Area.SPORTS, a.start.atZone(zone).toLocalDate(), xp) }
         // sleep: by sleep performance, bonus for a green recovery
         i.days.forEach { d ->
             val perf = d.sleep?.performance ?: return@forEach
@@ -132,6 +130,23 @@ object Garden {
         return DaySummary(date, m, xp)
     }
 
+    /** Most a day's walks can add to the Sports plant, all together: they help a little, games and runs do the growing. */
+    const val WALK_CAP = 20
+
+    /** Points per game, run or walk: strain x 6 (minutes / 2 without strain); walks a third of that, capped per day. */
+    fun sportsXp(list: List<ActivityItem>, zone: ZoneId): List<Pair<ActivityItem, Int>> {
+        val walked = HashMap<LocalDate, Int>()
+        return list.filter { it.sport != Sport.GYM }.sortedBy { it.start }.map { a ->
+            val full = a.strain?.let { (it * 6).toInt() } ?: (a.minutes / 2)
+            if (a.sport != Sport.WALK) return@map a to full
+            val d = a.start.atZone(zone).toLocalDate()
+            val so = walked[d] ?: 0
+            val xp = (full / 3).coerceAtMost(WALK_CAP - so).coerceAtLeast(0)
+            walked[d] = so + xp
+            a to xp
+        }
+    }
+
     /** What grew a plant, newest first: one line per session, game, night or day. [focusId] lets a study/work line be edited. */
     data class Entry(val date: LocalDate, val text: String, val sub: String, val xp: Int, val focusId: String? = null)
 
@@ -140,7 +155,7 @@ object Garden {
         Area.STUDY -> "1 point per focused minute of study (time in other apps doesn't count)"
         Area.WORK -> "1 point per focused minute of work or projects"
         Area.GYM -> "60 points per session, plus 3 per working set"
-        Area.SPORTS -> "Points from each game's or run's strain (strain x 6), so hard games count more"
+        Area.SPORTS -> "Points from each game's or run's strain (strain x 6), so hard games count more. Walks add a little, at most $WALK_CAP a day"
         Area.SLEEP -> "60 for an 85%+ night, 40 for 70%+, 20 otherwise; +20 for a green recovery"
         Area.MIND -> "10 for planning the day, 15 per main thing done, 25 for reflecting"
     }
@@ -156,9 +171,9 @@ object Garden {
                 val sets = s.sets.count { !it.warmup }
                 Entry(day(s.startMs).toLocalDate(), "${s.day.title} day", "$sets working sets", 60 + 3 * sets)
             }
-            Area.SPORTS -> i.sports.filter { it.sport != Sport.GYM }.map { x ->
+            Area.SPORTS -> sportsXp(i.sports, zone).map { (x, xp) ->
                 Entry(x.start.atZone(zone).toLocalDate(), "${x.sport.emoji} ${x.title}",
-                    "${x.minutes} min" + (x.strain?.let { " · strain %.1f".format(it) } ?: ""), x.strain?.let { (it * 6).toInt() } ?: (x.minutes / 2))
+                    "${x.minutes} min" + (x.strain?.let { " · strain %.1f".format(it) } ?: ""), xp)
             }
             Area.SLEEP -> i.days.mapNotNull { d ->
                 val s = d.sleep ?: return@mapNotNull null
