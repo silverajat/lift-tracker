@@ -16,6 +16,11 @@ import kotlin.math.max
  * mistake (at least 3 reps, and 0.3 of a rep per set): with a handful of
  * sets, chasing single miscounts would just learn the noise. Exercises
  * with fewer than 3 sets use the settings fitted on all your sets.
+ *
+ * Warm-ups get their own fit as well: they're lighter and quicker, often with a
+ * shorter range, so settings tuned on working sets can be a rep out on them. Once
+ * there are 3 corrected warm-ups (of one exercise, or of all of them together) they
+ * use those settings; until then, the normal ones.
  */
 object RepModel {
     private val H = listOf(0.25, 0.35, 0.45, 0.55)
@@ -25,7 +30,7 @@ object RepModel {
     const val MIN_SETS = 3
 
     /** A set to learn from: its data (one-arm sets already cut to the right arm) and true reps. */
-    class Example(val exerciseId: Int, val signals: RepEngine.Signals, val reps: Int)
+    class Example(val exerciseId: Int, val signals: RepEngine.Signals, val reps: Int, val warmup: Boolean = false)
 
     data class Fit(
         val params: CounterParams,
@@ -36,14 +41,23 @@ object RepModel {
         val missLearned: Int,
     )
 
-    data class Model(val global: Fit?, val perExercise: Map<Int, Fit>) {
-        fun params(exerciseId: Int): CounterParams =
-            perExercise[exerciseId]?.takeIf { it.sets >= MIN_SETS }?.params
+    data class Model(
+        val global: Fit?,
+        val perExercise: Map<Int, Fit>,
+        val warmGlobal: Fit? = null,
+        val warmPerExercise: Map<Int, Fit> = emptyMap(),
+    ) {
+        fun params(exerciseId: Int, warmup: Boolean = false): CounterParams =
+            (if (warmup) warmPerExercise[exerciseId]?.takeIf { it.sets >= MIN_SETS }?.params
+                ?: warmGlobal?.takeIf { it.sets >= MIN_SETS }?.params else null)
+                ?: perExercise[exerciseId]?.takeIf { it.sets >= MIN_SETS }?.params
                 ?: global?.params ?: CounterParams()
 
         fun toJson(): String = JSONObject().apply {
             global?.let { put("global", fitJson(it)) }
             put("ex", JSONObject().apply { perExercise.forEach { (k, v) -> put(k.toString(), fitJson(v)) } })
+            warmGlobal?.let { put("warm", fitJson(it)) }
+            put("warmEx", JSONObject().apply { warmPerExercise.forEach { (k, v) -> put(k.toString(), fitJson(v)) } })
         }.toString()
 
         companion object {
@@ -54,9 +68,12 @@ object RepModel {
                 return runCatching {
                     val o = JSONObject(s)
                     val ex = o.optJSONObject("ex")
+                    val wex = o.optJSONObject("warmEx")
                     Model(
                         o.optJSONObject("global")?.let(::fitFrom),
                         ex?.keys()?.asSequence()?.associate { it.toInt() to fitFrom(ex.getJSONObject(it)) } ?: emptyMap(),
+                        o.optJSONObject("warm")?.let(::fitFrom),
+                        wex?.keys()?.asSequence()?.associate { it.toInt() to fitFrom(wex.getJSONObject(it)) } ?: emptyMap(),
                     )
                 }.getOrDefault(EMPTY)
             }
@@ -107,10 +124,11 @@ object RepModel {
         )
     }
 
-    /** Fit everything: all sets together, then each exercise on its own. */
+    /** Fit everything: all sets together, then each exercise on its own; and the warm-ups the same way, on their own. */
     fun train(examples: List<Example>): Model {
         val global = fit(examples)
         val per = examples.groupBy { it.exerciseId }.mapValues { (_, v) -> fit(v)!! }
-        return Model(global, per)
+        val warm = examples.filter { it.warmup }
+        return Model(global, per, fit(warm), warm.groupBy { it.exerciseId }.mapValues { (_, v) -> fit(v)!! })
     }
 }

@@ -417,7 +417,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             calibration = calibration,
         )
         _active.value = set
-        counter.reset(_model.value.params(ex.id), Routines.isOneArm(ex) && !Routines.podSeesBothSides(ex.id), Routines.podSideFirst(ex.id))
+        counter.reset(_model.value.params(ex.id, set.warmup && !calibration), Routines.isOneArm(ex) && !Routines.podSeesBothSides(ex.id), Routines.podSideFirst(ex.id))
         halve = Routines.podSeesBothSides(ex.id)
         segments.clear()
         segmentReps = 0
@@ -645,7 +645,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val d = raw.load(s.id, l.exerciseId, l.setNo) ?: return@mapNotNull null
                         val cut = RepCounter.side(d, hz, Routines.isOneArm(l.exerciseId), Routines.podSideFirst(l.exerciseId))
                         if (cut.size < hz) null
-                        else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps)
+                        else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps, l.warmup && !l.calibration)
                     }
                 }
                 RepModel.train(examples)

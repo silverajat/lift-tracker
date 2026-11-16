@@ -98,4 +98,18 @@ class RepEngineTest {
         val back = RepModel.Model.fromJson(m.toJson())
         assertEquals(m.params(1), back.params(1))
     }
+
+    @Test
+    fun warmupsGetTheirOwnSettingsOnceThereAreEnough() {
+        val sets = fixtures().filter { !it.oneArm }.take(8)
+        val ex = sets.mapIndexed { i, f -> RepModel.Example(1, RepEngine.signals(f.data, 25), f.trueReps, warmup = i < 4) }
+        val m = RepModel.train(ex)
+        assertEquals(4, m.warmGlobal!!.sets)
+        assertEquals(4, m.warmPerExercise[1]!!.sets)
+        val back = RepModel.Model.fromJson(m.toJson())
+        assertEquals(m.params(1, warmup = true), back.params(1, warmup = true))
+        // too few warm-ups yet: the normal settings
+        val few = RepModel.train(ex.take(2) + ex.drop(4))
+        assertEquals(few.params(1), few.params(1, warmup = true))
+    }
 }
