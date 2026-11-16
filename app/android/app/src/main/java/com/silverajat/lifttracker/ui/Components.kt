@@ -148,7 +148,7 @@ fun PodBar(conn: PodConn, status: PodStatus?, onConnect: () -> Unit) {
             C.Pod, "Pod connected",
             status?.let {
                 buildString {
-                    append("${it.batteryPct}%")
+                    append(it.batteryLabel)
                     if (it.charging) append(" · charging")
                     if (it.recording) append(" · recording")
                     if (!it.imuOk) append(" · IMU not started")
@@ -177,7 +177,7 @@ fun PodBar(conn: PodConn, status: PodStatus?, onConnect: () -> Unit) {
                     Text(sub, style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                 }
             }
-            if (conn == PodConn.READY && status != null) {
+            if (conn == PodConn.READY && status != null && status.batteryKnown) {
                 BatteryGlyph(status.batteryPct)
             }
         }

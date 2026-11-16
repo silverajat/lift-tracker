@@ -69,11 +69,35 @@ data class PodStatus(
     val flashPct: Int,
     val firmware: Int,
 ) {
-    /** Rough charge from voltage (LiPo, light load). */
+    /** A real battery reading: under ~2.5 V means no battery on the pad or the reading failed (the pod sends 0 then). */
+    val batteryKnown: Boolean get() = battMv >= 2500
+
+    /** Charge from voltage along a LiPo discharge curve (a straight line reads too low in the middle). */
     val batteryPct: Int
-        get() = (((battMv - 3350) * 100) / (4150 - 3350)).coerceIn(0, 100)
+        get() {
+            if (!batteryKnown) return 0
+            val i = CURVE.indexOfFirst { battMv >= it.first }
+            if (i == 0) return 100
+            if (i < 0) return 0
+            val (v1, p1) = CURVE[i - 1]
+            val (v0, p0) = CURVE[i]
+            return (p0 + (p1 - p0) * (battMv - v0) / (v1 - v0)).coerceIn(0, 100)
+        }
+
+    /** What the app shows: "62%", "4% (3.42 V)" when it's nearly flat, or why there's no number. */
+    val batteryLabel: String
+        get() = when {
+            !batteryKnown && usb -> "on USB, no battery reading"
+            !batteryKnown -> "battery not reading"
+            batteryPct <= 10 -> "$batteryPct%% (%.2f V)".format(battMv / 1000.0)
+            else -> "$batteryPct%"
+        }
 
     companion object {
+        /** (mV, %) for a small LiPo under light load. */
+        private val CURVE = listOf(4150 to 100, 4050 to 90, 3950 to 78, 3870 to 65, 3800 to 52, 3750 to 40,
+            3700 to 28, 3650 to 18, 3600 to 10, 3500 to 4, 3400 to 1, 3300 to 0)
+
         fun parse(b: ByteArray): PodStatus? {
             if (b.size < 16) return null
             val bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN)

@@ -151,7 +151,7 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
         TodayUi(
             health = state, analysis = a, todayHealth = days.lastOrNull { it.date == LocalDate.now() }, syncedAt = synced,
             podReady = ready,
-            podSub = if (ready) (status?.let { "${it.batteryPct}%" + if (it.charging) ", charging" else "" } ?: "connected") else "for the gym",
+            podSub = if (ready) (status?.let { (if (it.batteryKnown) "${it.batteryPct}%" else "battery ?") + if (it.charging) ", charging" else "" } ?: "connected") else "for the gym",
             food = food, goalKg = goal, take = take, taking = taking, takeError = takeError, hasKey = key.isNotEmpty(),
             items = items,
             plan = jToday?.let { d -> jPages?.get(d) ?: com.silverajat.lifttracker.journal.DayPage(d) },
