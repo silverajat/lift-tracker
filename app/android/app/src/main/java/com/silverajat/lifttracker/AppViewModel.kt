@@ -481,7 +481,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_phase.value != Phase.LIFTING) return
         collecting = false
         countJob?.cancel()
-        val last = if (!_paused.value) counter.snapshot() else null
+        // the hand going to the phone to press stop isn't a rep: cut that off the end
+        val last = if (!_paused.value) counter.snapshot().let { RepCounter.cutReach(it, PodProtocol.STREAM_HZ) } else null
         val lastHold = com.silverajat.lifttracker.reps.PeakHold().also { if (last != null) { it.update(hold.peak, hold.peakLen) } }
         pausedAt?.let { pausedTotalMs += System.currentTimeMillis() - it }
         pausedAt = null

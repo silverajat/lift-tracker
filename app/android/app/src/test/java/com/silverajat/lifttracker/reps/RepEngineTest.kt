@@ -115,7 +115,8 @@ class RepEngineTest {
 
     /** The set, then the wrist turning over to reach for the phone (a quick 90 degree roll) and holding there. */
     private fun withReach(d: List<FloatArray>): List<FloatArray> {
-        val last = d.last()
+        // the resting wrist: last sample, accelerometer averaged over the last 10 (one sample is noisy)
+        val last = d.last().copyOf().also { l -> for (c in 0..2) l[c] = (d.takeLast(10).sumOf { it[c].toDouble() } / 10).toFloat() }
         val out = d.toMutableList()
         repeat(12) { out += last.copyOf() }                       // half a second still at the end
         val g0 = doubleArrayOf(last[0].toDouble(), last[1].toDouble(), last[2].toDouble())
@@ -141,10 +142,12 @@ class RepEngineTest {
         var worse = 0
         for (f in fx) {
             val before = countOf(f)
-            val after = RepCounter.count(withReach(f.data), 25, CounterParams(), f.oneArm)
+            val after = RepCounter.count(RepCounter.cutReach(withReach(f.data), 25), 25, CounterParams(), f.oneArm)
+            // and cutting must never change a set that ends normally
+            assertEquals(f.name, before, RepCounter.count(RepCounter.cutReach(f.data, 25), 25, CounterParams(), f.oneArm))
             if (after > before) { worse++; println("REACH ${f.name}: $before -> $after (true ${f.trueReps})") }
         }
         println("reach added reps on $worse/${fx.size} sets")
-        assertTrue("the reach was counted on $worse of ${fx.size} sets", worse <= fx.size / 10)
+        assertTrue("the reach was counted on $worse of ${fx.size} sets", worse <= 2)
     }
 }

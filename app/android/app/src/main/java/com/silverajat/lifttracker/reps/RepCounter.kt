@@ -83,6 +83,39 @@ class RepCounter(private val hz: Int = 25) {
         fun side(data: List<FloatArray>, hz: Int, oneArm: Boolean, firstSide: Boolean = false): List<FloatArray> =
             if (!oneArm) data else data.slice(if (firstSide) RepEngine.firstBout(data, hz) else RepEngine.lastBout(data, hz))
 
+        /**
+         * Reaching for the phone to press stop shows up as a short burst of movement after
+         * a still moment, right at the end. A real rep takes longer than that (and isn't
+         * on its own after the set has gone still), so the burst is cut off before counting.
+         */
+        fun cutReach(data: List<FloatArray>, hz: Int): List<FloatArray> {
+            val n = data.size
+            if (n < 3 * hz) return data
+            val bias = RepEngine.gyroBias(data, hz)
+            fun len(x: Double, y: Double, z: Double) = kotlin.math.sqrt(x * x + y * y + z * z)
+            val acc = DoubleArray(n) { i -> len(data[i][0].toDouble(), data[i][1].toDouble(), data[i][2].toDouble()) }
+            val g = acc.sorted()[n / 2]        // gravity as this pod reads it
+            val raw = DoubleArray(n) { i ->
+                val d = data[i]
+                maxOf(len(d[3] - bias[0], d[4] - bias[1], d[5] - bias[2]), kotlin.math.abs(acc[i] - g) * 300)   // 0.1 g ~ 30 deg/s
+            }
+            val h = maxOf(1, hz / 5) / 2
+            val cum = DoubleArray(n + 1).also { for (i in 0 until n) it[i + 1] = it[i] + raw[i] }
+            val act = DoubleArray(n) { i -> val lo = maxOf(0, i - h); val hi = minOf(n, i + h + 1); (cum[hi] - cum[lo]) / (hi - lo) }
+            val p95 = act.sorted()[((n - 1) * 0.95).toInt()]
+            val thr = maxOf(12.0, 0.2 * p95)
+            val on = BooleanArray(n) { act[it] > thr }
+            val end = (n - 1 downTo 0).firstOrNull { on[it] }?.plus(1) ?: return data
+            var start = end - 1
+            while (start > 0 && on[start - 1]) start--
+            var j = start - 1
+            var quiet = 0
+            while (j >= 0 && !on[j]) { j--; quiet++ }
+            return if (end - start <= (1.6 * hz).toInt() && quiet >= (0.3 * hz).toInt() && j > 0)
+                data.subList(0, maxOf(j + 1, start - (0.3 * hz).toInt()))
+            else data
+        }
+
         fun count(data: List<FloatArray>, hz: Int, p: CounterParams, oneArm: Boolean, firstSide: Boolean = false): Int {
             val d = side(data, hz, oneArm, firstSide)
             return RepEngine.count(d, hz, p)?.reps ?: 0

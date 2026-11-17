@@ -242,47 +242,13 @@ object RepEngine {
         val x = sig.prepared(c.name, w)
         val amp = sig.amplitude(c.name, w)
         val rs = cleanRuns(runs(x, p.h * amp), p.gap * t)
-        val all = if (rs.isEmpty()) 0 else ceil((rs.size - 1) / 2.0).toInt()
-        val reps = all - endReach(rs, x, all, sig.hz, t)
+        val reps = if (rs.isEmpty()) 0 else ceil((rs.size - 1) / 2.0).toInt()
         val windows = (0 until reps).map { k ->
             val a = rs[2 * k][1]
             val b = if (2 * k + 2 < rs.size) rs[2 * k + 2][1] else x.size
             intArrayOf(a, b)
         }
         return CountResult(reps, c.name, t, x, windows, sig.turns())
-    }
-
-    /**
-     * Reaching for the phone to press stop can look like a rep or two at the very end.
-     * Those don't look like the set's reps: a much bigger or smaller swing, or a much
-     * quicker or slower half-rep. So the last two reps, if they start in the last few
-     * seconds, are dropped when they're clearly off the set's usual rep (median of the
-     * others). Only for sets of 4+ reps, where there's a usual to compare with.
-     */
-    fun endReach(rs: List<IntArray>, x: DoubleArray, reps: Int, hz: Int, t: Int): Int {
-        if (reps < 4) return 0
-        fun swing(k: Int): Double {
-            val a = rs[2 * k][1]
-            val b = if (2 * k + 2 < rs.size) rs[2 * k + 2][1] else x.size
-            var lo = Double.MAX_VALUE; var hi = -Double.MAX_VALUE
-            for (i in a until b) { lo = min(lo, x[i]); hi = max(hi, x[i]) }
-            return hi - lo
-        }
-        // the up half of the rep: start of its high stretch to the start of its low one
-        fun half(k: Int) = (rs[2 * k + 1][1] - rs[2 * k][1]).toDouble()
-        val usual = (0 until reps - 2)
-        val mSwing = usual.map(::swing).sorted().let { it[it.size / 2] }
-        val mHalf = usual.map(::half).sorted().let { it[it.size / 2] }
-        if (mSwing <= 0 || mHalf <= 0) return 0
-        val tail = x.size - max(3 * hz, (1.5 * t).toInt())
-        var drop = 0
-        for (k in reps - 1 downTo reps - 2) {
-            if (rs[2 * k][1] < tail) break
-            val sw = swing(k) / mSwing
-            val hf = half(k) / mHalf
-            if (sw < 0.5 || sw > 1.8 || hf < 0.45 || hf > 2.2) drop++ else break
-        }
-        return drop
     }
 
     /** Stretches clearly high (+1) or low (-1), with hysteresis.
