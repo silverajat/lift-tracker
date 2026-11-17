@@ -279,7 +279,7 @@ private fun GymTile(history: List<com.silverajat.lifttracker.data.Session>, plan
     val done = history.filter { it.sets.isNotEmpty() }.sortedByDescending { it.startMs }
     val todayDone = done.firstOrNull { Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate() == today }
     val planned = plan?.get(today.dayOfWeek)
-    val week = done.count { Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate() > today.minusDays(7) }
+    val week = done.count { Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate() >= today.with(java.time.DayOfWeek.MONDAY) }   // since Monday, like the gym page
     val color = Plate.Red
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(color.copy(alpha = 0.16f)).clickable(onClick = onOpen)
