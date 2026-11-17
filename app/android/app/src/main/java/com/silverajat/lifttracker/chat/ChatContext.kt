@@ -104,7 +104,7 @@ object ChatContext {
         appendLine("Load = Banister TRIMP from heart rate (HRmax $hrMax). 7-day load: ${Scores.weekLoad(health)}.")
         appendLine()
         if (analysis != null) {
-            appendLine("## Analysis (formulas: recovery = HRV 0.5 / resting HR 0.2 / sleep performance 0.2 / breathing 0.1 vs his 30-day baseline, zones green>=67 yellow 34-66 red<34; strain 0-21 = 21(1-e^(-TRIMP/110)); sleep need = 7 h baseline + strain + debt; sleep score = hours vs need 55% + consistency 15% + efficiency 15% + restorative 15%, 85+ optimal, 70-84 sufficient)")
+            appendLine("## Analysis (formulas: recovery = HRV 0.5 / resting HR 0.2 / sleep performance 0.2 / breathing 0.1 vs his 30-day baseline, zones green>=67 yellow 34-66 red<34; strain 0-21 = 21(1-e^(-TRIMP/110)); sleep need = 7.5 h baseline + strain + debt; sleep score = hours vs need 55% + consistency 15% + efficiency 15% + restorative 15%, 85+ optimal, 70-84 sufficient)")
             analysis.headline.forEach { appendLine("- $it") }
             analysis.days.takeLast(14).reversed().forEach { d ->
                 val p = listOfNotNull(

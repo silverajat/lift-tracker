@@ -46,7 +46,7 @@ import kotlin.math.sqrt
  * MUSCULAR LOAD, from the pod: working-set volume (kg x reps) vs your
  * average gym day of the last 28 days. Heart rate misses most of lifting.
  *
- * SLEEP: need = 7 h + strain (+4 min per point above 10, max 45) + debt
+ * SLEEP: need = 7.5 h + strain (+4 min per point above 10, max 45) + debt
  *   (half of the last 3 nights' shortfall, max 60 min). Performance =
  *   asleep / need. Consistency = how close bed and wake times are to the
  *   last 4 nights (100% = same minute, -1% per minute of average spread).
@@ -66,7 +66,7 @@ object Analysis {
         val needMin: Int, val asleepMin: Int, val performance: Int, val debtMin: Int,
         val consistency: Int?, val efficiency: Int?, val deepPct: Int?, val remPct: Int?,
         val bed: Instant, val wake: Instant,
-        // what the need is made of: 7 h baseline + yesterday's strain + half the recent debt
+        // what the need is made of: 7.5 h baseline + yesterday's strain + half the recent debt
         val needStrainMin: Int = 0, val needDebtMin: Int = 0,
         val deepMin: Int = 0, val remMin: Int = 0, val lightMin: Int = 0, val awakeMin: Int = 0,
         val stages: List<SleepStage> = emptyList(),
@@ -186,8 +186,8 @@ object Analysis {
 
     // ---- sleep ------------------------------------------------------------------------------
 
-    /** Your baseline sleep need: 7 hours. */
-    const val SLEEP_BASE_MIN = 420
+    /** Your baseline sleep need: 7 h 30 min. */
+    const val SLEEP_BASE_MIN = 450
 
     fun sleep(days: List<HealthDay>, i: Int, strainPrev: Double?, zone: ZoneId): SleepResult? {
         val s = days[i].sleep ?: return null
