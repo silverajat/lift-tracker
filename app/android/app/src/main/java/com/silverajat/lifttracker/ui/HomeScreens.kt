@@ -106,8 +106,10 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         )
     }
 
-    val weekAgo = System.currentTimeMillis() - 7 * 24 * 3600_000L
-    val week = history.filter { it.startMs >= weekAgo && it.sets.isNotEmpty() }
+    // this calendar week, Monday on (like the week strip below), not the last 7 days
+    val weekStart = java.time.LocalDate.now().with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+        .atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val week = history.filter { it.startMs >= weekStart && it.sets.isNotEmpty() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().statusBarsPadding(),
