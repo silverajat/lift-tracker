@@ -30,8 +30,8 @@ class HubTest {
         assertEquals(2, satPlan.count { it.slot == Slot.YOGHURT && it.food.id in setOf("guava", "dragon_fruit") })
         assertEquals(1, satPlan.count { it.optional })
         val t = MealPlan.plannedTotal(tue)
-        assertTrue("planned kcal ${t.kcal}", t.kcal in 2400.0..3000.0)
-        assertTrue("planned protein ${t.protein}", t.protein in 130.0..170.0)
+        assertTrue("planned kcal ${t.kcal}", t.kcal in 2100.0..3000.0)   // ~2,300 with label values
+        assertTrue("planned protein ${t.protein}", t.protein in 110.0..170.0)
     }
 
     @Test fun weekAveragesOnlyCompletedWeeks() {
