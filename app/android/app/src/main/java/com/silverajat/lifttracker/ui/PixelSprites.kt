@@ -100,17 +100,20 @@ object Sprites {
         "...WWWW...",
     ), mapOf('W' to white, 'K' to dark))
 
-    val shuttle = Sprite(listOf(
-        "W.W.W.W",
-        "WWWWWWW",
-        ".WWWWW.",
-        ".WGWGW.",
-        "..WWW..",
-        "..WWW..",
-        "..RRR..",
-        "..RRR..",
-        "...R...",
-    ), mapOf('W' to white, 'G' to steel, 'R' to Plate.Yellow))
+    val racket = Sprite(listOf(
+        "......FFFF..",
+        ".....FWSWSF.",
+        "....FWSWSWSF",
+        "....FSWSWSWF",
+        "....FWSWSWSF",
+        ".....FSWSWF.",
+        "......FFFF..",
+        ".....G......",
+        "....G.......",
+        "...HH.......",
+        "..HH........",
+        ".HH.........",
+    ), mapOf('F' to Plate.Yellow, 'W' to white, 'S' to Color(0xFF3A3F48), 'G' to steel, 'H' to Plate.Red))
 
     val swimmer = Sprite(listOf(
         "........HHS.",
@@ -187,7 +190,7 @@ object Sprites {
         Sport.RUN -> runner
         Sport.WALK -> walker
         Sport.FOOTBALL -> ball
-        Sport.BADMINTON -> shuttle
+        Sport.BADMINTON -> racket
         Sport.GYM -> lifter
         Sport.SWIM -> swimmer
         Sport.CYCLE -> cyclist

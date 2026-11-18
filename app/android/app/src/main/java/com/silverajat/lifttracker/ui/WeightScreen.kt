@@ -2,6 +2,10 @@ package com.silverajat.lifttracker.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -100,12 +104,29 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // two numbers, named: the trend (the one that matters) and the scale this morning
+                    val last = weights.maxByOrNull { it.date }
                     Row(verticalAlignment = Alignment.Bottom) {
-                        Text("%.1f".format(now.trend), style = MaterialTheme.typography.displayLarge.merge(Tnum))
-                        Text(" kg", style = MaterialTheme.typography.displaySmall, color = C.Muted, modifier = Modifier.padding(bottom = 14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text("%.1f".format(now.trend), style = MaterialTheme.typography.displayLarge.merge(Tnum))
+                                Text(" kg", style = MaterialTheme.typography.displaySmall, color = C.Muted, modifier = Modifier.padding(bottom = 14.dp))
+                            }
+                            Text("your weight (trend)", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                        }
+                        last?.let {
+                            Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 2.dp)) {
+                                Text("%.1f kg".format(it.kg), style = MaterialTheme.typography.headlineMedium.merge(Tnum))
+                                Text(if (it.date == today) "scale today" else "scale, ${it.date.format(wFmt)}",
+                                    style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+                            }
+                        }
                     }
-                    weights.maxByOrNull { it.date }?.let { Text("Trend · last weigh-in %.1f kg on %s".format(it.kg, it.date.format(wFmt)),
-                        style = MaterialTheme.typography.bodyMedium, color = C.Muted) }
+                    last?.let {
+                        Text("The scale jumps around with water, salt and food. The trend moves only 10% of the way toward each " +
+                            "weigh-in, so one heavy or light morning barely shifts it. That's why it says %.1f while the scale said %.1f."
+                                .format(now.trend, it.kg), style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                    }
                     // the one-line answer: which way you're going, and whether that's the plan
                     (r14 ?: r28)?.let { r ->
                         val off = r - goalKgPerWeek
@@ -265,14 +286,29 @@ private fun WeightGraph(p: List<WeightStats.Point>, goal: Double, swing: Double?
     val vals = p.mapNotNull { it.scale } + p.map { it.trend + band } + p.map { it.trend - band } +
         (if (goal != 0.0) listOf(goalAt(p.last().date)) else emptyList())
     val lo = vals.min() - 0.2; val hi = vals.max() + 0.2
+    var sel by remember(p) { mutableStateOf<Int?>(null) }
     Column {
+        // what's under your finger, or how to get it
+        Text(sel?.let { i -> p[i].date.format(DateTimeFormatter.ofPattern("EEE d MMM")) + ": " +
+                (p[i].scale?.let { "scale %.1f kg · ".format(it) } ?: "no weigh-in · ") + "trend %.1f kg".format(p[i].trend) }
+                ?: "Hold the graph and slide to see any day",
+            style = MaterialTheme.typography.titleSmall.merge(Tnum), color = if (sel != null) C.Text else C.Muted,
+            modifier = Modifier.padding(bottom = 6.dp))
         Row {
             Column(Modifier.height(190.dp).width(36.dp), verticalArrangement = Arrangement.SpaceBetween) {
                 Text("%.1f".format(hi), style = MaterialTheme.typography.labelSmall, color = C.Muted)
                 Text("%.1f".format((hi + lo) / 2), style = MaterialTheme.typography.labelSmall, color = C.Muted)
                 Text("%.1f".format(lo), style = MaterialTheme.typography.labelSmall, color = C.Muted)
             }
-            Canvas(Modifier.weight(1f).height(190.dp)) {
+            Canvas(Modifier.weight(1f).height(190.dp).pointerInput(p) {
+                // hold, then slide along: shows that day
+                fun at(xp: Float) = (xp / size.width * (p.size - 1)).roundToInt().coerceIn(0, p.size - 1)
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { sel = at(it.x) },
+                    onDrag = { c, _ -> sel = at(c.position.x) },
+                    onDragEnd = { sel = null }, onDragCancel = { sel = null },
+                )
+            }) {
                 val n = p.size
                 fun x(i: Int) = i * size.width / (n - 1).coerceAtLeast(1)
                 fun y(v: Double) = (size.height * (1 - (v - lo) / (hi - lo))).toFloat()
@@ -298,6 +334,11 @@ private fun WeightGraph(p: List<WeightStats.Point>, goal: Double, swing: Double?
                 } }
                 for (i in 1 until n) drawLine(Plate.Blue, Offset(x(i - 1), y(p[i - 1].trend)), Offset(x(i), y(p[i].trend)), 3.dp.toPx(), cap = StrokeCap.Round)
                 drawCircle(Plate.Blue, 5.dp.toPx(), Offset(x(n - 1), y(p.last().trend)))
+                sel?.let { i ->
+                    drawLine(C.Text.copy(alpha = 0.6f), Offset(x(i), 0f), Offset(x(i), size.height), 1.5.dp.toPx())
+                    drawCircle(Plate.Blue, 6.dp.toPx(), Offset(x(i), y(p[i].trend)))
+                    p[i].scale?.let { drawCircle(C.Text, 5.dp.toPx(), Offset(x(i), y(it))) }
+                }
             }
         }
         // dates along the bottom
