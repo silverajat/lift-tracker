@@ -145,7 +145,11 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
 
 
         // ---- the day's macros ----
-        item { MacroCard(MealStore.totals(entries)) }
+        item {
+            val tg = Targets.day(analysis?.weight?.trendKg ?: weights.lastOrNull()?.kg,
+                analysis?.energy?.let { it.typicalFitbit * it.k }, goal)
+            MacroCard(MealStore.totals(entries), tg, date == today)
+        }
 
         // ---- slots ----
         Slot.entries.forEach { slot ->
@@ -439,32 +443,47 @@ private fun WeightDialog(onDismiss: () -> Unit, onSave: (Double) -> Unit) {
     )
 }
 
-/** Calories, protein, carbs, fat and fibre so far today; protein and fat against their targets. */
+/** The day's calories and macros against the recomp targets, and the one thing to do next. */
 @Composable
-private fun MacroCard(t: Macros) {
+private fun MacroCard(t: Macros, tg: com.silverajat.lifttracker.meals.DayTargets, today: Boolean) {
     Card(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("%,d".format(t.kcal.roundToInt()), style = MaterialTheme.typography.headlineMedium.merge(Tnum))
-                Text(" kcal", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 4.dp))
+                Text(" / %,d kcal".format(tg.kcal), style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 4.dp))
             }
-            MacroBar("Protein", t.protein, Targets.protein.start, Plate.Blue)
-            MacroBar("Carbs", t.carbs, null, Plate.Yellow)
-            MacroBar("Fat", t.fat, Targets.fat.endInclusive, Plate.Red)
-            MacroBar("Fibre", t.fibre, 30.0, Plate.Green)
+            MacroBar("Protein", t.protein, tg.protein.toDouble(), Plate.Blue)
+            MacroBar("Carbs", t.carbs, tg.carbs.toDouble(), Plate.Yellow)
+            MacroBar("Fat", t.fat, tg.fat.toDouble(), Plate.Red, ceiling = true)
+            MacroBar("Fibre", t.fibre, tg.fibre.toDouble(), Plate.Green)
+            if (today) advice(t, tg)?.let { Text(it, style = MaterialTheme.typography.titleSmall, color = C.Accent) }
         }
     }
 }
 
+/** One recommendation: the biggest gap first. */
+private fun advice(t: Macros, tg: com.silverajat.lifttracker.meals.DayTargets): String? {
+    val p = tg.protein - t.protein; val c = tg.carbs - t.carbs; val f = t.fat - tg.fat
+    return when {
+        f > 5 -> "Fat's over: plain rice and steamed sides for the rest of today"
+        p > 25 -> "%d g protein to go: a shake (32 g) or a Meiji (32 g)".format(p.roundToInt())
+        c > 60 -> "%d g carbs to go: rice, bread, fruit or honey".format(c.roundToInt())
+        p > 5 -> "%d g protein to go".format(p.roundToInt())
+        c > 15 -> "%d g carbs to go".format(c.roundToInt())
+        else -> "Targets hit"
+    }
+}
+
 @Composable
-private fun MacroBar(label: String, g: Double, target: Double?, color: Color) {
+private fun MacroBar(label: String, g: Double, target: Double, color: Color, ceiling: Boolean = false) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(64.dp))
         Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(C.Raised)) {
-            val frac = if (target != null) (g / target).toFloat().coerceIn(0f, 1f) else (g / 300.0).toFloat().coerceIn(0f, 1f)
-            Box(Modifier.fillMaxWidth(frac).height(8.dp).clip(RoundedCornerShape(4.dp)).background(color))
+            val frac = (g / target).toFloat().coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth(frac).height(8.dp).clip(RoundedCornerShape(4.dp))
+                .background(if (ceiling && g > target) C.Stop else color))
         }
-        Text("${g.roundToInt()}" + (target?.let { " / ${it.roundToInt()} g" } ?: " g"), style = MaterialTheme.typography.labelLarge.merge(Tnum),
-            color = C.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.End, modifier = Modifier.width(84.dp))
+        Text("${g.roundToInt()} / ${if (ceiling) "≤" else ""}${target.roundToInt()} g", style = MaterialTheme.typography.labelLarge.merge(Tnum),
+            color = C.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.End, modifier = Modifier.width(96.dp))
     }
 }

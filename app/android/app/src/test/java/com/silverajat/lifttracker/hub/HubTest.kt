@@ -34,6 +34,14 @@ class HubTest {
         assertTrue("planned protein ${t.protein}", t.protein in 110.0..170.0)
     }
 
+    @Test fun recompTargets() {
+        val t = com.silverajat.lifttracker.meals.Targets.day(56.6, 2700.0, 0.0)
+        assertEquals(2700, t.kcal)
+        assertEquals(124, t.protein)          // 2.2 g/kg
+        assertEquals(60, t.fat)               // 20% of calories
+        assertTrue(t.carbs.toString(), t.carbs in 410..430)   // the rest
+    }
+
     @Test fun weekAveragesOnlyCompletedWeeks() {
         val today = LocalDate.of(2026, 11, 13)            // Friday
         val w = (0 until 18).map { WeightEntry(today.minusDays(it.toLong()), 70.0 + it * 0.1, 0) }
