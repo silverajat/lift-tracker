@@ -316,9 +316,6 @@ private fun RemindersBlock(rs: List<com.silverajat.lifttracker.journal.Reminder>
             if (p.text.isBlank()) return@AddField
             if (p.at != null) act.addReminder(p.text, p.at) else asking = p.text to p.day
         }
-        if (rs.isEmpty()) Text("Just a notification at that time. Try \"call mum at 9\", \"gym bag tmr 8am\", " +
-            "\"dentist fri 3pm\" or \"laundry in 40 min\". No time? You'll pick a day and time.",
-            style = MaterialTheme.typography.bodySmall, color = C.Muted)
     }
 }
 
@@ -412,7 +409,7 @@ private fun Reflect(u: DayUi, page: DayPage, act: DayActions) {
                 modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp), colors = dayField(),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Saves as you type", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.weight(1f))
+                Box(Modifier.weight(1f))
                 val ok = text.isNotBlank() || page.mood != null
                 Text("Done", style = MaterialTheme.typography.titleSmall, color = if (ok) C.OnAccent else C.Muted,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(if (ok) C.Accent else C.Raised)

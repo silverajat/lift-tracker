@@ -179,7 +179,8 @@ object Insights {
         } + (if (s.debtMin >= 45) " Carrying ${hm(s.debtMin)} of sleep debt." else "")
         if (r != null) {
             r.contributors.firstOrNull { it.name == "HRV" && it.good != null }?.let {
-                lines += if (it.good == true) "HRV ${it.value}, above your ${it.vsNormal.removePrefix("normal ")} normal." else "HRV ${it.value}, under your ${it.vsNormal.removePrefix("normal ")} normal."
+                val (norm, how) = it.vsNormal.split(" · ").let { p -> p[0] to p.getOrElse(1) { "" } }
+                lines += "HRV ${it.value}, $how ($norm)."
             }
             val t = Analysis.strainTarget(r.zone)
             lines += when (r.zone) {

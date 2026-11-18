@@ -122,11 +122,6 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                             }
                         }
                     }
-                    last?.let {
-                        Text("The scale jumps around with water, salt and food. The trend moves only 10% of the way toward each " +
-                            "weigh-in, so one heavy or light morning barely shifts it. That's why it says %.1f while the scale said %.1f."
-                                .format(now.trend, it.kg), style = MaterialTheme.typography.bodySmall, color = C.Muted)
-                    }
                     // the one-line answer: which way you're going, and whether that's the plan
                     (r14 ?: r28)?.let { r ->
                         val off = r - goalKgPerWeek
@@ -164,7 +159,6 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                                     }, style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                             }
                             WeightGraph(shown, goalKgPerWeek, swing)
-                            GraphKey(goalKgPerWeek != 0.0, swing)
                         }
                     }
                 }
@@ -229,10 +223,10 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                     Card(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             swing?.let {
-                                StatLine("Daily swing", "±%.1f kg".format(it), "how much one weigh-in bounces around the trend. Changes smaller than this mean nothing.")
+                                StatLine("Daily swing", "±%.1f kg".format(it), "")
                             }
-                            if (scales.isNotEmpty()) StatLine("Last 30 days", "%.1f to %.1f".format(scales.min(), scales.max()), "lowest and highest weigh-in")
-                            StatLine("Weigh-ins", "$logged14 of 14", "days logged in the last two weeks", if (logged14 >= 10) Recover else Yellow)
+                            if (scales.isNotEmpty()) StatLine("Lowest to highest, 30 days", "%.1f to %.1f".format(scales.min(), scales.max()), "")
+                            StatLine("Weigh-ins, last 14 days", "$logged14", "", if (logged14 >= 10) Recover else Yellow)
                             val wd = WeightStats.weekdays(all.takeLast(84))
                             if (wd.size >= 5) {
                                 HorizontalDivider(color = C.Line)
@@ -264,7 +258,7 @@ private fun StatLine(label: String, value: String, sub: String, color: androidx.
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(label, style = MaterialTheme.typography.titleSmall)
-            Text(sub, style = MaterialTheme.typography.bodySmall, color = C.Muted)
+            if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = C.Muted)
         }
         Text(value, style = MaterialTheme.typography.headlineSmall.merge(Tnum), color = color)
     }
@@ -291,7 +285,7 @@ private fun WeightGraph(p: List<WeightStats.Point>, goal: Double, swing: Double?
         // what's under your finger, or how to get it
         Text(sel?.let { i -> p[i].date.format(DateTimeFormatter.ofPattern("EEE d MMM")) + ": " +
                 (p[i].scale?.let { "scale %.1f kg · ".format(it) } ?: "no weigh-in · ") + "trend %.1f kg".format(p[i].trend) }
-                ?: "Hold the graph and slide to see any day",
+                ?: " ",
             style = MaterialTheme.typography.titleSmall.merge(Tnum), color = if (sel != null) C.Text else C.Muted,
             modifier = Modifier.padding(bottom = 6.dp))
         Row {
@@ -352,15 +346,6 @@ private fun WeightGraph(p: List<WeightStats.Point>, goal: Double, swing: Double?
     }
 }
 
-@Composable
-private fun GraphKey(goal: Boolean, swing: Double?) {
-    // one line, not a legend box: the blue line is the only thing you need to read
-    Text(listOfNotNull(
-        "Blue line: your real weight (dots bounce day to day)",
-        swing?.let { "shading: normal ±%.1f kg".format(it) },
-        if (goal) "dashed: goal pace" else null,
-    ).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = C.Muted)
-}
 
 @Composable
 private fun WeekdayBars(wd: Map<DayOfWeek, Double>) {

@@ -82,7 +82,7 @@ class HubTest {
             (30 until 62).map { i -> day(start.plusDays(i.toLong()), 50.0 + (i % 3), 52) }
         val r = Analysis.recovery(days, 61, 90)!!
         val rhr = r.contributors.first { it.name == "Resting HR" }
-        assertEquals("normal 52", rhr.vsNormal)
+        assertTrue(rhr.vsNormal, rhr.vsNormal.startsWith("normal 52"))
     }
 
     @Test fun sleepScoreIsMoreThanHours() {
@@ -99,7 +99,7 @@ class HubTest {
     @Test fun recoveryZones() {
         val start = LocalDate.of(2026, 10, 1)
         val base = (0 until 20).map { i -> day(start.plusDays(i.toLong()), if (i % 2 == 0) 55.0 else 65.0, if (i % 2 == 0) 55 else 57) }
-        val good = base + day(start.plusDays(20), 85.0, 50, 480)
+        val good = base + day(start.plusDays(20), 66.0, 50, 480)
         val bad = base + day(start.plusDays(20), 35.0, 66, 300)
         val g = Analysis.recovery(good, 20, 95)!!
         val b = Analysis.recovery(bad, 20, 60)!!
@@ -109,6 +109,19 @@ class HubTest {
         val s = Analysis.sleep(bad, 20, 16.0, zone)!!
         assertTrue("need ${s.needMin}", s.needMin > 420)
         assertTrue(s.performance < 70)
+    }
+
+    /** HRV nearly 3x normal with resting HR up is NOT a great morning (Fitbit said 15 that day). */
+    @Test fun hrvSpikeIsAWarningNotAGreenLight() {
+        val start = LocalDate.of(2026, 10, 1)
+        val base = (0 until 25).map { i -> day(start.plusDays(i.toLong()), 38.0 + (i % 5) * 2, 49 + (i % 3)) }
+        val spike = base + day(start.plusDays(25), 116.0, 54, 470)
+        val r = Analysis.recovery(spike, 25, 96)!!
+        assertEquals(r.score.toString(), Analysis.Zone.RED, r.zone)
+        assertEquals(false, r.contributors.first { it.name == "HRV" }.good)
+        // a normal morning sits around 60
+        val normal = base + day(start.plusDays(25), 42.0, 50, 450)
+        assertTrue(Analysis.recovery(normal, 25, 88)!!.score.toString(), Analysis.recovery(normal, 25, 88)!!.score in 50..72)
     }
 
     @Test fun habitEffects() {

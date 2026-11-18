@@ -181,7 +181,7 @@ fun RecoveryDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Uni
             }
         }
         r?.let { rr ->
-            block("Why ${rr.score}%", "Compared with your last ${rr.baselineDays} days. HRV counts for half, resting heart rate and sleep a fifth each, breathing rate the rest.") {
+            block("Why ${rr.score}%") {
                 Column {
                     rr.contributors.forEachIndexed { i, c ->
                         if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
@@ -198,8 +198,7 @@ fun RecoveryDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Uni
             }
         }
         a?.effects?.takeIf { it.isNotEmpty() }?.let { effects ->
-            block("What moves your recovery", "Your next-morning recovery on days you did each thing versus days you didn't. " +
-                "Early signals become clear patterns after a few weeks of both kinds of day.") {
+            block("What moves your recovery") {
                 Column {
                     effects.take(6).forEachIndexed { i, e ->
                         if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
@@ -212,7 +211,7 @@ fun RecoveryDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Uni
         }
         val hd = days.takeLast(30)
         val hrv = hd.map { it.hrvMs }
-        block("Heart rate variability", "Higher than your normal (the shaded band) usually means well recovered. Measured while you sleep.") {
+        block("Heart rate variability") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 hd.lastOrNull()?.hrvMs?.let { Text("${it.roundToInt()} ms last night", style = MaterialTheme.typography.titleMedium) }
                 val b = baseOf(hrv.filterNotNull().dropLast(1).map { ln(it) })
@@ -220,7 +219,7 @@ fun RecoveryDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Uni
                 Axis(hd.firstOrNull()?.date)
             }
         }
-        block("Resting heart rate", "Lower than normal is good; a jump of 3+ bpm often means stress, illness, alcohol or a late meal.") {
+        block("Resting heart rate") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 hd.lastOrNull()?.restingHr?.let { Text("$it bpm", style = MaterialTheme.typography.titleMedium) }
                 val rhr = hd.map { it.restingHr?.toDouble() }
@@ -228,7 +227,7 @@ fun RecoveryDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Uni
                 Axis(hd.firstOrNull()?.date)
             }
         }
-        if (hd.any { it.respRate != null }) block("Breathing rate", "Usually very steady. A rise of 1+ breath a minute can be an early sign of getting sick.") {
+        if (hd.any { it.respRate != null }) block("Breathing rate") {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 hd.lastOrNull()?.respRate?.let { Text("%.1f per minute".format(it), style = MaterialTheme.typography.titleMedium) }
                 TrendLine(hd.map { it.respRate }, Plate.Chalk)
@@ -301,8 +300,8 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
         }
         a?.let { an ->
             val mg = com.silverajat.lifttracker.health.MoveGoal.compute(an.energy, goalKg, an.weight.lastWeekAvg)
-            block("Moving enough for your goal?", if (mg == null) null else "Uses your burn as checked against your weight trend (the Fitbit alone runs ${abs(an.energy.fitbitOffPct)}%% ${if (an.energy.fitbitOffPct >= 0) "high" else "low"}), what you've eaten, and your weight of %.1f kg.".format(mg.weightKg)) {
-                if (mg == null) Text("Needs about 2 weeks of logged food and morning weigh-ins. Then this tells you whether your running, games and gym are enough to hold your weight goal.",
+            block("Moving enough for your goal?") {
+                if (mg == null) Text("Needs about 2 weeks of food and weigh-ins.",
                     style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                 else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(mg.verdict, style = MaterialTheme.typography.bodyLarge, color = if (abs(mg.gapPerDay) <= 100) Recover else C.Text)
@@ -325,7 +324,7 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
             }
         }
         days.lastOrNull()?.load?.zones?.takeIf { it.sum() > 0 }?.let { z ->
-            block("Heart-rate zones today", "Minutes at each share of your max heart rate. Zones 2 and 3 build your base; 4 and 5 are hard efforts.") { Zones(z) }
+            block("Heart-rate zones today") { Zones(z) }
         }
         val ds = a?.days?.takeLast(14).orEmpty()
         if (ds.isNotEmpty()) block("Last 14 days", ds.mapNotNull { it.strain?.strain }.takeIf { it.isNotEmpty() }?.let { "Average %.1f a day.".format(it.average()) }) {
@@ -436,7 +435,6 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
                         Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(C.Raised)) {
                             Box(Modifier.fillMaxWidth(p.score / 100f).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(SleepPurple))
                         }
-                        Text("${(p.weight * 100).roundToInt()}% of the score · ${p.about}", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                     }
                 }
             }
@@ -451,7 +449,7 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
             }
         }
         val staged = s.deepMin + s.remMin + s.lightMin > 0
-        if (staged) block("Time in each stage", "Typical for adults: deep 13-23%, REM 20-25%, light about half. Deep repairs muscle; REM sorts memory and learning.") {
+        if (staged) block("Time in each stage") {
             val total = (s.deepMin + s.remMin + s.lightMin + s.awakeMin).coerceAtLeast(1)
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 StageRow("Awake", s.awakeMin, total, StageAwake)
@@ -462,7 +460,7 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
                 Kv("Restorative sleep", hmin(s.deepMin + s.remMin), "deep plus REM, ${(s.deepMin + s.remMin) * 100 / s.asleepMin.coerceAtLeast(1)}% of your sleep", StageRem)
             }
         }
-        block("What you needed", "Need goes up after hard days and when you're short on sleep. It resets as you catch up.") {
+        block("What you needed") {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Kv("Baseline", hmin(Analysis.SLEEP_BASE_MIN))
                 Kv("From yesterday's strain", "+${s.needStrainMin}m")
@@ -473,21 +471,21 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
         }
         block("Quality") {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                s.efficiency?.let { Kv("Efficiency", "$it%", "time asleep while in bed; 85%+ is good", if (it >= 85) Recover else Yellow) }
-                s.consistency?.let { Kv("Regularity", "$it%", "how close your bed and wake times are to the last few nights", if (it >= 80) Recover else Yellow) }
+                s.efficiency?.let { Kv("Efficiency", "$it%", null, if (it >= 85) Recover else Yellow) }
+                s.consistency?.let { Kv("Regularity", "$it%", null, if (it >= 80) Recover else Yellow) }
                 days.lastOrNull()?.respRate?.let { Kv("Breathing rate", "%.1f".format(it), "breaths a minute while asleep") }
                 days.lastOrNull()?.spo2?.let { Kv("Blood oxygen", "${it.roundToInt()}%", "average overnight") }
             }
         }
         val nights = a?.days?.takeLast(14).orEmpty()
-        block("Last 14 nights", "Bars are time asleep; the dashed line is your 7-hour baseline.") {
+        block("Last 14 nights") {
             Column {
                 DayBars(nights.map { n -> n.sleep?.let { (it.asleepMin / 600f) } ?: 0f },
                     nights.map { n -> n.sleep?.let { if (it.performance >= 85) SleepPurple else if (it.performance >= 70) Yellow else RedZ } ?: C.Raised }, 110, Analysis.SLEEP_BASE_MIN / 600f)
                 Axis(nights.firstOrNull()?.date)
             }
         }
-        block("Bed and wake times", "Each bar is one night, from falling asleep to waking. Going to bed at the same time is one of the biggest wins for deep sleep.") {
+        block("Bed and wake times") {
             Column { Schedule(nights, zone); Axis(nights.firstOrNull()?.date) }
         }
         item {

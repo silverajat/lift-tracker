@@ -393,7 +393,7 @@ private fun ExerciseCard(
                 title = { Text("Add-ons") },
                 text = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Text("Add-on weights you put on the stack for this set (not counted in kg or volume).",
+                        Text("1 kg each.",
                             style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
                             RoundBtn(Icons.Filled.Remove) { st.intValue = max(0, st.intValue - 1) }

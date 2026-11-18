@@ -109,13 +109,6 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                 }
                 ProgressStory(pts, metric)
                 LineChart(pts, Modifier.fillMaxWidth().height(200.dp))
-                if (pts.size < 3) {
-                    Text(
-                        if (metric == Metric.ROM) "Average ROM of your working sets each session, as % of your calibration set (100%). Fills in once you log sets with the pod."
-                        else "Working sets only (no warm-ups). The line fills in as you log sessions; the first point is what you did before the app.",
-                        style = MaterialTheme.typography.bodyMedium, color = C.Muted,
-                    )
-                }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Metric.entries.forEach { m ->
                         val on = m == metric
@@ -130,7 +123,6 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                         )
                     }
                 }
-                Text(metricHelp(metric), style = MaterialTheme.typography.bodySmall, color = C.Muted)
                 Card(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         SectionLabel("Personal records")
@@ -186,29 +178,9 @@ private fun CounterCard(fit: RepModel.Fit?, training: Boolean, oneArm: Boolean) 
     Card(Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel("Rep counter")
-            val line = when {
-                fit == null || fit.sets == 0 ->
-                    "No pod sets yet. Fix the count after each set: every correction is training data."
-                fit.sets < RepModel.MIN_SETS ->
-                    "Learning from ${fit.sets} corrected set${if (fit.sets > 1) "s" else ""}: " +
-                        "this exercise gets its own settings from ${RepModel.MIN_SETS}. " +
-                        "Exact on ${fit.exactLearned} of ${fit.sets}."
-                fit.params.changes() == 0 ->
-                    "Exact on ${fit.exactLearned} of ${fit.sets} sets with the standard settings " +
-                        "(${fit.missLearned} rep${if (fit.missLearned != 1) "s" else ""} off in total). Nothing to fix yet."
-                else ->
-                    "Learned from your ${fit.sets} corrected sets: exact on ${fit.exactLearned} of them " +
-                        "(was ${fit.exactDefault} before learning, ${fit.missDefault} → ${fit.missLearned} reps off)."
-            }
-            Text(line, style = MaterialTheme.typography.bodyLarge)
-            if (fit != null && fit.params.changes() > 0 && fit.sets >= RepModel.MIN_SETS) {
-                val p = fit.params
-                Text(
-                    "Settings: counts the ${signalName(p.signal)} · threshold ${(p.h * 100).toInt()}% · " +
-                        "ignores blips under ${(p.gap * 100).toInt()}% of a rep",
-                    style = MaterialTheme.typography.bodyMedium, color = C.Muted,
-                )
-            }
+            // just the result: how often it's been exactly right on this exercise
+            Text(if (fit == null || fit.sets == 0) "No pod sets yet"
+                else "Exact on ${fit.exactLearned} of ${fit.sets} sets", style = MaterialTheme.typography.bodyLarge)
             if (training) Text("Updating…", style = MaterialTheme.typography.labelMedium, color = C.Pod)
         }
     }
@@ -299,14 +271,6 @@ fun LineChart(points: List<Point>, modifier: Modifier) {
     }
 }
 
-private fun metricHelp(m: Metric) = when (m) {
-    Metric.HEAVIEST -> "Heaviest weight: the most you put on the bar for a working set, whatever the reps."
-    Metric.ONE_RM -> "Est. 1-rep max: what your best set says you could lift once. It counts weight and reps together, so it's the fairest single number for getting stronger."
-    Metric.BEST_SET -> "Best set volume: weight × reps of your biggest single set."
-    Metric.VOLUME -> "Session volume: weight × reps added up over all working sets. More sets or more reps push it up too."
-    Metric.REPS -> "Total reps across your working sets."
-    Metric.ROM -> "Range of motion: how far each rep went, as a % of your calibration set. Dropping means shorter reps."
-}
 
 /** The chart in a sentence or two: where you are, which way it's going, and what to do about it. */
 @Composable

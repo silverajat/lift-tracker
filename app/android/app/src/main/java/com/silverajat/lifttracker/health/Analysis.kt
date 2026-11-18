@@ -26,17 +26,14 @@ import kotlin.math.sqrt
  * from a formula written out here (nothing hidden, nothing copied from
  * Google or WHOOP, whose scores other apps can't read).
  *
- * RECOVERY (1-99%) each morning, against YOUR last 30 days:
- *   HRV (ln RMSSD, z-score)            weight 0.50
- *   resting HR (z, lower is better)    weight 0.20
- *   sleep performance (vs sleep need)  weight 0.20
- *   breathing rate (z, lower is better) weight 0.10
- *   score = 50 + 20 x weighted z, zones: green >= 67, yellow 34-66, red < 34.
- *   Weights renormalise over what's available; needs 5+ days of baseline.
- *   The baseline is a rolling 30 days, so it follows you: if your resting HR
- *   settles at 52, within a few weeks 52 is your normal. Each metric's spread
- *   has a floor (HRV 8%, resting HR 2 bpm, breathing 0.6/min) and each z is
- *   capped at +-2.5, so a very steady month can't turn a small blip into a crash.
+ * RECOVERY (1-99%) each morning, against YOUR last 30 days (full write-up: docs/HOW_IT_WORKS.md):
+ *   HRV tonight (ln RMSSD, z)          0.35   near or a bit above normal is good; far off EITHER way is bad
+ *   HRV past week (7-day mean, z)      0.15   same shape; one odd night can't carry the score
+ *   resting HR (z, lower is better)    0.25   lower helps a little (capped at +1), higher hurts (to -2.5)
+ *   sleep, last 4 nights               0.20   0.6 x last night + 0.4 x the 3 before, vs 85% of need
+ *   breathing rate (z)                 0.05   a rise warns; a drop doesn't add
+ *   score = 100 x Phi(z / 0.7 + 0.3): a normal day ~60, +-1 combined spread ~90 / ~25.
+ *   Zones: green >= 67, yellow 34-66, red < 34. Needs 5+ days of baseline.
  *
  * STRAIN (0-21), cardiovascular, from heart rate:
  *   strain = 21 x (1 - e^(-TRIMP / 110)), TRIMP = Banister (see Scores.load).
@@ -226,39 +223,69 @@ object Analysis {
 
     // ---- recovery --------------------------------------------------------------------------
 
-    fun recovery(days: List<HealthDay>, i: Int, sleepPerf: Int?): RecoveryResult? {
+    /**
+     * HRV is good near and a little above your normal, but far outside it either way is a warning:
+     * a big spike often means the body is under unusual load (or a bad reading), not super recovery.
+     */
+    private fun hrvEffect(z: Double) = if (z <= 1.0) z.coerceAtLeast(-2.5) else (1.0 - 1.25 * (z - 1.0)).coerceAtLeast(-2.5)
+
+    /** Standard normal CDF (Abramowitz-Stegun), for turning the combined z into a 1-99 score. */
+    private fun phi(x: Double): Double {
+        val t = 1 / (1 + 0.2316419 * abs(x))
+        val d = 0.3989423 * exp(-x * x / 2)
+        val p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))))
+        return if (x >= 0) 1 - p else p
+    }
+
+    fun recovery(days: List<HealthDay>, i: Int, sleepPerf: Int?, priorSleep: List<Int> = emptyList()): RecoveryResult? {
         val d = days[i]
         val past = days.subList(maxOf(0, i - 30), i)
-        val parts = ArrayList<Pair<Double, Double>>()   // (z, weight)
+        val parts = ArrayList<Pair<Double, Double>>()   // (effect, weight)
         val contrib = ArrayList<Contributor>()
+        fun word(z: Double, hi: String, lo: String) = when { z >= 2 -> "much $hi than usual"; z >= 1 -> "$hi than usual"; z <= -2 -> "much $lo than usual"; z <= -1 -> "$lo than usual"; else -> "normal" }
         val hrvBase = base(past.mapNotNull { it.hrvMs?.takeIf { v -> v > 0 }?.let { v -> ln(v) } }, floor = 0.08)
         if (d.hrvMs != null && d.hrvMs > 0 && hrvBase != null) {
-            val z = clampZ((ln(d.hrvMs) - hrvBase.mean) / hrvBase.sd)
-            parts += z to 0.5
-            contrib += Contributor("HRV", "${d.hrvMs.roundToInt()} ms", "normal ${exp(hrvBase.mean).roundToInt()} ms", if (abs(z) < 0.5) null else z > 0)
+            val z = (ln(d.hrvMs) - hrvBase.mean) / hrvBase.sd
+            val e = hrvEffect(z)
+            parts += e to 0.35
+            contrib += Contributor("HRV", "${d.hrvMs.roundToInt()} ms", "normal ${exp(hrvBase.mean).roundToInt()} ms · ${word(z, "higher", "lower")}",
+                if (abs(e) < 0.5) null else e > 0)
+            // the past week's average against the same normal: one odd night can't carry it
+            val week = days.subList(maxOf(0, i - 6), i + 1).mapNotNull { it.hrvMs?.takeIf { v -> v > 0 }?.let { v -> ln(v) } }
+            if (week.size >= 3) {
+                val zw = (week.average() - hrvBase.mean) / (hrvBase.sd * 0.5)
+                val ew = hrvEffect(zw)
+                parts += ew to 0.15
+                contrib += Contributor("HRV, past week", "${exp(week.average()).roundToInt()} ms", word(zw, "higher", "lower"), if (abs(ew) < 0.5) null else ew > 0)
+            }
         }
         val rhrBase = base(past.mapNotNull { it.restingHr?.toDouble() }, floor = 2.0)
         if (d.restingHr != null && rhrBase != null) {
-            val z = clampZ((rhrBase.mean - d.restingHr) / rhrBase.sd)
-            parts += z to 0.2
-            contrib += Contributor("Resting HR", "${d.restingHr} bpm", "normal ${rhrBase.mean.roundToInt()}", if (abs(z) < 0.5) null else z > 0)
+            val z = (rhrBase.mean - d.restingHr) / rhrBase.sd
+            val e = z.coerceIn(-2.5, 1.0)   // lower than usual helps a little; higher hurts a lot
+            parts += e to 0.25
+            contrib += Contributor("Resting HR", "${d.restingHr} bpm", "normal ${rhrBase.mean.roundToInt()} · ${word(-z, "higher", "lower")}", if (abs(e) < 0.5) null else e > 0)
         }
         if (sleepPerf != null) {
-            val z = ((sleepPerf - 85) / 10.0).coerceIn(-3.0, 1.5)
-            parts += z to 0.2
-            contrib += Contributor("Sleep performance", "$sleepPerf%", "aim 85%+", if (abs(z) < 0.5) null else z > 0)
+            // last night counts most, the three before it too (one bad night matters less than a run of them)
+            val recent = if (priorSleep.isEmpty()) sleepPerf.toDouble() else 0.6 * sleepPerf + 0.4 * priorSleep.average()
+            val z = ((recent - 85) / 10.0).coerceIn(-3.0, 1.5)
+            parts += z to 0.20
+            contrib += Contributor("Sleep, last 4 nights", "${recent.roundToInt()}%", "of what you needed", if (abs(z) < 0.5) null else z > 0)
         }
         val rrBase = base(past.mapNotNull { it.respRate }, floor = 0.6)
         if (d.respRate != null && rrBase != null) {
-            val z = clampZ((rrBase.mean - d.respRate) / rrBase.sd)
-            parts += z to 0.1
-            contrib += Contributor("Breathing rate", "%.1f /min".format(d.respRate), "normal %.1f".format(rrBase.mean), if (abs(z) < 1.0 || abs(d.respRate - rrBase.mean) < 0.5) null else z > 0)
+            val z = (rrBase.mean - d.respRate) / rrBase.sd
+            val e = z.coerceIn(-2.5, 0.5)   // a rise is the warning sign; a drop is usually just a different night
+            parts += e to 0.05
+            contrib += Contributor("Breathing rate", "%.1f /min".format(d.respRate), "normal %.1f".format(rrBase.mean), if (e > -1.0) null else false)
         }
         // needs HRV or resting HR against a baseline: sleep alone isn't a recovery score
         if (hrvBase == null && rhrBase == null) return null
         if (parts.isEmpty()) return null
         val z = parts.sumOf { it.first * it.second } / parts.sumOf { it.second }
-        val score = (50 + 20 * z).roundToInt().coerceIn(1, 99)
+        // a normal day lands around 60; one combined "usual spread" either way moves it to about 90 or 25
+        val score = (100 * phi(z / 0.7 + 0.3)).roundToInt().coerceIn(1, 99)
         return RecoveryResult(score, zoneOf(score), contrib, minOf(maxOf(hrvBase?.n ?: 0, rhrBase?.n ?: 0), 30))
     }
 
@@ -408,6 +435,7 @@ object Analysis {
         val lift = MuscleLoad.byDay(sessions, zone)
         val out = ArrayList<Day>()
         var prevStrain: Double? = null
+        val perfs = ArrayList<Int>()   // sleep performance night by night, for recovery's "last 4 nights"
         health.forEachIndexed { i, h ->
             // heart rate plus what the gym did to your muscles (heart rate alone undercounts lifting)
             val ml = lift[h.date]
@@ -417,7 +445,8 @@ object Analysis {
                 StrainResult(strainOf(total), null, total, h.load?.moderateMin ?: 0, h.load?.vigorousMin ?: 0, ml?.strain, hr)
             }
             val sl = sleep(health, i, prevStrain, zone)
-            val rec = recovery(health, i, sl?.performance)
+            val rec = recovery(health, i, sl?.performance, perfs.takeLast(3))
+            sl?.performance?.let { perfs += it }
             val v = vol[h.date]
             out += Day(
                 date = h.date, recovery = rec,

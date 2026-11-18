@@ -49,9 +49,6 @@ internal fun LazyListScope.readingTab(u: DayUi, act: DayActions) {
         Block("Reading now", progress = reading.size.takeIf { it > 0 }?.let { if (it == 1) "1 book" else "$it books" }) {
             reading.forEach { BookRow(it, u, act) }
             AddField("Add a book… e.g. Dune by Herbert, 600") { act.addBook(it) }
-            if (reading.isEmpty()) Text("Add what you're reading (author and pages optional), then log each sitting. " +
-                "Reading grows the Mind plant: a point a minute, +${Reading.FINISH_BONUS} when you finish a book.",
-                style = MaterialTheme.typography.bodySmall, color = C.Muted)
         }
     }
     if (u.reads.isNotEmpty()) item {
