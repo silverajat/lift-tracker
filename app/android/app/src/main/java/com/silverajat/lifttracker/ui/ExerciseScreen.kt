@@ -47,6 +47,7 @@ import com.silverajat.lifttracker.reps.RepModel
 import com.silverajat.lifttracker.reps.unitLabel
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlin.math.roundToInt
 import java.util.Locale
 
 private val shortDate = SimpleDateFormat("d MMM", Locale.getDefault())
@@ -106,6 +107,7 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                         style = MaterialTheme.typography.bodyMedium, color = C.Accent,
                     )
                 }
+                ProgressStory(pts, metric)
                 LineChart(pts, Modifier.fillMaxWidth().height(200.dp))
                 if (pts.size < 3) {
                     Text(
@@ -128,6 +130,7 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                         )
                     }
                 }
+                Text(metricHelp(metric), style = MaterialTheme.typography.bodySmall, color = C.Muted)
                 Card(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         SectionLabel("Personal records")
@@ -243,12 +246,14 @@ private fun SetLines(lines: List<Triple<Boolean, String, String?>>) {
 fun LineChart(points: List<Point>, modifier: Modifier) {
     val measurer = rememberTextMeasurer()
     val labelStyle = TextStyle(color = C.Muted, fontSize = 11.sp)
+    val valueStyle = TextStyle(color = C.Text, fontSize = 11.sp)
+    val bestStyle = TextStyle(color = Plate.Yellow, fontSize = 11.sp)
     Canvas(modifier) {
         if (points.isEmpty()) return@Canvas
         val left = 44.dp.toPx()
         val bottom = size.height - 22.dp.toPx()
-        val top = 8.dp.toPx()
-        val right = size.width - 8.dp.toPx()
+        val top = 20.dp.toPx()
+        val right = size.width - 14.dp.toPx()
         val vMin = points.minOf { it.value }
         val vMax = points.maxOf { it.value }
         val pad = if (vMax == vMin) maxOf(1.0, vMax * 0.1) else (vMax - vMin) * 0.15
@@ -268,15 +273,69 @@ fun LineChart(points: List<Point>, modifier: Modifier) {
             if (i == 0) path.moveTo(x(i), y(p.value)) else path.lineTo(x(i), y(p.value))
         }
         drawPath(path, C.Accent, style = Stroke(width = 2.5.dp.toPx()))
+        val best = points.indices.maxBy { points[it].value }
+        val few = points.size <= 8
         points.forEachIndexed { i, p ->
             drawCircle(C.Accent, radius = 4.dp.toPx(), center = Offset(x(i), y(p.value)))
+            // the best one gets a ring and says so; with few points every point shows its number
+            if (i == best) drawCircle(Plate.Yellow, radius = 7.dp.toPx(), center = Offset(x(i), y(p.value)), style = Stroke(2.dp.toPx()))
+            if (few || i == best || i == points.lastIndex) {
+                val t = Stats.fmt(p.value) + if (i == best && points.size > 1) " best" else ""
+                val st = if (i == best) bestStyle else valueStyle
+                val w = measurer.measure(t, st).size.width
+                val tx = (x(i) - w / 2).coerceIn(left, size.width - w)
+                drawText(measurer, t, Offset(tx, y(p.value) - 20.dp.toPx()), st)
+            }
         }
         fun label(p: Point) = p.timeMs?.let { shortDate.format(Date(it)) } ?: "before"
-        drawText(measurer, label(points.first()), Offset(left - 10.dp.toPx(), bottom + 6.dp.toPx()), labelStyle)
-        if (points.size > 1) {
-            val t = label(points.last())
+        // dates: under every point when there's room, else first and last
+        val show = if (points.size <= 5) points.indices.toList() else listOf(0, points.lastIndex)
+        show.forEach { i ->
+            val t = label(points[i])
             val w = measurer.measure(t, labelStyle).size.width
-            drawText(measurer, t, Offset(right - w, bottom + 6.dp.toPx()), labelStyle)
+            val tx = (x(i) - w / 2).coerceIn(0f, size.width - w)
+            drawText(measurer, t, Offset(tx, bottom + 6.dp.toPx()), labelStyle)
         }
+    }
+}
+
+private fun metricHelp(m: Metric) = when (m) {
+    Metric.HEAVIEST -> "Heaviest weight: the most you put on the bar for a working set, whatever the reps."
+    Metric.ONE_RM -> "Est. 1-rep max: what your best set says you could lift once. It counts weight and reps together, so it's the fairest single number for getting stronger."
+    Metric.BEST_SET -> "Best set volume: weight × reps of your biggest single set."
+    Metric.VOLUME -> "Session volume: weight × reps added up over all working sets. More sets or more reps push it up too."
+    Metric.REPS -> "Total reps across your working sets."
+    Metric.ROM -> "Range of motion: how far each rep went, as a % of your calibration set. Dropping means shorter reps."
+}
+
+/** The chart in a sentence or two: where you are, which way it's going, and what to do about it. */
+@Composable
+private fun ProgressStory(pts: List<Point>, metric: Metric) {
+    if (pts.size < 2) return
+    val unit = if (metric.unit == "kg") " kg" else if (metric == Metric.ROM) "%" else " ${metric.unit}"
+    val first = pts.first(); val last = pts.last(); val prev = pts[pts.size - 2]
+    val bestBefore = pts.dropLast(1).maxOf { it.value }
+    val bestAt = pts.indices.maxBy { pts[it].value }
+    val sinceBest = pts.lastIndex - bestAt
+    fun pct(a: Double, b: Double) = if (b == 0.0) 0 else ((a - b) / b * 100).roundToInt()
+    val (head, color) = when {
+        last.value > bestBefore + 1e-9 -> "New best last session: ${Stats.fmt(last.value)}$unit" to Plate.Green
+        pct(last.value, prev.value) <= -3 -> "Down from last time: ${Stats.fmt(prev.value)} → ${Stats.fmt(last.value)}$unit" to Plate.Yellow
+        sinceBest >= 3 -> "No new best for $sinceBest sessions" to Plate.Yellow
+        pct(last.value, prev.value) >= 1 -> "Up from last time: ${Stats.fmt(prev.value)} → ${Stats.fmt(last.value)}$unit" to Plate.Green
+        else -> "Holding steady at ${Stats.fmt(last.value)}$unit" to C.Text
+    }
+    val tip = when {
+        last.value > bestBefore + 1e-9 -> "Keep the same weight next time and add a rep before going heavier."
+        pct(last.value, prev.value) <= -3 -> "One off day is normal (sleep, food, a hard day before). Two in a row: take it a bit lighter for a week."
+        sinceBest >= 3 -> "You've stalled: add a rep to each set before adding weight, or drop 5–10% and build back up."
+        else -> null
+    }
+    val start = first.timeMs?.let { shortDate.format(Date(it)) } ?: "before the app"
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Surface).padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(head, style = MaterialTheme.typography.titleMedium, color = color)
+        Text("Since $start: ${Stats.fmt(first.value)} → ${Stats.fmt(last.value)}$unit (%+d%%) over ${pts.size} sessions".format(pct(last.value, first.value)),
+            style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+        tip?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
 }
