@@ -154,7 +154,7 @@ class HubTest {
         assertTrue(usual.macros.kcal > old.macros.kcal)
         val honey = com.silverajat.lifttracker.meals.Foods.withAmounts(com.silverajat.lifttracker.meals.Foods.base("honey20")!!, mapOf("g" to 30.0))
         assertEquals("Honey, 30 g", honey.name)
-        assertEquals(91.5, honey.macros.kcal, 0.5)
+        assertEquals(99.0, honey.macros.kcal, 0.5)   // 33 kcal per 10 g, from your label
         // usual amounts are saved and come back
         val dir = java.nio.file.Files.createTempDirectory("meals").toFile()
         val store = com.silverajat.lifttracker.meals.MealStore(dir)

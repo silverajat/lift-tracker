@@ -56,8 +56,14 @@ class MealStore(root: File) {
         if (!f.exists()) return emptyList()
         return runCatching {
             val a = JSONArray(f.readText())
-            (0 until a.length()).map { fromJson(a.getJSONObject(it)) }.sortedBy { it.timeMs }
+            (0 until a.length()).map { fromJson(a.getJSONObject(it)) }.map(::current).sortedBy { it.timeMs }
         }.getOrDefault(emptyList())
+    }
+
+    /** A logged food re-priced from today's food list: fix a food's numbers once and every past log follows. */
+    private fun current(e: MealEntry): MealEntry {
+        val b = e.foodId?.let { Foods.base(it) } ?: return e
+        return e.copy(macros = Foods.withAmounts(b, e.amounts.ifEmpty { null }).macros * e.portion)
     }
 
     fun days(from: LocalDate, to: LocalDate): Map<LocalDate, List<MealEntry>> =
