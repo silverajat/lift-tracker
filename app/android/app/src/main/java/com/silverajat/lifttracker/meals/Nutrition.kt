@@ -74,17 +74,21 @@ object Foods {
         Food("caffeine", "Caffeine pill, 200 mg", Macros.ZERO),
         Food("shake", "Whey 32 g + creatine 3 g, 100 ml HL milk + 100 ml NutriSoy", Macros(219.0, 32.5, 10.9, 4.6, 1.3),
             "labels"),
-        // salad: brown/red rice ~150 g, citrus-lime chicken breast ~110 g, a scoop each of chickpeas and edamame,
-        // 1 egg, a little broccoli, ~10 ml roasted sesame dressing (USDA values per part)
+        // salad: brown/red rice ~150 g (3.9 g protein), citrus-lime chicken breast ~75 g (23 g), a scoop each of chickpeas
+        // (2.7 g) and edamame (3.3 g), 1 egg (6.3 g), a little broccoli, ~10 ml roasted sesame dressing
         Food("salad_egg", "Salad bowl: citrus-lime chicken, brown rice, broccoli, chickpeas, edamame, egg, sesame dressing",
-            Macros(610.0, 54.0, 55.0, 18.0, 9.0), "built from its parts"),
-        Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(550.0, 48.0, 58.0, 13.5, 10.0), "built from its parts"),
-        // HPB steamed chicken rice plate (488 kcal, ~21 g protein) + kailan in oyster sauce + braised egg + soup
-        Food("chicken_rice", "Steamed chicken rice, kailan, braised egg, soup",
+            Macros(510.0, 41.0, 51.0, 16.0, 7.6), "built from its parts"),
+        Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(450.0, 35.0, 54.0, 11.0, 8.4), "built from its parts"),
+        // HPB steamed chicken rice plate (488 kcal, ~21 g protein) + extra skinless chicken (~50 g, 14 g) + extra rice
+        // (~half a plate, chicken-rice style) + kailan in oyster sauce + braised egg + soup
+        Food("chicken_rice", "Chicken rice + extra chicken & rice, kailan, braised egg, soup",
+            Macros(920.0, 48.0, 122.0, 29.0, 4.0), "HPB plate + sides"),
+        Food("chicken_rice_plain", "Chicken rice (no extras), kailan, braised egg, soup",
             Macros(645.0, 31.0, 89.0, 21.0, 4.0), "HPB plate + sides"),
-        // 1 cup rice ~200 g, 3 scoops curry chicken + mushroom, tofu, tomato egg, cabbage (per-part estimates)
+        // 1 cup cooked rice ~160 g (4 g protein), 3 scoops curry chicken & mushroom (~60 g chicken, 16 g),
+        // braised tofu (7 g), tomato egg (5 g), stir-fried cabbage (1 g)
         Food("mixed_rice", "Mixed rice: 1 cup rice, curry chicken & mushroom, tofu, tomato egg, cabbage",
-            Macros(870.0, 43.0, 80.0, 40.0, 4.0), "built from its parts"),
+            Macros(715.0, 34.0, 66.0, 34.0, 4.6), "built from its parts"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),

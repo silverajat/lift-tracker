@@ -169,7 +169,7 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
                         // planned items not yet logged
                         val loggedIds = logged.mapNotNull { it.foodId }.toSet()
                         val options: List<Food> = when {
-                            isMain -> (MealPlan.mains(date.dayOfWeek) + listOf(Foods.get("chicken_rice"), Foods.get("mixed_rice"),
+                            isMain -> (MealPlan.mains(date.dayOfWeek) + listOf(Foods.get("chicken_rice"), Foods.get("chicken_rice_plain"), Foods.get("mixed_rice"),
                                 MealPlan.salad(date.dayOfWeek))).distinctBy { it.id }.takeIf { logged.isEmpty() } ?: emptyList()
                             slot == Slot.EXTRA -> listOf(Foods.get("meiji"), Foods.get("konjac"))
                             // the bowl: today's planned items first, then any of your fruits
@@ -219,7 +219,8 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
 private fun short(f: Food): String = when (f.id) {
     "salad_egg" -> "Salad bowl"
     "salad_carrot" -> "Salad bowl (carrot)"
-    "chicken_rice" -> "Chicken rice"
+    "chicken_rice" -> "Chicken rice + extras"
+    "chicken_rice_plain" -> "Chicken rice"
     "mixed_rice" -> "Mixed rice"
     "coconut_water" -> "Coconut water"
     "bread" -> "Bread"
