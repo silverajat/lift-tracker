@@ -256,7 +256,7 @@ object Insights {
         lines += "Where today is heading" + (if (t.restOfPlan) " with the rest of the plan" else "") + ": ${signed(t.endOfDay)} (goal ${signed(goal)})."
         lines += when {
             abs(diff) <= 150 -> "Nothing to change. Nice."
-            diff < -400 -> "Quite a bit under: a Meiji (~170) plus an extra bread + Mayver's (~135) gets you closer."
+            diff < -400 -> "Quite a bit under: a Meiji (~240) plus an extra slice of bread with peanut butter (~145) gets you closer."
             diff < 0 -> "Slightly under: an extra slice of bread with honey (~100) or a Meiji (~170) closes it."
             diff > 400 -> "Well over: skip the extra peanut butter and keep the yoghurt bowl plain-ish."
             else -> "A little over: fine if it's a training day."

@@ -254,6 +254,28 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         reloadMeals()
     }
 
+    /**
+     * Eating out: GPT's estimate of a dish's calories and macros (Singapore portions), as
+     * kcal, protein, carbs, fat, fibre. Null when there's no key or it couldn't read the answer.
+     */
+    fun estimateFood(what: String, onDone: (Macros?) -> Unit) {
+        val key = _apiKey.value
+        if (key.isBlank() || what.isBlank()) { onDone(null); return }
+        viewModelScope.launch {
+            val m = runCatching {
+                val text = withContext(Dispatchers.IO) {
+                    Gpt.send(key, _model.value,
+                        "You estimate nutrition for food eaten in Singapore. Use Singapore HPB values for hawker dishes and typical " +
+                            "portions. Reply with ONLY a JSON object: {\"kcal\":n,\"protein\":g,\"carbs\":g,\"fat\":g,\"fibre\":g}.",
+                        listOf(com.silverajat.lifttracker.chat.ChatMessage("user", what, System.currentTimeMillis())), maxTokens = 300)
+                }
+                val o = org.json.JSONObject(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1))
+                Macros(o.getDouble("kcal"), o.optDouble("protein", 0.0), o.optDouble("carbs", 0.0), o.optDouble("fat", 0.0), o.optDouble("fibre", 0.0))
+            }.getOrNull()
+            onDone(m)
+        }
+    }
+
     fun logCustom(slot: Slot, name: String, macros: Macros) {
         val d = _date.value
         val t = if (d == LocalDate.now(zone)) System.currentTimeMillis() else d.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()

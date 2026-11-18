@@ -35,19 +35,19 @@ object Foods {
     private val weighed: Map<String, List<Part>> = mapOf(
         // your labels: whey 130 kcal / 32 g; milks from the plan's shake totals
         "shake" to listOf(
-            Part("whey", "Whey (ON Gold Standard)", "g", 32.0, Macros(4.0625, 0.774, 0.10, 0.048)),
+            Part("whey", "Whey (ON Gold Standard)", "g", 32.0, Macros(4.0625, 0.75, 0.09375, 0.0625)),
             Part("creatine", "Creatine", "g", 3.0, Macros.ZERO),
-            Part("hl", "Marigold HL milk", "ml", 100.0, Macros(0.49, 0.036, 0.050, 0.015)),
-            Part("soy", "NutriSoy no sugar", "ml", 100.0, Macros(0.40, 0.060, 0.011, 0.019, 0.005)),
+            Part("hl", "Marigold HL milk", "ml", 100.0, Macros(0.49, 0.042, 0.067, 0.006)),
+            Part("soy", "NutriSoy no sugar", "ml", 100.0, Macros(0.40, 0.043, 0.012, 0.020, 0.013)),
         ),
-        "coconut_water" to one("ml", "Coconut water", "ml", 250.0, Macros(55.0, 0.5, 12.6, 0.0)),
+        "coconut_water" to one("ml", "Coconut water", "ml", 250.0, Macros(55.0, 0.5, 13.0, 0.0)),
         "honey20" to one("g", "Honey", "g", 20.0, Macros(66.0, 0.1, 17.8, 0.0)),
         "honey10" to one("g", "Honey", "g", 10.0, Macros(33.0, 0.0, 8.9, 0.0)),
-        "mayvers10" to one("g", "Mayver's", "g", 10.0, Macros(58.5, 2.3, 2.1, 4.7, 0.8)),
-        "clusters" to one("g", "Protein clusters", "g", 50.0, Macros(207.0, 9.6, 27.0, 6.7, 3.9)),
+        "mayvers10" to one("g", "Peanut butter", "g", 10.0, Macros(58.5, 2.45, 2.15, 4.2, 0.75)),
+        "clusters" to one("g", "Protein clusters", "g", 50.0, Macros(207.0, 8.3, 16.2, 10.1, 8.5)),
         "yoghurt" to one("g", "Yoghurt", "g", 125.0, Macros(95.0, 5.0, 18.1, 0.2)),
         "blueberries" to one("g", "Blueberries", "g", 125.0, Macros(71.0, 0.9, 18.0, 0.4, 3.0)),
-        "psyllium" to one("g", "Psyllium husk", "g", 5.0, Macros(15.0, 0.1, 4.5, 0.0, 4.0)),
+        "psyllium" to one("g", "Psyllium husk", "g", 5.0, Macros(20.0, 0.0, 4.0, 0.0, 4.0)),
     )
 
     /** Your usual amounts (food id -> part -> amount), loaded from the meal store. */
@@ -66,23 +66,27 @@ object Foods {
     }
 
     private val base: List<Food> = listOf(
-        Food("coconut_water", "UFC Refresh coconut water, 250 ml", Macros(55.0, 0.5, 12.6, 0.0)),
-        Food("bread", "FairPrice Enriched White Bread, 1 slice", Macros(85.0, 2.9, 15.9, 1.1, 0.8)),
+        Food("coconut_water", "UFC Refresh coconut water, 250 ml", Macros(55.0, 0.5, 13.0, 0.0)),
+        Food("bread", "FairPrice Enriched White Bread, 1 slice", Macros(85.0, 3.5, 15.9, 0.8, 1.05), "label"),
         Food("honey20", "Honey, 20 g", Macros(66.0, 0.1, 17.8, 0.0)),
         Food("honey10", "Honey, 10 g", Macros(33.0, 0.0, 8.9, 0.0)),
         Food("banana", "Banana, 1 medium", Macros(105.0, 1.3, 27.0, 0.4, 3.1)),
         Food("caffeine", "Caffeine pill, 200 mg", Macros.ZERO),
-        Food("shake", "Whey 32 g + creatine 3 g, 100 ml HL milk + 100 ml NutriSoy", Macros(219.0, 34.4, 9.3, 4.9, 0.5),
-            "protein and fat from your labels"),
+        Food("shake", "Whey 32 g + creatine 3 g, 100 ml HL milk + 100 ml NutriSoy", Macros(219.0, 32.5, 10.9, 4.6, 1.3),
+            "labels"),
+        // salad: brown/red rice ~150 g, citrus-lime chicken breast ~110 g, a scoop each of chickpeas and edamame,
+        // 1 egg, a little broccoli, ~10 ml roasted sesame dressing (USDA values per part)
         Food("salad_egg", "Salad bowl: citrus-lime chicken, brown rice, broccoli, chickpeas, edamame, egg, sesame dressing",
-            Macros(650.0, 42.0, 62.0, 24.0, 12.0), "estimate"),
-        Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(590.0, 36.0, 64.0, 19.0, 13.0), "estimate"),
-        Food("chicken_rice", "Steamed chicken rice + extra skinless chicken, extra rice, bok choy, ½ egg",
-            Macros(950.0, 55.0, 125.0, 24.0, 3.0), "estimate"),
-        Food("mixed_rice", "Mixed rice: rice, 2× curry chicken, tofu, egg, cabbage/broccoli",
-            Macros(1000.0, 60.0, 85.0, 42.0, 5.0), "estimate"),
-        Food("mayvers10", "Mayver's choc hazelnut peanut butter, 10 g", Macros(58.5, 2.3, 2.1, 4.7, 0.8)),
-        Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 9.6, 27.0, 6.7, 3.9)),
+            Macros(610.0, 54.0, 55.0, 18.0, 9.0), "built from its parts"),
+        Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(550.0, 48.0, 58.0, 13.5, 10.0), "built from its parts"),
+        // HPB steamed chicken rice plate (488 kcal, ~21 g protein) + kailan in oyster sauce + braised egg + soup
+        Food("chicken_rice", "Steamed chicken rice, kailan, braised egg, soup",
+            Macros(645.0, 31.0, 89.0, 21.0, 4.0), "HPB plate + sides"),
+        // 1 cup rice ~200 g, 3 scoops curry chicken + mushroom, tofu, tomato egg, cabbage (per-part estimates)
+        Food("mixed_rice", "Mixed rice: 1 cup rice, curry chicken & mushroom, tofu, tomato egg, cabbage",
+            Macros(870.0, 43.0, 80.0, 40.0, 4.0), "built from its parts"),
+        Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
+        Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
         // fruit: one serving of about 150 g (USDA values per 100 g x 1.5)
         Food("kiwi2", "2 green kiwis (150 g)", Macros(92.0, 1.7, 22.0, 0.8, 4.5)),
@@ -94,9 +98,9 @@ object Foods {
         Food("apple", "Apple, 150 g", Macros(78.0, 0.4, 20.7, 0.3, 3.6)),
         Food("orange", "Orange, 150 g", Macros(70.0, 1.4, 17.7, 0.2, 3.6)),
         Food("supplements", "Zinc 30 mg, magnesium glycinate 200 mg, D3/K2, omega-3", Macros(10.0, 0.0, 0.0, 1.0)),
-        Food("psyllium", "Psyllium husk, 5 g (with water)", Macros(15.0, 0.1, 4.5, 0.0, 4.0)),
-        Food("meiji", "Meiji protein drink (30 g protein)", Macros(170.0, 30.0, 10.0, 1.5), "estimate"),
-        Food("konjac", "Konjac jelly", Macros(15.0, 0.0, 4.0, 0.0, 0.5)),
+        Food("psyllium", "Psyllium husk, 5 g (with water)", Macros(20.0, 0.0, 4.0, 0.0, 4.0), "label"),
+        Food("meiji", "Meiji High Protein milk, 350 ml", Macros(240.0, 32.0, 20.0, 3.5), "online values"),
+        Food("konjac", "Konjac jelly", Macros(5.0, 0.0, 1.2, 0.0, 0.3)),
     )
     private val byId = base.associateBy { it.id }
     val all: List<Food> get() = base.map { withAmounts(it, usual[it.id]) }
@@ -192,7 +196,7 @@ object MealPlan {
         Post-workout: ${Foods.get("shake").amounts["whey"]?.toInt() ?: 32} g Optimum Nutrition Gold Standard Whey (Mocha Cappuccino) + 3 g creatine in 100 ml Marigold HL Green + 100 ml NutriSoy No Sugar Added (~32 g protein, ~4.8 g fat). Measure everything.
         Mains: (1) Salad bowl: citrus-lime chicken breast, Japanese roasted sesame dressing (ask for less), brown rice + broccoli, chickpeas + edamame + egg (carrot instead of egg on Tue/Thu). (2) Steamed chicken rice set + extra skinless chicken (ask for breast), extra rice, bok choy, half a boiled egg. (3) Mixed rice: rice, 2 portions curry chicken, tofu, egg, cabbage or broccoli.
         Rotation: Mon-Fri salad + chicken rice; Sat and Sun chicken rice + mixed rice. Salad is usually weekday lunch and should be early (shop may close); chicken rice can be lunch or dinner; order flexible.
-        Afternoon snack: 1 slice bread, 10 g Mayver's Chocolate Hazelnut Peanut Butter, 10 g honey.
+        Afternoon snack: 1 slice bread, 10 g unsalted peanut butter, 10 g honey.
         9 PM yoghurt bowl: 50 g Red Tractor protein clusters + 125 g Marigold mixed berries non-fat yoghurt + fruit (Mon 2 kiwis, Tue 125 g blueberries, Wed 1 cup apple/orange/guava, Thu 2 kiwis, Fri 125 g blueberries, Sat 1 cup guava or red dragon fruit, Sun 1 cup mango).
         10 PM supplements: NOW L-OptiZinc 30 mg, NOW magnesium glycinate 200 mg, NOW D3/K2 1,000 IU + 45 mcg, NOW Ultra Omega-3 500 mg EPA + 250 mg DHA.
         Psyllium husk 5 g once daily around a low-fibre meal with water. Honey 30 g/day. Peanut butter 20 g/day per plan (the snack lists 10 g). Coconut water 250 ml on waking.

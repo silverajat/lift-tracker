@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -93,7 +95,7 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
     var weightOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
 
     editing?.let { e -> EntryDialog(e, onDismiss = { editing = null }, hub = hub) }
-    customSlot?.let { s -> CustomDialog(s, onDismiss = { customSlot = null }, onSave = { n, m -> hub.logCustom(s, n, m); customSlot = null }) }
+    customSlot?.let { s -> CustomDialog(s, hub, onDismiss = { customSlot = null }, onSave = { n, m -> hub.logCustom(s, n, m); customSlot = null }) }
     if (weightDialog) WeightDialog(onDismiss = { weightDialog = false }, onSave = { hub.setWeight(it, if (weightOpen) LocalDate.now() else date); weightDialog = false })
     if (weightOpen) {
         androidx.activity.compose.BackHandler { weightOpen = false }
@@ -141,6 +143,9 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
             }
         }
 
+
+        // ---- the day's macros ----
+        item { MacroCard(MealStore.totals(entries)) }
 
         // ---- slots ----
         Slot.entries.forEach { slot ->
@@ -221,7 +226,7 @@ private fun short(f: Food): String = when (f.id) {
     "honey20", "honey10" -> "Honey"
     "caffeine" -> "Caffeine"
     "shake" -> "Shake"
-    "mayvers10" -> "Mayver's"
+    "mayvers10" -> "Peanut butter"
     "clusters" -> "Clusters"
     "yoghurt" -> "Yoghurt"
     "supplements" -> "Supplements"
@@ -368,23 +373,48 @@ fun TimeDialog(hour: Int, minute: Int, onDismiss: () -> Unit, title: String = "W
 }
 
 @Composable
-private fun CustomDialog(slot: Slot, onDismiss: () -> Unit, onSave: (String, Macros) -> Unit) {
+private fun CustomDialog(slot: Slot, hub: HubViewModel, onDismiss: () -> Unit, onSave: (String, Macros) -> Unit) {
     var name by remember { mutableStateOf("") }
     var kcal by remember { mutableStateOf("") }
+    var p by remember { mutableStateOf("") }
+    var c by remember { mutableStateOf("") }
+    var f by remember { mutableStateOf("") }
+    var fib by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    val key by hub.apiKey.collectAsStateWithLifecycle()
+    fun n(v: Double) = if (v == 0.0) "" else "%.0f".format(v)
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Surface,
         title = { Text("Add to ${slot.title}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("What (e.g. kaya toast)") }, singleLine = true, colors = fieldColors())
-                NumField("Rough kcal", kcal, { kcal = it })
-                Text("Only used for net calories. A rough guess is fine: the scale corrects it over time.", style = MaterialTheme.typography.labelMedium, color = C.Muted)
+                OutlinedTextField(name, { name = it }, label = { Text("What (e.g. 2 kaya toast + kopi)") }, colors = fieldColors())
+                if (key.isNotBlank()) Text(if (busy) "Estimating…" else if (failed) "Couldn't estimate: fill it in" else "Estimate it for me",
+                    style = MaterialTheme.typography.titleSmall, color = if (busy || failed) C.Muted else C.Accent,
+                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(enabled = !busy && name.isNotBlank()) {
+                        busy = true; failed = false
+                        hub.estimateFood(name.trim()) { m ->
+                            busy = false
+                            if (m == null) failed = true else { kcal = n(m.kcal); p = n(m.protein); c = n(m.carbs); f = n(m.fat); fib = n(m.fibre) }
+                        }
+                    }.padding(vertical = 6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumField("kcal", kcal, { kcal = it }, Modifier.weight(1f))
+                    NumField("Protein g", p, { p = it }, Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumField("Carbs g", c, { c = it }, Modifier.weight(1f))
+                    NumField("Fat g", f, { f = it }, Modifier.weight(1f))
+                    NumField("Fibre g", fib, { fib = it }, Modifier.weight(1f))
+                }
             }
         },
         confirmButton = {
             TextButton(enabled = name.isNotBlank(), onClick = {
-                onSave(name.trim(), Macros(kcal.toDoubleOrNull() ?: 0.0, 0.0, 0.0, 0.0))
+                fun d(s: String) = s.replace(',', '.').toDoubleOrNull() ?: 0.0
+                onSave(name.trim(), Macros(d(kcal), d(p), d(c), d(f), d(fib)))
             }) { Text("Add", color = C.Accent, fontWeight = FontWeight.Bold) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) } },
@@ -406,4 +436,34 @@ private fun WeightDialog(onDismiss: () -> Unit, onSave: (Double) -> Unit) {
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = C.Muted) } },
     )
+}
+
+/** Calories, protein, carbs, fat and fibre so far today; protein and fat against their targets. */
+@Composable
+private fun MacroCard(t: Macros) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("%,d".format(t.kcal.roundToInt()), style = MaterialTheme.typography.headlineMedium.merge(Tnum))
+                Text(" kcal", style = MaterialTheme.typography.bodyMedium, color = C.Muted, modifier = Modifier.padding(bottom = 4.dp))
+            }
+            MacroBar("Protein", t.protein, Targets.protein.start, Plate.Blue)
+            MacroBar("Carbs", t.carbs, null, Plate.Yellow)
+            MacroBar("Fat", t.fat, Targets.fat.endInclusive, Plate.Red)
+            MacroBar("Fibre", t.fibre, 30.0, Plate.Green)
+        }
+    }
+}
+
+@Composable
+private fun MacroBar(label: String, g: Double, target: Double?, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(64.dp))
+        Box(Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(C.Raised)) {
+            val frac = if (target != null) (g / target).toFloat().coerceIn(0f, 1f) else (g / 300.0).toFloat().coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth(frac).height(8.dp).clip(RoundedCornerShape(4.dp)).background(color))
+        }
+        Text("${g.roundToInt()}" + (target?.let { " / ${it.roundToInt()} g" } ?: " g"), style = MaterialTheme.typography.labelLarge.merge(Tnum),
+            color = C.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.End, modifier = Modifier.width(84.dp))
+    }
 }
