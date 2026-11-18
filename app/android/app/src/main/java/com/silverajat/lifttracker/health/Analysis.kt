@@ -294,8 +294,8 @@ object Analysis {
                 atTop.any { it.reps < top - 3 } -> "Stay at ${fmt(heaviest)} kg, build back to $top reps"
                 else -> "Stay at ${fmt(heaviest)} kg, add a rep per set (target $top)"
             }
-            val (nextKg, nextReps, nextWhy): Triple<Double?, Int?, String> = when {
-                ex.bodyweight -> Triple(null, atTop.maxOf { it.reps } + 1, "add a rep")
+            val (nextKg, nextReps, nextWhy) = when {
+                ex.bodyweight -> Triple<Double?, Int?, String>(null, atTop.maxOf { it.reps } + 1, "add a rep")
                 atTop.all { it.reps >= top } -> Triple(heaviest + ex.step, null, "go heavier")
                 atTop.any { it.reps < top - 3 } -> Triple(heaviest, top, "build back up")
                 else -> Triple(heaviest, top, "add reps")
