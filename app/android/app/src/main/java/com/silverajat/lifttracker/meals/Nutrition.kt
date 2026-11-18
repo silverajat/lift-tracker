@@ -74,22 +74,22 @@ object Foods {
         Food("caffeine", "Caffeine pill, 200 mg", Macros.ZERO),
         Food("shake", "Whey 32 g + creatine 3 g, 100 ml HL milk + 100 ml NutriSoy", Macros(219.0, 32.5, 10.9, 4.6, 1.3),
             "labels"),
-        // salad: brown/red rice ~150 g (3.9 g protein), citrus-lime chicken breast ~75 g (23 g), a scoop each of chickpeas
-        // (2.7 g) and edamame (3.3 g), 1 egg (6.3 g), a little broccoli, ~10 ml roasted sesame dressing
+        // salad: brown/red rice ~220 g (246 kcal, 6 g protein), citrus-lime chicken ~75 g with its coating (164 kcal, 23 g),
+        // chickpeas ~40 g (66 kcal, 4 g), edamame ~40 g (49 kcal, 4 g), egg (72 kcal, 6 g), broccoli, ~15 ml sesame dressing (70 kcal)
         Food("salad_egg", "Salad bowl: citrus-lime chicken, brown rice, broccoli, chickpeas, edamame, egg, sesame dressing",
-            Macros(510.0, 41.0, 51.0, 16.0, 7.6), "built from its parts"),
-        Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(450.0, 35.0, 54.0, 11.0, 8.4), "built from its parts"),
+            Macros(680.0, 44.0, 72.0, 24.0, 10.0), "built from its parts"),
+        Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(620.0, 38.0, 75.0, 19.0, 11.0), "built from its parts"),
         // HPB steamed chicken rice plate (488 kcal, ~21 g protein) + extra skinless chicken (~50 g, 14 g) + extra rice
         // (~half a plate, chicken-rice style) + kailan in oyster sauce + braised egg + soup
         Food("chicken_rice", "Chicken rice + extra chicken & rice, kailan, braised egg, soup",
             Macros(920.0, 48.0, 122.0, 29.0, 4.0), "HPB plate + sides"),
         Food("chicken_rice_plain", "Chicken rice (no extras), kailan, braised egg, soup",
             Macros(645.0, 31.0, 89.0, 21.0, 4.0), "HPB plate + sides"),
-        // 1 cup cooked rice ~160 g (208 kcal, 4 g protein); 3 scoops thin brown curry chicken & mushroom, no coconut
-        // (~60 g chicken: 150 kcal, 16 g protein, 6 g fat); tofu bricks, lightly oiled (120 kcal, 10 g, 6 g fat);
+        // rice ~250 g, a big hawker cup (325 kcal, 7 g protein); 3 scoops thin brown curry chicken & mushroom, no coconut
+        // (~60 g chicken: 150 kcal, 16 g, 6 g fat); tofu bricks, lightly oiled (120 kcal, 10 g, 6 g fat);
         // watery tomato egg (90 kcal, 5 g, 6 g fat); stir-fried cabbage (50 kcal, 1 g, 3 g fat)
-        Food("mixed_rice", "Mixed rice: 1 cup rice, curry chicken & mushroom, tofu, tomato egg, cabbage",
-            Macros(620.0, 37.0, 64.0, 21.0, 4.6), "built from its parts"),
+        Food("mixed_rice", "Mixed rice: rice, curry chicken & mushroom, tofu, tomato egg, cabbage",
+            Macros(740.0, 39.0, 89.0, 22.0, 5.0), "built from its parts"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
