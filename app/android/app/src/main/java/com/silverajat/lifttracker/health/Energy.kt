@@ -26,9 +26,14 @@ import kotlin.math.sqrt
  * pull it to the truth over ~2-4 weeks. Because it corrects the Fitbit's
  * DAILY numbers, each day keeps its own burn (gym day vs lazy Sunday).
  *
- * Days with under 1,200 kcal logged count as "not logged" (a forgotten
- * meal would otherwise look like a huge deficit): on those days the filter
+ * A day only counts as logged when it has at least 1,200 kcal AND at least
+ * 65% of that day's planned food: a day with a forgotten meal would otherwise
+ * look like a big deficit and drag the burn down. On other days the filter
  * just widens its doubt about the weight instead of learning from them.
+ *
+ * The correction is kept within 0.8-1.25 x the Fitbit: wrist trackers are
+ * typically 10-25% off on total burn, not 40%. Hitting a limit means the
+ * logs are missing food, not that you burn like someone in bed all day.
  */
 object Energy {
     const val KCAL_PER_KG = 7700.0          // ~3,500 kcal/lb; early on, water and glycogen make it lower
@@ -108,7 +113,8 @@ object Energy {
         while (d < today) {
             val f = fitbitDays[d] ?: typicalFitbit
             val e = eaten(d)
-            val logged = e != null && e >= MIN_LOGGED
+            val logged = e != null && e >= MIN_LOGGED &&
+                e >= 0.65 * com.silverajat.lifttracker.meals.MealPlan.plannedTotal(d).kcal
             // measurement update with this morning's weigh-in
             scale[d]?.let { z ->
                 val r = SCALE_SD * SCALE_SD
@@ -144,7 +150,7 @@ object Energy {
             w += gw * y; kk += gk * y
             pkk -= gk * pwk; pww *= (1 - gw)
         }
-        kk = kk.coerceIn(0.6, 1.4)
+        kk = kk.coerceIn(0.8, 1.25)
         val kSd = sqrt(max(pkk, 0.0))
         val conf = ((1 - (kSd / 0.15)) * 100).roundToInt().coerceIn(0, 100)
 
