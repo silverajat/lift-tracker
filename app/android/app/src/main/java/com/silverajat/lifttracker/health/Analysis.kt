@@ -249,14 +249,14 @@ object Analysis {
             val e = hrvEffect(z)
             parts += e to 0.35
             contrib += Contributor("HRV", "${d.hrvMs.roundToInt()} ms", "normal ${exp(hrvBase.mean).roundToInt()} ms · ${word(z, "higher", "lower")}",
-                if (abs(e) < 0.5) null else e > 0)
+                if (abs(z) < 1) null else e > 0)
             // the past week's average against the same normal: one odd night can't carry it
             val week = days.subList(maxOf(0, i - 6), i + 1).mapNotNull { it.hrvMs?.takeIf { v -> v > 0 }?.let { v -> ln(v) } }
             if (week.size >= 3) {
                 val zw = (week.average() - hrvBase.mean) / (hrvBase.sd * 0.5)
                 val ew = hrvEffect(zw)
                 parts += ew to 0.15
-                contrib += Contributor("HRV, past week", "${exp(week.average()).roundToInt()} ms", word(zw, "higher", "lower"), if (abs(ew) < 0.5) null else ew > 0)
+                contrib += Contributor("HRV, past week", "${exp(week.average()).roundToInt()} ms", word(zw, "higher", "lower"), if (abs(zw) < 1) null else ew > 0)
             }
         }
         val rhrBase = base(past.mapNotNull { it.restingHr?.toDouble() }, floor = 2.0)
@@ -264,7 +264,7 @@ object Analysis {
             val z = (rhrBase.mean - d.restingHr) / rhrBase.sd
             val e = z.coerceIn(-2.5, 1.0)   // lower than usual helps a little; higher hurts a lot
             parts += e to 0.25
-            contrib += Contributor("Resting HR", "${d.restingHr} bpm", "normal ${rhrBase.mean.roundToInt()} · ${word(-z, "higher", "lower")}", if (abs(e) < 0.5) null else e > 0)
+            contrib += Contributor("Resting HR", "${d.restingHr} bpm", "normal ${rhrBase.mean.roundToInt()} · ${word(-z, "higher", "lower")}", if (abs(z) < 1) null else e > 0)
         }
         if (sleepPerf != null) {
             // last night counts most, the three before it too (one bad night matters less than a run of them)
