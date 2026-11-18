@@ -146,8 +146,14 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
 
         // ---- the day's macros ----
         item {
+            // the same burn the Net tab uses: from your scale once there's a month of logs, else today's corrected Fitbit
+            val nowMin = java.time.LocalTime.now().let { it.hour * 60 + it.minute }
             val tg = Targets.day(analysis?.weight?.trendKg ?: weights.lastOrNull()?.kg,
-                analysis?.energy?.let { e -> e.maintenance?.toDouble() ?: (e.typicalFitbit * e.k) }, goal)
+                analysis?.energy?.let { e ->
+                    e.maintenance?.toDouble()
+                        ?: if (date == today) e.burnedToday(nowMin).toDouble()
+                        else e.days.firstOrNull { it.date == date }?.burned?.toDouble() ?: (e.typicalFitbit * e.k)
+                }, goal)
             MacroCard(MealStore.totals(entries), tg, date == today)
         }
 
