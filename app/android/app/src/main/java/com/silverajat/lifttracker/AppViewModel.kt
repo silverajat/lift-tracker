@@ -738,6 +738,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         vm.defaultVibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 350, 150, 350, 150, 600), -1))
     }
 
+    /**
+     * Fix a past workout: each pair is (set as saved, corrected set) or (set, null) to remove it.
+     * Next-time weights and the PREVIOUS column come from history, so they follow the fix.
+     */
+    fun fixPast(sessionId: Long, changes: List<Pair<SetLog, SetLog?>>) {
+        if (changes.isEmpty()) return
+        val s = _history.value.firstOrNull { it.id == sessionId } ?: return
+        var sets = s.sets
+        changes.forEach { (old, new) -> sets = if (new == null) sets.filter { it != old } else sets.map { if (it == old) new else it } }
+        val fixed = s.copy(sets = sets)
+        if (fixed.sets.isEmpty()) store.delete(fixed.id) else store.save(fixed)
+        _history.value = store.all()
+        if (_session.value?.id == sessionId) _session.value = fixed
+        if (changes.any { (o, n) -> n == null || n.reps != o.reps }) retrain()
+    }
+
     private fun saveSession(s: Session) {
         store.save(s)
         _history.value = store.all()

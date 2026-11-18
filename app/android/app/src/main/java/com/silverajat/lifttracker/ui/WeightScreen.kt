@@ -106,6 +106,17 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                     }
                     weights.maxByOrNull { it.date }?.let { Text("Trend · last weigh-in %.1f kg on %s".format(it.kg, it.date.format(wFmt)),
                         style = MaterialTheme.typography.bodyMedium, color = C.Muted) }
+                    // the one-line answer: which way you're going, and whether that's the plan
+                    (r14 ?: r28)?.let { r ->
+                        val off = r - goalKgPerWeek
+                        val dir = when { r > 0.05 -> "Gaining %.2f kg a week".format(r); r < -0.05 -> "Losing %.2f kg a week".format(-r); else -> "Holding steady" }
+                        val vs = when {
+                            abs(off) <= 0.1 -> "right on your goal"
+                            off > 0 -> if (goalKgPerWeek > 0) "faster than your goal" else "above your goal"
+                            else -> if (goalKgPerWeek > 0) "slower than your goal" else "below your goal"
+                        }
+                        Text("$dir: $vs.", style = MaterialTheme.typography.titleMedium, color = if (abs(off) <= 0.1) Recover else Yellow)
+                    }
                 }
             }
             item {
@@ -116,12 +127,23 @@ fun WeightDetail(weights: List<WeightEntry>, goalKgPerWeek: Double, onBack: () -
                         }
                     }
                     Card(Modifier.fillMaxWidth()) {
-                        Column {
-                            WeightGraph(shown)
-                            Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-                                Text(shown.firstOrNull()?.date?.format(wFmt) ?: "", style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.weight(1f))
-                                Text("dots: weigh-ins, line: trend", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            // what the graph says, in words, before the graph
+                            if (shown.size >= 2) {
+                                val a = shown.first(); val b = shown.last()
+                                val days = ChronoUnit.DAYS.between(a.date, b.date).coerceAtLeast(1)
+                                val goalEnd = a.trend + goalKgPerWeek * days / 7.0
+                                Text("%.1f → %.1f kg since %s (%+.1f kg)".format(a.trend, b.trend, a.date.format(wFmt), b.trend - a.trend),
+                                    style = MaterialTheme.typography.titleMedium.merge(Tnum))
+                                if (goalKgPerWeek != 0.0) Text(
+                                    "On your goal pace you'd be at %.1f kg now: ".format(goalEnd) + when {
+                                        abs(b.trend - goalEnd) <= 0.3 -> "you're right there."
+                                        b.trend > goalEnd -> "you're %.1f kg above it.".format(b.trend - goalEnd)
+                                        else -> "you're %.1f kg below it.".format(goalEnd - b.trend)
+                                    }, style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                             }
+                            WeightGraph(shown, goalKgPerWeek, swing)
+                            GraphKey(goalKgPerWeek != 0.0, swing)
                         }
                     }
                 }
@@ -227,28 +249,85 @@ private fun StatLine(label: String, value: String, sub: String, color: androidx.
     }
 }
 
+private val GoalPace = androidx.compose.ui.graphics.Color(0xFF4CC38A)
+
+/**
+ * The trend (blue) is the line to read. Around it, a shaded band of normal day-to-day
+ * bounce: weigh-ins inside it are noise. The dashed green line is where your goal pace
+ * would have taken you from the start of the range: above or below it says ahead or behind.
+ */
 @Composable
-private fun WeightGraph(p: List<WeightStats.Point>) {
+private fun WeightGraph(p: List<WeightStats.Point>, goal: Double, swing: Double?) {
     if (p.size < 2) { Text("A couple more weigh-ins and the graph appears.", color = C.Muted); return }
-    val vals = p.mapNotNull { it.scale } + p.map { it.trend }
-    val lo = vals.min() - 0.3; val hi = vals.max() + 0.3
+    val d0 = p.first().date
+    val goalAt = { d: LocalDate -> p.first().trend + goal * ChronoUnit.DAYS.between(d0, d) / 7.0 }
+    val band = swing ?: 0.0
+    val vals = p.mapNotNull { it.scale } + p.map { it.trend + band } + p.map { it.trend - band } +
+        (if (goal != 0.0) listOf(goalAt(p.last().date)) else emptyList())
+    val lo = vals.min() - 0.2; val hi = vals.max() + 0.2
     Column {
         Row {
-            Column(Modifier.height(180.dp).width(36.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.height(190.dp).width(36.dp), verticalArrangement = Arrangement.SpaceBetween) {
                 Text("%.1f".format(hi), style = MaterialTheme.typography.labelSmall, color = C.Muted)
                 Text("%.1f".format((hi + lo) / 2), style = MaterialTheme.typography.labelSmall, color = C.Muted)
                 Text("%.1f".format(lo), style = MaterialTheme.typography.labelSmall, color = C.Muted)
             }
-            Canvas(Modifier.weight(1f).height(180.dp)) {
+            Canvas(Modifier.weight(1f).height(190.dp)) {
                 val n = p.size
                 fun x(i: Int) = i * size.width / (n - 1).coerceAtLeast(1)
                 fun y(v: Double) = (size.height * (1 - (v - lo) / (hi - lo))).toFloat()
                 for (k in 0..2) { val yy = size.height * k / 2f; drawLine(C.Line, Offset(0f, yy), Offset(size.width, yy), 1f,
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))) }
-                p.forEachIndexed { i, pt -> pt.scale?.let { drawCircle(C.Muted, 3.dp.toPx(), Offset(x(i), y(it))) } }
+                // normal bounce around the trend
+                if (band > 0) {
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(x(0), y(p[0].trend + band))
+                        for (i in 1 until n) lineTo(x(i), y(p[i].trend + band))
+                        for (i in n - 1 downTo 0) lineTo(x(i), y(p[i].trend - band))
+                        close()
+                    }
+                    drawPath(path, Plate.Blue.copy(alpha = 0.13f))
+                }
+                // goal pace from where the range starts
+                if (goal != 0.0) drawLine(GoalPace, Offset(x(0), y(goalAt(p.first().date))), Offset(x(n - 1), y(goalAt(p.last().date))),
+                    2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f)))
+                // weigh-ins: faint inside the bounce, brighter outside it (worth a look)
+                p.forEachIndexed { i, pt -> pt.scale?.let {
+                    val out = band > 0 && abs(it - pt.trend) > band
+                    drawCircle(if (out) C.Text.copy(alpha = 0.8f) else C.Muted.copy(alpha = 0.6f), (if (out) 3.5f else 2.5f) * density, Offset(x(i), y(it)))
+                } }
                 for (i in 1 until n) drawLine(Plate.Blue, Offset(x(i - 1), y(p[i - 1].trend)), Offset(x(i), y(p[i].trend)), 3.dp.toPx(), cap = StrokeCap.Round)
+                drawCircle(Plate.Blue, 5.dp.toPx(), Offset(x(n - 1), y(p.last().trend)))
             }
         }
+        // dates along the bottom
+        Row(Modifier.fillMaxWidth().padding(start = 36.dp, top = 4.dp)) {
+            Text(p.first().date.format(wFmt), style = MaterialTheme.typography.labelSmall, color = C.Muted, modifier = Modifier.weight(1f))
+            Text(p[p.size / 2].date.format(wFmt), style = MaterialTheme.typography.labelSmall, color = C.Muted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.weight(1f))
+            Text(p.last().date.format(wFmt), style = MaterialTheme.typography.labelSmall, color = C.Muted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun GraphKey(goal: Boolean, swing: Double?) {
+    @Composable fun key(color: androidx.compose.ui.graphics.Color, text: String, dashed: Boolean = false, dot: Boolean = false) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Canvas(Modifier.width(22.dp).height(10.dp)) {
+                if (dot) drawCircle(color, 3.dp.toPx(), Offset(size.width / 2, size.height / 2))
+                else drawLine(color, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 3.dp.toPx(),
+                    pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(8f, 6f)) else null)
+            }
+            Text(" $text", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        key(Plate.Blue, "Trend: your real weight, the line to read")
+        swing?.let { key(Plate.Blue.copy(alpha = 0.35f), "Shading: normal day-to-day bounce (±%.1f kg)".format(it)) }
+        key(C.Muted, "Dots: each morning's weigh-in", dot = true)
+        if (goal) key(GoalPace, "Dashed: where your goal pace would put you", dashed = true)
     }
 }
 
