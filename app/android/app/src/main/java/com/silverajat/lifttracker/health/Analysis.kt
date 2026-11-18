@@ -315,13 +315,18 @@ object Analysis {
             val top = (ex.last.filter { !it.warmup }.maxOfOrNull { it.reps } ?: 10).coerceAtLeast(8)
             val heaviest = lastSets.maxOf { it.weight }
             val atTop = lastSets.filter { it.weight == heaviest }
+            // range of motion: the third lever. Short reps first get fixed, before more reps or more weight
+            val romLast = lastSets.flatMap { it.romPct }.takeIf { it.isNotEmpty() }?.average()?.roundToInt()
+            val shortRom = romLast != null && romLast < ROM_FULL
             val suggestion = when {
+                shortRom -> "Stay at ${fmt(heaviest)} kg and use the full range (ROM $romLast%, aim $ROM_FULL%+)"
                 ex.bodyweight -> "Add reps: aim ${atTop.maxOf { it.reps } + 1}+"
                 atTop.all { it.reps >= top } -> "Hit $top+ on every set: go up to ${fmt(heaviest + ex.step)} kg"
                 atTop.any { it.reps < top - 3 } -> "Stay at ${fmt(heaviest)} kg, build back to $top reps"
                 else -> "Stay at ${fmt(heaviest)} kg, add a rep per set (target $top)"
             }
             val (nextKg, nextReps, nextWhy) = when {
+                shortRom -> Triple<Double?, Int?, String>(if (ex.bodyweight) null else heaviest, null, "full range")
                 ex.bodyweight -> Triple<Double?, Int?, String>(null, atTop.maxOf { it.reps } + 1, "add a rep")
                 atTop.all { it.reps >= top } -> Triple(heaviest + ex.step, null, "go heavier")
                 atTop.any { it.reps < top - 3 } -> Triple(heaviest, top, "build back up")
@@ -343,6 +348,9 @@ object Analysis {
     }
 
     private fun fmt(w: Double) = if (w == Math.floor(w)) "%.0f".format(w) else "%.2f".format(w).trimEnd('0').trimEnd('.')
+
+    /** ROM % (of the calibration set) that counts as full range; under it, range comes before reps or weight. */
+    const val ROM_FULL = 90
 
     // ---- food, weight ------------------------------------------------------------------------
 

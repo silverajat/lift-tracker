@@ -177,6 +177,9 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                                         if (e.nextWhy.isNotEmpty()) Text("  ${e.nextWhy}", style = MaterialTheme.typography.bodySmall, color = C.Muted,
                                             modifier = Modifier.padding(bottom = 2.dp))
                                     }
+                                    // the three levers, last time: weight, reps, range of motion
+                                    Text(listOfNotNull(e.lastSets.substringBefore(" ("), e.romAvg?.let { "ROM $it%" }).joinToString(" · "),
+                                        style = MaterialTheme.typography.bodySmall, color = if ((e.romAvg ?: 100) < com.silverajat.lifttracker.health.Analysis.ROM_FULL) Plate.Yellow else C.Muted)
                                 }
                                 e.changePct?.let {
                                     val r = it.roundToInt()
