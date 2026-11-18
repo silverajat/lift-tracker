@@ -313,22 +313,12 @@ private fun WeightGraph(p: List<WeightStats.Point>, goal: Double, swing: Double?
 
 @Composable
 private fun GraphKey(goal: Boolean, swing: Double?) {
-    @Composable fun key(color: androidx.compose.ui.graphics.Color, text: String, dashed: Boolean = false, dot: Boolean = false) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Canvas(Modifier.width(22.dp).height(10.dp)) {
-                if (dot) drawCircle(color, 3.dp.toPx(), Offset(size.width / 2, size.height / 2))
-                else drawLine(color, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 3.dp.toPx(),
-                    pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(8f, 6f)) else null)
-            }
-            Text(" $text", style = MaterialTheme.typography.bodySmall, color = C.Muted)
-        }
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        key(Plate.Blue, "Trend: your real weight, the line to read")
-        swing?.let { key(Plate.Blue.copy(alpha = 0.35f), "Shading: normal day-to-day bounce (±%.1f kg)".format(it)) }
-        key(C.Muted, "Dots: each morning's weigh-in", dot = true)
-        if (goal) key(GoalPace, "Dashed: where your goal pace would put you", dashed = true)
-    }
+    // one line, not a legend box: the blue line is the only thing you need to read
+    Text(listOfNotNull(
+        "Blue line: your real weight (dots bounce day to day)",
+        swing?.let { "shading: normal ±%.1f kg".format(it) },
+        if (goal) "dashed: goal pace" else null,
+    ).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = C.Muted)
 }
 
 @Composable

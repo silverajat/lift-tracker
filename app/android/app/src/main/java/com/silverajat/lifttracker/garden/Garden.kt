@@ -180,7 +180,7 @@ object Garden {
                 Entry(day(s.startMs).toLocalDate(), "${s.day.title} day", "$sets working sets", 60 + 3 * sets)
             }
             Area.SPORTS -> sportsXp(i.sports, zone).map { (x, xp) ->
-                Entry(x.start.atZone(zone).toLocalDate(), "${x.sport.emoji} ${x.title}",
+                Entry(x.start.atZone(zone).toLocalDate(), x.title,
                     "${x.minutes} min" + (x.strain?.let { " · strain %.1f".format(it) } ?: ""), xp)
             }
             Area.SLEEP -> i.days.mapNotNull { d ->
@@ -195,7 +195,7 @@ object Garden {
                     (if (p.planned) 10 else 0) + 15 * p.mains.count { it.done } + (if (p.reflected) 25 else 0))
             } + com.silverajat.lifttracker.journal.Reading.xp(i.reads).map { (s, x) ->
                 val b = i.books.firstOrNull { it.id == s.bookId }
-                Entry(s.date, "📖 ${b?.title ?: "Reading"}", "${hm(s.minutes)}" + (s.toPage?.let { " · to p. $it" } ?: ""), x)
+                Entry(s.date, "Read: ${b?.title ?: "a book"}", "${hm(s.minutes)}" + (s.toPage?.let { " · to p. $it" } ?: ""), x)
             } + i.books.mapNotNull { b -> b.finished?.let { Entry(it, "Finished ${b.title}", "book done", com.silverajat.lifttracker.journal.Reading.FINISH_BONUS) } }
         }
         return out.filter { it.xp > 0 }.sortedByDescending { it.date }

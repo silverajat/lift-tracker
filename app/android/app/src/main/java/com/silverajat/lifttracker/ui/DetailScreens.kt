@@ -380,7 +380,7 @@ fun ActivityRow(it: ActivityItem, onOpen: (ActivityItem) -> Unit, showDate: Bool
     val s = it.start.atZone(zone)
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Surface).clickable { onOpen(it) }.padding(14.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Text(it.sport.emoji, style = MaterialTheme.typography.headlineSmall)
+        PixelSprite(Sprites.sport(it.sport), 30.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(it.title, style = MaterialTheme.typography.titleSmall, maxLines = 1)

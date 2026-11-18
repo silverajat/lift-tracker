@@ -148,12 +148,12 @@ fun SportsScreen(hub: HubViewModel, onStartGps: (Sport) -> Unit, onOpenGym: (Lon
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(enabled = canNext) { monthKey = month.plusMonths(1).toString() }.padding(horizontal = 12.dp))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StartTile("Run", Sport.RUN.emoji, "GPS", Plate.Blue, Modifier.weight(1f)) { onStartGps(Sport.RUN) }
-                    StartTile("Walk", Sport.WALK.emoji, "GPS", Plate.Chalk, Modifier.weight(1f)) { onStartGps(Sport.WALK) }
+                    StartTile("Run", Sport.RUN, "GPS", Plate.Blue, Modifier.weight(1f)) { onStartGps(Sport.RUN) }
+                    StartTile("Walk", Sport.WALK, "GPS", Plate.Chalk, Modifier.weight(1f)) { onStartGps(Sport.WALK) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StartTile("Football", Sport.FOOTBALL.emoji, "timer", Plate.Green, Modifier.weight(1f)) { RunTracker.start(ctx, Sport.FOOTBALL) }
-                    StartTile("Badminton", Sport.BADMINTON.emoji, "timer", Plate.Yellow, Modifier.weight(1f)) { RunTracker.start(ctx, Sport.BADMINTON) }
+                    StartTile("Football", Sport.FOOTBALL, "timer", Plate.Green, Modifier.weight(1f)) { RunTracker.start(ctx, Sport.FOOTBALL) }
+                    StartTile("Badminton", Sport.BADMINTON, "timer", Plate.Yellow, Modifier.weight(1f)) { RunTracker.start(ctx, Sport.BADMINTON) }
                 }
             }
         }
@@ -258,13 +258,13 @@ private fun BigStat(value: String, label: String, color: Color = C.Text) {
 }
 
 @Composable
-private fun StartTile(name: String, emoji: String, sub: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
+private fun StartTile(name: String, sport: Sport, sub: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
     Column(
         modifier.clip(RoundedCornerShape(22.dp)).background(color.copy(alpha = 0.16f)).clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(emoji, style = MaterialTheme.typography.headlineMedium)
+        PixelSprite(Sprites.sport(sport), 34.dp)
         // one line even for "Badminton" on a narrow phone
         Text(name, style = MaterialTheme.typography.titleLarge.copy(fontSize = 19.sp), color = color, maxLines = 1, softWrap = false)
         Text("Start, $sub", style = MaterialTheme.typography.bodySmall, color = C.Muted)
@@ -287,7 +287,7 @@ private fun GymTile(history: List<com.silverajat.lifttracker.data.Session>, plan
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(Sport.GYM.emoji, style = MaterialTheme.typography.displaySmall)
+            PixelSprite(Sprites.lifter, 52.dp)
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Text("Gym", style = MaterialTheme.typography.headlineMedium, color = color)
                 Text(when {
@@ -347,7 +347,8 @@ fun LiveSession(s: RunTracker.State, onFinish: (String) -> Unit) {
 
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${s.sport.emoji} ${s.sport.label}", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+            PixelSprite(Sprites.sport(s.sport), 30.dp, Modifier.padding(end = 10.dp))
+            Text(s.sport.label, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
             if (s.usesGps) Text(if (s.gpsOk) "GPS good" else "Finding GPS…", style = MaterialTheme.typography.labelLarge,
                 color = if (s.gpsOk) Recover else Yellow)
         }
@@ -532,7 +533,7 @@ fun LogActivityDialog(start: Sport, onDismiss: () -> Unit, onSave: (Sport, Long,
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 FlowRowCompat(spacing = 6.dp) {
                     Sport.entries.filter { it != Sport.GYM }.forEach { s ->
-                        Tag("${s.emoji} ${s.label}", color = if (s == sport) C.Accent else C.Text, modifier = Modifier.clickable { sport = s })
+                        Tag(s.label, color = if (s == sport) C.Accent else C.Text, modifier = Modifier.clickable { sport = s })
                     }
                 }
                 FlowRowCompat(spacing = 6.dp) {
@@ -570,7 +571,7 @@ fun ActivityInfo(it: ActivityItem, onDismiss: () -> Unit, onDelete: (() -> Unit)
     var changing by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = C.Surface,
-        title = { Text("${it.sport.emoji} ${it.title}") },
+        title = { Text(it.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(it.start.atZone(zone).format(sDay) + ", " + it.start.atZone(zone).format(sTime) + " to " + it.end.atZone(zone).format(sTime),
@@ -586,7 +587,7 @@ fun ActivityInfo(it: ActivityItem, onDismiss: () -> Unit, onDelete: (() -> Unit)
                         Text("What was it?", style = MaterialTheme.typography.titleSmall)
                         FlowRowCompat(spacing = 6.dp) {
                             Sport.entries.filter { s -> s != Sport.GYM }.forEach { s ->
-                                Tag("${s.emoji} ${s.label}", color = if (s == it.sport) C.Accent else C.Text, modifier = Modifier.clickable { onChange(s) })
+                                Tag(s.label, color = if (s == it.sport) C.Accent else C.Text, modifier = Modifier.clickable { onChange(s) })
                             }
                         }
                         if (it.manualId == null) Text("Not an activity: hide it", style = MaterialTheme.typography.labelLarge, color = C.Stop,

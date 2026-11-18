@@ -104,6 +104,8 @@ object Analysis {
     data class ExerciseTrend(
         val exerciseId: Int, val name: String, val e1rmNow: Double, val e1rmThen: Double?, val changePct: Double?,
         val lastSets: String, val suggestion: String, val qualityAvg: Int?, val romAvg: Int?,
+        /** Next time, short: the weight (null for bodyweight), the reps to aim for (null: whatever you get), and why. */
+        val nextKg: Double? = null, val nextReps: Int? = null, val nextWhy: String = "",
     )
 
     data class NutritionResult(
@@ -292,6 +294,12 @@ object Analysis {
                 atTop.any { it.reps < top - 3 } -> "Stay at ${fmt(heaviest)} kg, build back to $top reps"
                 else -> "Stay at ${fmt(heaviest)} kg, add a rep per set (target $top)"
             }
+            val (nextKg, nextReps, nextWhy): Triple<Double?, Int?, String> = when {
+                ex.bodyweight -> Triple(null, atTop.maxOf { it.reps } + 1, "add a rep")
+                atTop.all { it.reps >= top } -> Triple(heaviest + ex.step, null, "go heavier")
+                atTop.any { it.reps < top - 3 } -> Triple(heaviest, top, "build back up")
+                else -> Triple(heaviest, top, "add reps")
+            }
             val q = lastSets.mapNotNull { it.quality }
             val rom = lastSets.flatMap { it.romPct }
             ExerciseTrend(
@@ -300,6 +308,7 @@ object Analysis {
                 lastSets = lastSets.sortedBy { it.setNo }.joinToString(", ") { "${fmt(it.weight)}×${it.reps}" } +
                     " (${lastDate})",
                 suggestion = suggestion,
+                nextKg = nextKg, nextReps = nextReps, nextWhy = nextWhy,
                 qualityAvg = q.takeIf { it.isNotEmpty() }?.average()?.roundToInt(),
                 romAvg = rom.takeIf { it.isNotEmpty() }?.average()?.roundToInt(),
             )

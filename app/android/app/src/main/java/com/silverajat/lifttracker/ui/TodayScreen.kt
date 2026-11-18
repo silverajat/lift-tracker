@@ -251,7 +251,8 @@ fun TodayContent(
                     if (todays.isEmpty()) Text("Nothing logged yet today.", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
                     todays.take(4).forEach { it ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${it.sport.emoji}  ${it.title}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1)
+                            PixelSprite(Sprites.sport(it.sport), 20.dp, Modifier.padding(end = 10.dp))
+                            Text(it.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1)
                             Text("${it.minutes} min" + (it.strain?.let { s -> ", %.1f".format(s) } ?: ""), style = MaterialTheme.typography.bodyMedium.merge(Tnum), color = C.Muted)
                         }
                     }

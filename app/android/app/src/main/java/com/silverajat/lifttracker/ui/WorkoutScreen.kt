@@ -215,7 +215,7 @@ fun WorkoutScreen(vm: AppViewModel, day: Day, onShare: (Session) -> Unit) {
             AlertDialog(
                 onDismissRequest = { finished = null; vm.open(Screen.Home) },
                 containerColor = C.Surface,
-                title = { Text("Workout saved 💪") },
+                title = { Text("Workout saved") },
                 text = { Text("${s.sets.size} sets · ${Stats.fmt(s.sets.sumOf { it.weight * it.reps })} kg volume. Send the summary to ChatGPT?") },
                 confirmButton = {
                     TextButton(onClick = { onShare(s); finished = null; vm.open(Screen.Home) }) {

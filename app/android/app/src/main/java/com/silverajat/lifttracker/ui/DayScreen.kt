@@ -58,7 +58,8 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-val MOODS = listOf("😞", "😕", "😐", "🙂", "😄")
+/** Moods 1 to 5 as pixel faces (Sprites.moods). */
+val MOODS = Sprites.moods
 private val dHead = DateTimeFormatter.ofPattern("EEEE d MMMM")
 private val dShort = DateTimeFormatter.ofPattern("EEE d MMM")
 private val dTime = DateTimeFormatter.ofPattern("H:mm")
@@ -395,7 +396,7 @@ private fun Reflect(u: DayUi, page: DayPage, act: DayActions) {
                 Box(Modifier.size(44.dp).clip(CircleShape).background(if (on) C.Raised else C.Bg)
                     .then(if (on) Modifier.border(1.5.dp, C.Accent, CircleShape) else Modifier)
                     .clickable { act.mood(if (on) null else i + 1) }, contentAlignment = Alignment.Center) {
-                    Text(e, style = MaterialTheme.typography.titleLarge)
+                    PixelSprite(e, 26.dp)
                 }
             }
         }
@@ -496,7 +497,7 @@ private fun LazyListScope.notesTab(u: DayUi, act: DayActions, onEdit: (Note) -> 
     item {
         Card(Modifier.fillMaxWidth(), onClick = act.brainstorm) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("💬", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(end = 14.dp))
+                PixelSprite(Sprites.chat, 28.dp, Modifier.padding(end = 14.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Brainstorm with GPT", style = MaterialTheme.typography.titleMedium)
                     Text("Talk an idea through. It knows your training, sleep and food.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
@@ -514,7 +515,7 @@ private fun LazyListScope.notesTab(u: DayUi, act: DayActions, onEdit: (Note) -> 
         Card(Modifier.fillMaxWidth(), onClick = { onEdit(n) }) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(n.text, style = MaterialTheme.typography.bodyLarge, maxLines = 8, overflow = TextOverflow.Ellipsis)
-                Text((if (n.pinned) "📌 " else "") + whenText(n.updated), style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                Text((if (n.pinned) "Pinned · " else "") + whenText(n.updated), style = MaterialTheme.typography.bodySmall, color = C.Muted)
             }
         }
     }
@@ -615,7 +616,7 @@ private fun PastDay(p: DayPage, sum: com.silverajat.lifttracker.garden.Garden.Da
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p.date.format(dShort), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                p.mood?.let { Text(MOODS[it - 1], style = MaterialTheme.typography.titleLarge) }
+                p.mood?.let { PixelSprite(MOODS[it - 1], 22.dp) }
             }
             sum?.minutes?.takeIf { it.isNotEmpty() }?.let { m ->
                 Text(m.entries.joinToString(" · ") { (a, v) -> "${if (a == com.silverajat.lifttracker.garden.Area.MIND) "Reading" else a.label} ${com.silverajat.lifttracker.garden.Garden.hm(v)}" },

@@ -83,7 +83,7 @@ fun ActivityDetail(
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel", color = C.Muted) } })
 
     Column(Modifier.fillMaxSize()) {
-        TopBar("${item.sport.emoji} ${item.title}", st.format(dDay) + ", " + st.format(dTime) + "–" + item.end.atZone(zone).format(dTime), onBack) {
+        TopBar(item.title, st.format(dDay) + ", " + st.format(dTime) + "–" + item.end.atZone(zone).format(dTime), onBack) {
             if (onDelete != null) TextButton(onClick = { confirm = true }) { Text("Delete", color = C.Muted) }
         }
         LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 40.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -119,7 +119,7 @@ fun ActivityDetail(
                         else {
                             FlowRowCompat(spacing = 6.dp) {
                                 Sport.entries.filter { s -> s != Sport.GYM }.forEach { s ->
-                                    Tag("${s.emoji} ${s.label}", color = if (s == item.sport) C.Accent else C.Text, modifier = Modifier.clickable { onChange(s) })
+                                    Tag(s.label, color = if (s == item.sport) C.Accent else C.Text, modifier = Modifier.clickable { onChange(s) })
                                 }
                             }
                             if (item.manualId == null) Text("Not an activity: hide it", style = MaterialTheme.typography.labelLarge, color = C.Stop,

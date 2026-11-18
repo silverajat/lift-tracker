@@ -156,24 +156,32 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         }
         // Strength: estimated 1RM per lift and what to do next session
         if (strength.isNotEmpty()) {
-            item { SectionLabel("Strength", Modifier.padding(top = 6.dp)) }
+            // one line per lift: what to do next time, and whether it's going up. Tap a lift for its history and graph.
+            item {
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Bottom) {
+                    SectionLabel("Next time", Modifier.weight(1f))
+                    Text("strength, last 3 weeks", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                }
+            }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column {
                         strength.forEachIndexed { i, e ->
-                            if (i > 0) androidx.compose.material3.HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 12.dp))
-                            Row(Modifier.clickable { vm.open(Screen.ExerciseInfo(e.exerciseId, fromHome = true)) }, verticalAlignment = Alignment.Top) {
+                            if (i > 0) androidx.compose.material3.HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
+                            Row(Modifier.clickable { vm.open(Screen.ExerciseInfo(e.exerciseId, fromHome = true)) }, verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text(e.name, style = MaterialTheme.typography.titleSmall)
-                                    Text(e.suggestion, style = MaterialTheme.typography.bodyMedium)
-                                    Text("Last: ${e.lastSets.substringBefore(" (")}", style = MaterialTheme.typography.bodySmall, color = C.Muted)
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text("${e.e1rmNow.roundToInt()} kg", style = MaterialTheme.typography.headlineSmall.merge(Tnum))
-                                    e.changePct?.let {
-                                        Text("${if (it >= 0) "+" else ""}${"%.1f".format(it)}%", style = MaterialTheme.typography.labelLarge.merge(Tnum),
-                                            color = if (it >= 0) C.Done else C.Stop)
+                                    Row(verticalAlignment = Alignment.Bottom) {
+                                        Text(listOfNotNull(e.nextKg?.let { fmtKg(it) + " kg" }, e.nextReps?.let { "× $it" }).joinToString(" ")
+                                            .ifEmpty { e.suggestion }, style = MaterialTheme.typography.titleMedium.merge(Tnum), color = C.Accent)
+                                        if (e.nextWhy.isNotEmpty()) Text("  ${e.nextWhy}", style = MaterialTheme.typography.bodySmall, color = C.Muted,
+                                            modifier = Modifier.padding(bottom = 2.dp))
                                     }
+                                }
+                                e.changePct?.let {
+                                    val r = it.roundToInt()
+                                    Text(when { r > 0 -> "▲ $r%"; r < 0 -> "▼ ${-r}%"; else -> "= 0%" }, style = MaterialTheme.typography.labelLarge.merge(Tnum),
+                                        color = when { r > 0 -> C.Done; r < 0 -> C.Stop; else -> C.Muted })
                                 }
                             }
                         }
@@ -431,3 +439,5 @@ private fun PlanDialog(week: Map<DayOfWeek, Day?>, onSave: (Map<DayOfWeek, Day?>
         },
     )
 }
+
+private fun fmtKg(w: Double) = if (w == Math.floor(w)) "%.0f".format(w) else "%.2f".format(w).trimEnd('0').trimEnd('.')
