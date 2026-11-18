@@ -85,10 +85,11 @@ object Foods {
             Macros(920.0, 48.0, 122.0, 29.0, 4.0), "HPB plate + sides"),
         Food("chicken_rice_plain", "Chicken rice (no extras), kailan, braised egg, soup",
             Macros(645.0, 31.0, 89.0, 21.0, 4.0), "HPB plate + sides"),
-        // 1 cup cooked rice ~160 g (4 g protein), 3 scoops curry chicken & mushroom (~60 g chicken, 16 g),
-        // braised tofu (7 g), tomato egg (5 g), stir-fried cabbage (1 g)
+        // 1 cup cooked rice ~160 g (208 kcal, 4 g protein); 3 scoops thin brown curry chicken & mushroom, no coconut
+        // (~60 g chicken: 150 kcal, 16 g protein, 6 g fat); tofu bricks, lightly oiled (120 kcal, 10 g, 6 g fat);
+        // watery tomato egg (90 kcal, 5 g, 6 g fat); stir-fried cabbage (50 kcal, 1 g, 3 g fat)
         Food("mixed_rice", "Mixed rice: 1 cup rice, curry chicken & mushroom, tofu, tomato egg, cabbage",
-            Macros(715.0, 34.0, 66.0, 34.0, 4.6), "built from its parts"),
+            Macros(620.0, 37.0, 64.0, 21.0, 4.6), "built from its parts"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
