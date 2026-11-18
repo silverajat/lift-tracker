@@ -25,10 +25,10 @@ object Stats {
         val work = sets.filter { !it.warmup }
         if (work.isEmpty()) return null
         return when (m) {
-            Metric.HEAVIEST -> work.maxOf { it.weight }
-            Metric.ONE_RM -> work.maxOf { oneRm(it.weight, it.reps) }
-            Metric.BEST_SET -> work.maxOf { it.weight * it.reps }
-            Metric.VOLUME -> work.sumOf { it.weight * it.reps }
+            Metric.HEAVIEST -> work.maxOf { it.load }
+            Metric.ONE_RM -> work.maxOf { oneRm(it.load, it.reps) }
+            Metric.BEST_SET -> work.maxOf { it.load * it.reps }
+            Metric.VOLUME -> work.sumOf { it.load * it.reps }
             Metric.REPS -> work.sumOf { it.reps }.toDouble()
             Metric.ROM -> null   // from the pod's per-rep data: see romSeries
         }
@@ -64,15 +64,15 @@ object Stats {
         }
         val work = all.filter { !it.warmup }
         if (work.isEmpty()) return emptyList()
-        val heaviest = work.maxBy { it.weight }
-        val best1rm = work.maxBy { oneRm(it.weight, it.reps) }
-        val bestSet = work.maxBy { it.weight * it.reps }
+        val heaviest = work.maxBy { it.load }
+        val best1rm = work.maxBy { oneRm(it.load, it.reps) }
+        val bestSet = work.maxBy { it.load * it.reps }
         val mostReps = work.maxBy { it.reps }
         return listOf(
-            Record("Heaviest weight", "%s kg".format(fmt(heaviest.weight))),
+            Record("Heaviest weight", "%s kg".format(fmt(heaviest.load))),
             Record("Best est. 1RM", "%s kg".format(fmt(oneRm(best1rm.weight, best1rm.reps)))),
-            Record("Best set", "%s kg × %d".format(fmt(bestSet.weight), bestSet.reps)),
-            Record("Most reps", "%d × %s kg".format(mostReps.reps, fmt(mostReps.weight))),
+            Record("Best set", "%s kg × %d".format(fmt(bestSet.load), bestSet.reps)),
+            Record("Most reps", "%d × %s kg".format(mostReps.reps, fmt(mostReps.load))),
         )
     }
 

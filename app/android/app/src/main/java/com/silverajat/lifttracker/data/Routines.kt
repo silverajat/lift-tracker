@@ -20,7 +20,9 @@ data class PlanSet(
     val reps: Int,
     val warmup: Boolean = false,
     val addons: Int = 0,
-)
+) {
+    val load: Double get() = weight + addons * Routines.ADDON_KG
+}
 
 /** Muscle group: sets the colour of the exercise's badge. */
 enum class Group(val label: String) {
@@ -42,6 +44,9 @@ private fun w(weight: Double, reps: Int, addons: Int = 0) = PlanSet(weight, reps
 private fun s(weight: Double, reps: Int, addons: Int = 0) = PlanSet(weight, reps, addons = addons)
 
 object Routines {
+    /** One machine add-on plate, in kg (before add-ons were logged, you counted each as 1 kg). */
+    const val ADDON_KG = 1.0
+
     val upper = listOf(
         Exercise(1, Day.UPPER, "Incline bench", "3D Smith",
             listOf(w(20.0, 12), s(55.0, 10), s(55.0, 8))),

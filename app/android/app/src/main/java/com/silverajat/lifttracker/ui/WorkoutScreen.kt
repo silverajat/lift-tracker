@@ -158,7 +158,7 @@ fun WorkoutScreen(vm: AppViewModel, day: Day, onShare: (Session) -> Unit) {
                         .padding(horizontal = 18.dp, vertical = 14.dp),
                 ) {
                     StatCell("Duration", current?.let { elapsed(now - it.startMs) } ?: "0:00", Modifier.weight(1f))
-                    StatCell("Volume", "${Stats.fmt(sets.sumOf { it.weight * it.reps })} kg", Modifier.weight(1f))
+                    StatCell("Volume", "${Stats.fmt(sets.sumOf { it.load * it.reps })} kg", Modifier.weight(1f))
                     StatCell("Sets", "${sets.size}", Modifier.weight(0.6f))
                 }
             }
@@ -216,7 +216,7 @@ fun WorkoutScreen(vm: AppViewModel, day: Day, onShare: (Session) -> Unit) {
                 onDismissRequest = { finished = null; vm.open(Screen.Home) },
                 containerColor = C.Surface,
                 title = { Text("Workout saved") },
-                text = { Text("${s.sets.size} sets · ${Stats.fmt(s.sets.sumOf { it.weight * it.reps })} kg volume. Send the summary to ChatGPT?") },
+                text = { Text("${s.sets.size} sets · ${Stats.fmt(s.sets.sumOf { it.load * it.reps })} kg volume. Send the summary to ChatGPT?") },
                 confirmButton = {
                     TextButton(onClick = { onShare(s); finished = null; vm.open(Screen.Home) }) {
                         Text("Share", color = C.Accent, fontWeight = FontWeight.Bold)

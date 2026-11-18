@@ -53,9 +53,9 @@ object MuscleLoad {
     fun score(s: Session, history: List<Session>): SessionLoad {
         // best estimated 1RM per lift from earlier sessions; this session's best if it's new
         val before = history.filter { it.startMs < s.startMs && it.id != s.id }.flatMap { it.sets }.filter { !it.warmup && it.weight > 0 }
-            .groupBy { it.exerciseId }.mapValues { (_, v) -> v.maxOf { Stats.oneRm(it.weight, it.reps) } }
+            .groupBy { it.exerciseId }.mapValues { (_, v) -> v.maxOf { Stats.oneRm(it.load, it.reps) } }
         val own = s.sets.filter { !it.warmup && it.weight > 0 }.groupBy { it.exerciseId }
-            .mapValues { (_, v) -> v.maxOf { Stats.oneRm(it.weight, it.reps) } }
+            .mapValues { (_, v) -> v.maxOf { Stats.oneRm(it.load, it.reps) } }
         val scores = s.sets.map { l ->
             val ex = runCatching { Routines.byId(l.exerciseId) }.getOrNull()
             val e1 = before[l.exerciseId] ?: own[l.exerciseId]

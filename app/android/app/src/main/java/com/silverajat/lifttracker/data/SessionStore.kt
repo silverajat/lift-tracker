@@ -25,7 +25,10 @@ data class SetLog(
     val calibration: Boolean = false,       // light full-ROM set that sets the baseline
     val romUnit: String = "deg",            // "deg" (forearm turns) or "cm" (wrist travels)
     val counter: Int = 0,                   // rep counter version that measured rom (0 = v0)
-)
+) {
+    /** What you actually lifted: the stack plus the add-on plates. All the analysis uses this. */
+    val load: Double get() = weight + addons * Routines.ADDON_KG
+}
 
 data class Session(
     val id: Long,              // start time, epoch seconds (also sent to the pod)

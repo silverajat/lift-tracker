@@ -269,7 +269,7 @@ object Analysis {
     fun volumeByDay(sessions: List<Session>, zone: ZoneId): Map<LocalDate, Pair<Double, Int>> =
         sessions.groupBy { sessionDate(it, zone) }.mapValues { (_, ss) ->
             val work = ss.flatMap { it.sets }.filter { !it.warmup }
-            Pair(work.sumOf { it.weight * it.reps * (if (Routines.isOneArm(it.exerciseId)) 2 else 1) }, work.size)
+            Pair(work.sumOf { it.load * it.reps * (if (Routines.isOneArm(it.exerciseId)) 2 else 1) }, work.size)
         }
 
     fun exerciseTrends(sessions: List<Session>, today: LocalDate, zone: ZoneId): List<ExerciseTrend> {
@@ -281,9 +281,9 @@ object Analysis {
             }
             if (bySession.isEmpty()) return@mapNotNull null
             val (lastDate, lastSets) = bySession.last()
-            val e1 = lastSets.maxOf { Stats.oneRm(it.weight, it.reps) }
+            val e1 = lastSets.maxOf { Stats.oneRm(it.load, it.reps) }
             val old = bySession.lastOrNull { it.first <= lastDate.minusDays(21) } ?: bySession.firstOrNull()?.takeIf { it.first < lastDate }
-            val e1Then = old?.second?.maxOf { Stats.oneRm(it.weight, it.reps) }
+            val e1Then = old?.second?.maxOf { Stats.oneRm(it.load, it.reps) }
                 ?: Stats.value(com.silverajat.lifttracker.data.Metric.ONE_RM, ex.last)
             val top = (ex.last.filter { !it.warmup }.maxOfOrNull { it.reps } ?: 10).coerceAtLeast(8)
             val heaviest = lastSets.maxOf { it.weight }

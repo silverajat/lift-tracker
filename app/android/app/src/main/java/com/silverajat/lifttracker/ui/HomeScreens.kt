@@ -135,7 +135,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                 StatTile("Sets", "${week.sumOf { it.sets.size }}", "this week", Modifier.weight(1f))
                 StatTile(
                     "Volume",
-                    Stats.fmt(week.sumOf { s -> s.sets.sumOf { it.weight * it.reps } } / 1000.0),
+                    Stats.fmt(week.sumOf { s -> s.sets.sumOf { it.load * it.reps } } / 1000.0),
                     "tonnes", Modifier.weight(1f),
                 )
             }

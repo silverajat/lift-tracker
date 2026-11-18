@@ -76,7 +76,7 @@ object ShareText {
             }
         }
 
-        val volume = s.sets.sumOf { it.weight * it.reps }
+        val volume = s.sets.sumOf { it.load * it.reps }
         append("\n${s.sets.size} sets · volume ${"%,.0f".format(volume)} kg")
         val q = s.sets.mapNotNull { it.quality }
         if (q.isNotEmpty()) append(" · avg rep quality ${q.average().toInt()}/100")

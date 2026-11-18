@@ -102,7 +102,7 @@ object Insights {
         val end = s.endMs ?: System.currentTimeMillis()
         val mins = ((end - s.startMs) / 60_000).toInt()
         val work = s.sets.filter { !it.warmup }
-        fun vol(list: List<SetLog>) = list.sumOf { it.weight * it.reps * (if (Routines.isOneArm(it.exerciseId)) 2 else 1) }
+        fun vol(list: List<SetLog>) = list.sumOf { it.load * it.reps * (if (Routines.isOneArm(it.exerciseId)) 2 else 1) }
         val volume = vol(work)
         val past = history.filter { it.id != s.id && it.day == s.day && it.startMs < s.startMs && it.sets.isNotEmpty() }
             .sortedByDescending { it.startMs }.take(4)
@@ -113,7 +113,7 @@ object Insights {
             .filter { t -> work.any { it.exerciseId == t.exerciseId } }
         val bestBefore = { exId: Int ->
             history.filter { it.id != s.id && it.startMs < s.startMs }.flatMap { it.sets }
-                .filter { it.exerciseId == exId && !it.warmup }.maxOfOrNull { Stats.oneRm(it.weight, it.reps) }
+                .filter { it.exerciseId == exId && !it.warmup }.maxOfOrNull { Stats.oneRm(it.load, it.reps) }
         }
         val prs = trends.filter { t -> bestBefore(t.exerciseId)?.let { t.e1rmNow > it + 0.01 } == true }
         val pct = usual?.let { (volume / it * 100).roundToInt() }
@@ -280,7 +280,7 @@ object Insights {
         }
         val gym = sessions.filter { Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate() == date && it.sets.isNotEmpty() }
         gym.forEach { s ->
-            val v = s.sets.filter { !it.warmup }.sumOf { it.weight * it.reps * (if (Routines.isOneArm(it.exerciseId)) 2 else 1) }
+            val v = s.sets.filter { !it.warmup }.sumOf { it.load * it.reps * (if (Routines.isOneArm(it.exerciseId)) 2 else 1) }
             lines += "${s.day.title} day ✓ (${"%,d".format(v.roundToInt())} kg)."
         }
         // net
@@ -331,7 +331,7 @@ object Insights {
         if (gym.isEmpty() && rec.isEmpty() && nets.isEmpty()) return null
         val lines = ArrayList<String>()
         lines += "🏋️ ${gym.size} gym session${if (gym.size == 1) "" else "s"}" +
-            (if (gym.isNotEmpty()) ", ${"%,d".format(gym.sumOf { s -> s.sets.filter { !it.warmup }.sumOf { it.weight * it.reps } }.roundToInt())} kg total" else "") + "."
+            (if (gym.isNotEmpty()) ", ${"%,d".format(gym.sumOf { s -> s.sets.filter { !it.warmup }.sumOf { it.load * it.reps } }.roundToInt())} kg total" else "") + "."
         if (rec.isNotEmpty()) lines += "💚 Recovery averaged ${rec.average().roundToInt()}%."
         if (sleep.isNotEmpty()) lines += "😴 Sleep averaged ${hm(sleep.average().roundToInt())}."
         if (nets.isNotEmpty()) {
