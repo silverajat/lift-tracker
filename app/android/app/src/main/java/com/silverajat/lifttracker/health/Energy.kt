@@ -36,6 +36,23 @@ import kotlin.math.sqrt
  * logs are missing food, not that you burn like someone in bed all day.
  */
 object Energy {
+    /**
+     * Eaten minus stored: over the last 28 days, the average logged intake on complete days, less the
+     * weight trend's change in that time x 7,700 kcal/kg. Needs 10+ complete days spread over 2+ weeks.
+     */
+    fun maintenance(days: List<DayNet>, trendNow: Double?): Int? {
+        val win = days.takeLast(28)
+        val logged = win.filter { it.logged && it.net != null && it.burned != null }
+        if (logged.size < 10 || trendNow == null) return null
+        val span = java.time.temporal.ChronoUnit.DAYS.between(logged.first().date, logged.last().date)
+        if (span < 14) return null
+        val startTrend = win.firstOrNull { it.trendKg != null }?.trendKg ?: return null
+        val n = win.size.coerceAtLeast(1)
+        val eaten = logged.map { it.net!! + it.burned!! }.average()
+        val storedPerDay = (trendNow - startTrend) * KCAL_PER_KG / n
+        return (eaten - storedPerDay).roundToInt()
+    }
+
     const val KCAL_PER_KG = 7700.0          // ~3,500 kcal/lb; early on, water and glycogen make it lower
     const val MIN_LOGGED = 1200.0
     private const val SCALE_SD = 0.6        // kg, day-to-day water/food/gut swing
@@ -75,6 +92,8 @@ object Energy {
         val typicalFitbit: Double,      // the Fitbit's median day
         val days: List<DayNet>,         // oldest first, up to [DAYS]
         val note: String,
+        /** Maintenance from YOUR scale: what you ate on fully logged days (last 4 weeks) minus what the weight trend gained. */
+        val maintenance: Int? = null,
     ) {
         fun burned(fitbitKcal: Double) = (fitbitKcal * k).roundToInt()
         /**
@@ -175,6 +194,7 @@ object Energy {
             todayFitbitSoFar = health[today]?.kcalTotal,
             typicalFitbit = typicalFitbit,
             days = out, note = note,
+            maintenance = maintenance(out, trendNow),
         )
     }
 }

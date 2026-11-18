@@ -136,14 +136,15 @@ object Targets {
     /**
      * Calories = your scale-checked burn (+/- the weight goal). Protein 2.2 g per kg of body weight,
      * the top of the range where muscle gain stops improving (Morton et al. 2018: 1.6, up to 2.2).
-     * Fat 20% of calories, the low end of the 20-35% guideline (lower risks hormones).
+     * Fat 20% of calories, the low end of the 20-35% guideline (lower risks hormones), at least 0.8 g/kg.
      * Carbs: everything left, for training energy.
      */
     fun day(weightKg: Double?, burn: Double?, goalKgPerWeek: Double): DayTargets {
         val w = weightKg ?: 57.0
         val kcal = (burn ?: burnKcal.toDouble()) + goalKgPerWeek * 7700 / 7
         val p = 2.2 * w
-        val f = 0.20 * kcal / 9
+        // 20% of calories, but never under 0.8 g per kg
+        val f = maxOf(0.20 * kcal / 9, 0.8 * w)
         val c = ((kcal - p * 4 - f * 9) / 4).coerceAtLeast(0.0)
         return DayTargets(kcal.toInt(), p.toInt(), f.toInt(), c.toInt())
     }

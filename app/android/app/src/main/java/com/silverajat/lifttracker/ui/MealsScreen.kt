@@ -147,7 +147,7 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
         // ---- the day's macros ----
         item {
             val tg = Targets.day(analysis?.weight?.trendKg ?: weights.lastOrNull()?.kg,
-                analysis?.energy?.let { it.typicalFitbit * it.k }, goal)
+                analysis?.energy?.let { e -> e.maintenance?.toDouble() ?: (e.typicalFitbit * e.k) }, goal)
             MacroCard(MealStore.totals(entries), tg, date == today)
         }
 
