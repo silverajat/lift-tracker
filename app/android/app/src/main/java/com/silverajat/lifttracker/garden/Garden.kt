@@ -74,10 +74,10 @@ object Garden {
         i.gym.filter { it.endMs != null && it.sets.isNotEmpty() }.forEach { s -> add(Area.GYM, day(s.startMs), 60 + 3 * s.sets.count { !it.warmup }) }
         // sports: from strain, so a hard badminton game counts more than a stroll
         sportsXp(i.sports, zone).forEach { (a, xp) -> add(Area.SPORTS, a.start.atZone(zone).toLocalDate(), xp) }
-        // sleep: by sleep performance, bonus for a green recovery
+        // sleep: by the sleep score's zone (optimal / sufficient / poor), bonus for a green recovery
         i.days.forEach { d ->
-            val perf = d.sleep?.performance ?: return@forEach
-            add(Area.SLEEP, d.date, (if (perf >= 85) 60 else if (perf >= 70) 40 else 20) + (if ((d.recovery?.score ?: 0) >= 67) 20 else 0))
+            val score = d.sleep?.score ?: return@forEach
+            add(Area.SLEEP, d.date, (if (score >= 85) 60 else if (score >= 70) 40 else 20) + (if ((d.recovery?.score ?: 0) >= 67) 20 else 0))
         }
         // mind: planning, the main 3, and reflecting
         i.pages.values.forEach { p ->
@@ -111,7 +111,7 @@ object Garden {
             }
             Area.GYM -> "${i.gym.count { it.endMs != null && it.sets.isNotEmpty() && inWeek(day(it.startMs)) }} sessions"
             Area.SPORTS -> i.sports.filter { it.sport != Sport.GYM && inWeek(it.start.atZone(zone).toLocalDate()) }.let { "${it.size} · ${hm(it.sumOf { s -> s.minutes })}" }
-            Area.SLEEP -> "${i.days.count { inWeek(it.date) && (it.sleep?.performance ?: 0) >= 80 }}/7 good nights"
+            Area.SLEEP -> "${i.days.count { inWeek(it.date) && (it.sleep?.score ?: 0) >= 70 }}/7 good nights"
             Area.MIND -> i.pages.values.filter { inWeek(it.date) }.let { ps -> "${ps.sumOf { p -> p.mains.count { it.done } }}/${ps.sumOf { it.mains.size }} main" } +
                 (i.reads.filter { inWeek(it.date) }.sumOf { it.minutes }.takeIf { it > 0 }?.let { " · ${hm(it)} read" } ?: "")
         }

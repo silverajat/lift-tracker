@@ -9,9 +9,10 @@ import kotlin.math.roundToInt
  * Net calories (from the scale-checked burn) tell how far your days are from
  * the goal. If you're eating the same, the difference has to come from
  * moving more (or less). That gap is turned into things you actually do,
- * sized to your body weight:
- *   running: ~1.0 kcal per kg per km
- *   football: ~7 METs, badminton: ~5.5 METs (kcal/min = METs × kg / 60)
+ * sized to your body weight. Only the EXTRA burn counts (the 1 MET you'd burn
+ * sitting anyway is taken off, or the activity looks bigger than it is):
+ *   running: ~0.9 kcal per kg per km on top of resting
+ *   football: 7 METs, badminton: 5.5 METs (Compendium 2011); extra kcal/min = (METs − 1) × kg / 60
  */
 object MoveGoal {
     data class Result(
@@ -33,9 +34,9 @@ object MoveGoal {
         val gap = net - goal
         val burn = (e.typicalFitbit * e.k).roundToInt()
         val week = gap * 7
-        val run = abs(week) / (kg * 1.0)
-        val foot = (abs(week) / (7.0 * kg / 60)).roundToInt()
-        val bad = (abs(week) / (5.5 * kg / 60)).roundToInt()
+        val run = abs(week) / (kg * 0.9)
+        val foot = (abs(week) / ((7.0 - 1) * kg / 60)).roundToInt()
+        val bad = (abs(week) / ((5.5 - 1) * kg / 60)).roundToInt()
         val what = if (goalKgPerWeek == 0.0) "staying at maintenance" else if (goalKgPerWeek > 0) "your lean-gain goal" else "your cut"
         val verdict = when {
             abs(gap) <= 100 -> "You're moving the right amount for $what. Keep this week like the last two."

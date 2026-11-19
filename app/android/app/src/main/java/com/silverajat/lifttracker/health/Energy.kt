@@ -59,6 +59,8 @@ object Energy {
     private const val LOG_SD_FRAC = 0.15    // logged intake is ±15% (hawker estimates)
     private const val K_DRIFT_SD = 0.004    // the correction can drift slowly (per day)
     const val DAYS = 60L
+    /** Burn rate asleep vs the day's average: about BMR (sleeping metabolic rate) over a typical active day's total. */
+    const val ASLEEP_RATE = 0.55
 
     /** Today's net: so far, and by the end of the day if you eat the rest of the plan. */
     data class TodayNet(val soFar: Int, val endOfDay: Int, val restOfPlan: Boolean)
@@ -94,15 +96,26 @@ object Energy {
         val note: String,
         /** Maintenance from YOUR scale: what you ate on fully logged days (last 4 weeks) minus what the weight trend gained. */
         val maintenance: Int? = null,
+        /** Your usual bedtime (minutes after midnight, can be > 1440 for after-midnight bedtimes) and time in bed. */
+        val bedClock: Int = 23 * 60,
+        val sleepMin: Int = 480,
     ) {
         fun burned(fitbitKcal: Double) = (fitbitKcal * k).roundToInt()
         /**
-         * Today's burn for the whole day: the Fitbit's number so far plus the
-         * rest of the day at about resting rate, corrected by k.
+         * Today's burn for the whole day: the Fitbit's number so far, plus the rest of the day the way
+         * your days usually go, corrected by k. Asleep you burn about your BMR (~55% of the day's
+         * average rate); awake, the rest of a typical day is spread over the waking hours. (It used
+         * to assume resting rate for the whole rest of the day, which made mornings look ~800 kcal short.)
          */
         fun burnedToday(minutesNow: Int): Int {
             val soFar = todayFitbitSoFar ?: return (typicalFitbit * k).roundToInt()
-            val rest = (1440 - minutesNow).coerceAtLeast(0) * typicalFitbit * 0.6 / 1440
+            val avg = typicalFitbit / 1440
+            val sl = sleepMin.coerceIn(300, 660)
+            val awakeRate = (1440 - ASLEEP_RATE * sl) / (1440 - sl)
+            val left = (1440 - minutesNow).coerceAtLeast(0)
+            // tonight's sleep before midnight (none if you usually go to bed after midnight)
+            val asleepLeft = if (bedClock >= 1440) 0 else (1440 - maxOf(bedClock, minutesNow)).coerceIn(0, left)
+            val rest = avg * (awakeRate * (left - asleepLeft) + ASLEEP_RATE * asleepLeft)
             return ((soFar + rest) * k).roundToInt()
         }
         /** Net calories a day for a weekly weight change. */
@@ -117,6 +130,12 @@ object Energy {
         val scale = weights.filter { it.date >= from && it.date <= today }.associate { it.date to it.kg }
         val fitbitDays = health.filterKeys { it < today }.mapNotNull { (d, h) -> h.kcalTotal?.takeIf { it > 1000 }?.let { d to it } }.toMap()
         val typicalFitbit = fitbitDays.values.takeIf { it.isNotEmpty() }?.sorted()?.let { it[it.size / 2] } ?: fallbackBurn
+        // your usual bedtime and time in bed (last 2 weeks), for projecting the rest of today
+        val zone = java.time.ZoneId.systemDefault()
+        val nights = health.values.mapNotNull { it.sleep }.sortedBy { it.end }.takeLast(14)
+        val bedClock = nights.map { n -> n.start.atZone(zone).toLocalTime().let { t -> t.hour * 60 + t.minute }.let { m -> if (m < 12 * 60) m + 1440 else m } }
+            .sorted().let { if (it.size >= 3) it[it.size / 2] else 23 * 60 }
+        val sleepLen = nights.map { java.time.Duration.between(it.start, it.end).toMinutes().toInt() }.sorted().let { if (it.size >= 3) it[it.size / 2] else 480 }
         fun eaten(d: LocalDate) = meals[d]?.takeIf { it.isNotEmpty() }?.let { MealStore.totals(it).kcal }
 
         // start the day of the first weigh-in in the window
@@ -195,6 +214,7 @@ object Energy {
             typicalFitbit = typicalFitbit,
             days = out, note = note,
             maintenance = maintenance(out, trendNow),
+            bedClock = bedClock, sleepMin = sleepLen,
         )
     }
 }

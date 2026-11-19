@@ -1,9 +1,9 @@
 package com.silverajat.lifttracker.data
 
 /**
- * Progress numbers for the exercise page, Hevy-style. Add-on plates aren't
- * weighed, so they don't count toward weight or volume. Warm-up and
- * calibration sets are left out of every chart and record.
+ * Progress numbers for the exercise page, Hevy-style. Add-on plates count as
+ * 1 kg each everywhere (see Routines.ADDON_KG). Warm-up and calibration sets
+ * are left out of every chart and record.
  */
 enum class Metric(val label: String, val unit: String) {
     HEAVIEST("Heaviest weight", "kg"),
@@ -70,7 +70,7 @@ object Stats {
         val mostReps = work.maxBy { it.reps }
         return listOf(
             Record("Heaviest weight", "%s kg".format(fmt(heaviest.load))),
-            Record("Best est. 1RM", "%s kg".format(fmt(oneRm(best1rm.weight, best1rm.reps)))),
+            Record("Best est. 1RM", "%s kg".format(fmt(oneRm(best1rm.load, best1rm.reps)))),
             Record("Best set", "%s kg × %d".format(fmt(bestSet.load), bestSet.reps)),
             Record("Most reps", "%d × %s kg".format(mostReps.reps, fmt(mostReps.load))),
         )

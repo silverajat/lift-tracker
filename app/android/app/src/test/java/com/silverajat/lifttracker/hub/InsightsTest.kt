@@ -84,6 +84,19 @@ class InsightsTest {
         assertTrue("k with gaps ${e2.k}", abs(e2.k - 1.0) < 0.08)
     }
 
+    /** At 9 AM most of the day's burn is still to come: the projection mustn't assume you'll rest all day. */
+    @Test fun morningBurnProjection() {
+        val e = Energy.Result(1.0, 0.1, 50, 0, null, null, 57.0, null, 900.0, 2700.0, emptyList(), "",
+            bedClock = 22 * 60 + 5, sleepMin = 500)
+        val morning = e.burnedToday(9 * 60)
+        assertTrue("9 AM projection $morning", morning in 2600..3000)
+        // late at night it's basically what the Fitbit has
+        val late = e.copy(todayFitbitSoFar = 2650.0).burnedToday(23 * 60 + 30)
+        assertTrue("late $late", late in 2650..2700)
+        // after-midnight sleeper: no sleep left before midnight, so a bit more is still to come
+        assertTrue(e.copy(bedClock = 24 * 60 + 30).burnedToday(9 * 60) > morning)
+    }
+
     @Test fun eveningNet() {
         val e = Energy.estimate(emptyMap(), emptyList(), mapOf(day to hd(day, 2500.0)), day)
         val lunch = MealEntry("1", day, Slot.LUNCH, "salad_egg", "salad", Foods.get("salad_egg").macros, ms(12))

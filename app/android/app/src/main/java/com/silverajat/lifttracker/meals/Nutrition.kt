@@ -128,7 +128,6 @@ enum class Slot(val title: String, val hint: String) {
     EXTRA("Extras", "going out, lab days, anything else"),
 }
 
-/** Targets from the plan. */
 /** A day's targets for a recomp: protein high, fat at the healthy floor, carbs fill the rest. */
 data class DayTargets(val kcal: Int, val protein: Int, val fat: Int, val carbs: Int, val fibre: Int = 30)
 
@@ -142,15 +141,16 @@ object Targets {
     fun day(weightKg: Double?, burn: Double?, goalKgPerWeek: Double): DayTargets {
         val w = weightKg ?: 57.0
         val kcal = (burn ?: burnKcal.toDouble()) + goalKgPerWeek * 7700 / 7
-        val p = 2.2 * w
+        val p = PROTEIN_G_PER_KG * w
         // 20% of calories, but never under 0.8 g per kg
         val f = maxOf(0.20 * kcal / 9, 0.8 * w)
         val c = ((kcal - p * 4 - f * 9) / 4).coerceAtLeast(0.0)
-        return DayTargets(kcal.toInt(), p.toInt(), f.toInt(), c.toInt())
+        // fibre: 14 g per 1,000 kcal (US Dietary Guidelines / IOM), never under HPB's 26 g for men
+        val fib = maxOf(14.0 * kcal / 1000, 26.0)
+        return DayTargets(kcal.toInt(), p.toInt(), f.toInt(), c.toInt(), fib.toInt())
     }
 
-    val protein = 120.0..125.0
-    val fat = 60.0..70.0
+    const val PROTEIN_G_PER_KG = 2.2
     const val burnKcal = 3000          // daily average burned (tracker estimate)
     const val cardioLoadGoogle = 800   // Google Health's Cardio Load target (not readable by apps)
     const val walkAfterMealMin = 15
@@ -215,7 +215,7 @@ object MealPlan {
 
     /** The plan as text, for the chat's context. */
     fun describe(): String = """
-        Daily targets: protein 120-125 g, fat ~60-70 g. Activity: average 3,000 kcal burned/day (tracker estimate), Google Health Cardio Load target 800, walk 15 min after every meal. Plan review date: ${Targets.reviewDate}.
+        Daily targets (the app works these out each day): calories = his scale-checked burn (maintenance, recomp); protein 2.2 g per kg; fat 20% of calories but at least 0.8 g per kg; carbs fill the rest; fibre 14 g per 1,000 kcal (at least 26 g). Walk 15 min after every meal. Plan review date: ${Targets.reviewDate}.
         Breakfast (pre-workout): 250 ml UFC Refresh coconut water on waking, 1 slice FairPrice Enriched White Bread, 20 g honey, 1 banana, caffeine pill 200 mg.
         Post-workout: ${Foods.get("shake").amounts["whey"]?.toInt() ?: 32} g Optimum Nutrition Gold Standard Whey (Mocha Cappuccino) + 3 g creatine in 100 ml Marigold HL Green + 100 ml NutriSoy No Sugar Added (~32 g protein, ~4.8 g fat). Measure everything.
         Mains: (1) Salad bowl: citrus-lime chicken breast, Japanese roasted sesame dressing (ask for less), brown rice + broccoli, chickpeas + edamame + egg (carrot instead of egg on Tue/Thu). (2) Steamed chicken rice set + extra skinless chicken (ask for breast), extra rice, bok choy, half a boiled egg. (3) Mixed rice: rice, 2 portions curry chicken, tofu, egg, cabbage or broccoli.

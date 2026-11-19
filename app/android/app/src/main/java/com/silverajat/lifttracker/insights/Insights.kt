@@ -176,7 +176,7 @@ object Insights {
             s.performance >= 95 -> "Slept ${hm(s.asleepMin)}: all ${hm(s.needMin)} you needed. 👌"
             s.performance >= 80 -> "Slept ${hm(s.asleepMin)} of ${hm(s.needMin)} needed: close enough."
             else -> "Slept ${hm(s.asleepMin)} of ${hm(s.needMin)} needed: ${hm(s.needMin - s.asleepMin)} short."
-        } + (if (s.debtMin >= 45) " Carrying ${hm(s.debtMin)} of sleep debt." else "")
+        } + (if (s.debtMin >= 60) " ${hm(s.debtMin)} short over the last 3 nights." else "")
         if (r != null) {
             r.contributors.firstOrNull { it.name == "HRV" && it.good != null }?.let {
                 val (norm, how) = it.vsNormal.split(" · ").let { p -> p[0] to p.getOrElse(1) { "" } }
@@ -257,7 +257,7 @@ object Insights {
         lines += when {
             abs(diff) <= 150 -> "Nothing to change. Nice."
             diff < -400 -> "Quite a bit under: a Meiji (~240) plus an extra slice of bread with peanut butter (~145) gets you closer."
-            diff < 0 -> "Slightly under: an extra slice of bread with honey (~100) or a Meiji (~170) closes it."
+            diff < 0 -> "Slightly under: an extra slice of bread with honey (~120) or a Meiji (~240) closes it."
             diff > 400 -> "Well over: skip the extra peanut butter and keep the yoghurt bowl plain-ish."
             else -> "A little over: fine if it's a training day."
         }
@@ -299,13 +299,15 @@ object Insights {
         } else lines += "No food logged today, so no net calories."
         // when to sleep: tonight's need, against your usual wake-up
         val wakes = a.days.takeLast(7).mapNotNull { it.sleep?.wake?.atZone(zone)?.toLocalTime() }
-        val todayStrain = today?.load?.let { Analysis.strainOf(it.trimp) } ?: 0.0
-        val lastNights = a.days.takeLast(3).mapNotNull { it.sleep?.asleepMin }
-        val need = Analysis.SLEEP_BASE_MIN + ((todayStrain - 10) * 4).coerceIn(0.0, 45.0).roundToInt() +
-            (lastNights.sumOf { (Analysis.SLEEP_BASE_MIN - it).coerceAtLeast(0) } / 2).coerceAtMost(60)
+        // the same need formula as the Sleep page, with today's full strain (gym included)
+        val todayStrain = a.days.lastOrNull { it.date == date }?.strain?.strain ?: today?.load?.let { Analysis.strainOf(it.trimp) }
+        val lastNights = a.days.filter { it.date <= date }.takeLast(3).mapNotNull { it.sleep?.asleepMin }
+        val need = Analysis.sleepNeed(todayStrain, lastNights).total
         if (wakes.size >= 3) {
             val wake = wakes.map { it.toSecondOfDay() }.sorted()[wakes.size / 2].let { LocalTime.ofSecondOfDay(it.toLong()) }
-            val bed = wake.minusMinutes(need + 15L)
+            // time in bed = need ÷ your usual efficiency (nobody sleeps 100% of the night), plus ~15 min to fall asleep
+            val eff = a.days.takeLast(7).mapNotNull { it.sleep?.efficiency }.takeIf { it.size >= 3 }?.average()?.div(100.0) ?: 0.9
+            val bed = wake.minusMinutes((need / eff.coerceIn(0.75, 1.0)).roundToInt() + 15L)
             lines += "Tonight you need ${hm(need)}: lights out by ${clock(bed)} for your usual ${clock(wake)} wake-up."
         } else lines += "Tonight you need about ${hm(need)} of sleep."
         val title = when {

@@ -104,7 +104,7 @@ object ChatContext {
         appendLine("Load = Banister TRIMP from heart rate (HRmax $hrMax). 7-day load: ${Scores.weekLoad(health)}.")
         appendLine()
         if (analysis != null) {
-            appendLine("## Analysis (formulas: recovery = HRV 0.5 / resting HR 0.2 / sleep performance 0.2 / breathing 0.1 vs his 30-day baseline, zones green>=67 yellow 34-66 red<34; strain 0-21 = 21(1-e^(-TRIMP/110)); sleep need = 7.5 h baseline + strain + debt; sleep score = hours vs need 55% + consistency 15% + efficiency 15% + restorative 15%, 85+ optimal, 70-84 sufficient)")
+            appendLine("## Analysis (formulas: recovery = HRV last night 0.35 (far off normal either way is bad) / HRV 7-day 0.15 / resting HR 0.25 / sleep last 4 nights 0.20 / breathing 0.05 vs his 30-day baseline, zones green>=67 yellow 34-66 red<34; strain 0-21 = 21(1-e^(-TRIMP/110)) incl. gym muscular load; sleep need = 7.5 h + strain + half the net debt of 3 nights; sleep score = hours vs need 55% + consistency 15% + efficiency 15% + deep 8% + REM 7%, 85+ optimal, 70-84 sufficient. Full write-up in docs/HOW_IT_WORKS.md)")
             analysis.headline.forEach { appendLine("- $it") }
             analysis.days.takeLast(14).reversed().forEach { d ->
                 val p = listOfNotNull(
@@ -176,7 +176,10 @@ object ChatContext {
             appendLine("$name: exact on ${f.exactLearned}/${f.sets} corrected sets (default counter ${f.exactDefault}/${f.sets})")
         }
         appendLine()
-        appendLine("Targets reminder: protein ${Targets.protein.start.toInt()}-${Targets.protein.endInclusive.toInt()} g, fat ${Targets.fat.start.toInt()}-${Targets.fat.endInclusive.toInt()} g, burn ~${Targets.burnKcal} kcal/day.")
+        analysis?.let { a ->
+            val t = Targets.day(a.weight.trendKg ?: a.weight.lastWeighIn?.kg, a.energy.maintenance?.toDouble() ?: (a.energy.typicalFitbit * a.energy.k), a.goalKgPerWeek)
+            appendLine("Targets for a typical day: ${t.kcal} kcal, protein ${t.protein} g, carbs ${t.carbs} g, fat ${t.fat} g, fibre ${t.fibre} g.")
+        }
     }
 
     private fun fmtKg(w: Double) = if (w == Math.floor(w)) "%.0f".format(w) else "%.2f".format(w).trimEnd('0').trimEnd('.')

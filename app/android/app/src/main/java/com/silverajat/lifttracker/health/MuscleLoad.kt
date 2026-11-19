@@ -45,8 +45,9 @@ object MuscleLoad {
     /** Reps in reserve from how much the reps slowed (pod), else from your 1RM. */
     fun rir(l: SetLog, e1rm: Double?): Double? {
         l.speedDrop?.let { return (5.0 - it / 10.0).coerceIn(0.0, 5.0) }
-        if (e1rm == null || l.weight <= 0) return null
-        val maxReps = 30 * (e1rm / l.weight - 1)
+        if (e1rm == null || l.load <= 0) return null
+        // add-ons count, like everywhere else (the 1RM includes them too)
+        val maxReps = 30 * (e1rm / l.load - 1)
         return (maxReps - l.reps).coerceIn(0.0, 8.0)
     }
 
@@ -60,7 +61,7 @@ object MuscleLoad {
             val ex = runCatching { Routines.byId(l.exerciseId) }.getOrNull()
             val e1 = before[l.exerciseId] ?: own[l.exerciseId]
             val bodyweight = ex?.bodyweight == true || l.weight <= 0
-            val inten = if (bodyweight || e1 == null) 0.7 else (l.weight / e1).coerceIn(0.2, 1.05)
+            val inten = if (bodyweight || e1 == null) 0.7 else (l.load / e1).coerceIn(0.2, 1.05)
             val r = rir(l, if (bodyweight) null else e1)
             val effort = 1 + 1.5 * exp(-(r ?: 3.0) / 2)
             val m = ex?.let { muscle(Routines.group(it)) } ?: 1.0

@@ -44,7 +44,7 @@ import kotlin.math.sqrt
  * average gym day of the last 28 days. Heart rate misses most of lifting.
  *
  * SLEEP: need = 7.5 h + strain (+4 min per point above 10, max 45) + debt
- *   (half of the last 3 nights' shortfall, max 60 min). Performance =
+ *   (half of the last 3 nights' net shortfall, max 60 min). Performance =
  *   asleep / need. Consistency = how close bed and wake times are to the
  *   last 4 nights (100% = same minute, -1% per minute of average spread).
  *
@@ -75,16 +75,20 @@ object Analysis {
     data class ScorePart(val name: String, val value: String, val score: Int, val weight: Double, val about: String)
 
     /**
-     * SLEEP SCORE (0-100), WHOOP-style: not just hours. Hours vs need 55%,
-     * consistency 15%, efficiency 15%, restorative (deep + REM) 15%; the weights
-     * renormalise over what the Fitbit gave. 85+ optimal, 70-84 sufficient, below 70 poor.
+     * SLEEP SCORE (0-100): not just hours. Hours vs need 55%, consistency 15%, efficiency 15%,
+     * deep 8% and REM 7%, each against its own normal range (a big REM night can't hide very little
+     * deep: they do different jobs). The weights renormalise over what the Fitbit gave.
+     * 85+ optimal, 70-84 sufficient, below 70 poor.
      */
-    fun sleepScore(performance: Int, consistency: Int?, efficiency: Int?, restorativePct: Int?): Pair<Int, List<ScorePart>> {
+    fun sleepScore(performance: Int, consistency: Int?, efficiency: Int?, deepPct: Int?, remPct: Int?): Pair<Int, List<ScorePart>> {
         val parts = listOfNotNull(
             ScorePart("Hours vs needed", "$performance%", performance.coerceIn(0, 100), 0.55, "asleep compared with what you needed"),
             consistency?.let { ScorePart("Consistency", "$it%", it.coerceIn(0, 100), 0.15, "bed and wake times vs the last few nights") },
-            efficiency?.let { ScorePart("Efficiency", "$it%", ((it - 70) * 4).coerceIn(0, 100), 0.15, "time asleep while in bed; 95% scores full") },
-            restorativePct?.let { ScorePart("Restorative", "$it%", ((it - 20) * 5).coerceIn(0, 100), 0.15, "deep + REM share; 40%+ scores full") },
+            // 85% is the clinical line for good sleep (NSF); 90%+ scores full
+            efficiency?.let { ScorePart("Efficiency", "$it%", ((it - 70) * 5).coerceIn(0, 100), 0.15, "asleep while in bed") },
+            // adults: deep ~13-23%, REM ~20-25% of sleep. Full marks from 15% deep / 20% REM
+            deepPct?.let { ScorePart("Deep", "$it%", ((it - 5) * 10).coerceIn(0, 100), 0.08, "of your sleep") },
+            remPct?.let { ScorePart("REM", "$it%", ((it - 10) * 10).coerceIn(0, 100), 0.07, "of your sleep") },
         )
         val score = (parts.sumOf { it.score * it.weight } / parts.sumOf { it.weight }).roundToInt().coerceIn(0, 100)
         return score to parts
@@ -150,9 +154,19 @@ object Analysis {
      */
     private fun base(x: List<Double>, floor: Double): Base? {
         if (x.size < 5) return null
-        val m = x.average()
-        val sd = sqrt(x.sumOf { (it - m) * (it - m) } / (x.size - 1)).coerceAtLeast(floor)
+        // one wild night (a bad reading, a sick day) is pulled in to 3 spreads from the median first,
+        // so it can't stretch "normal" for the next month and make every later warning look normal
+        val med = median(x)
+        val robust = (1.4826 * median(x.map { abs(it - med) })).coerceAtLeast(floor)
+        val y = x.map { it.coerceIn(med - 3 * robust, med + 3 * robust) }
+        val m = y.average()
+        val sd = sqrt(y.sumOf { (it - m) * (it - m) } / (y.size - 1)).coerceAtLeast(floor)
         return Base(m, sd, x.size)
+    }
+
+    private fun median(x: List<Double>): Double {
+        val s = x.sorted()
+        return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2
     }
 
     /** One metric can move the score this far and no further. */
@@ -178,8 +192,7 @@ object Analysis {
     private fun wakeMinutes(t: Instant, zone: ZoneId): Int = t.atZone(zone).toLocalTime().let { it.hour * 60 + it.minute }
 
     private fun mad(x: List<Int>): Double {
-        val s = x.sorted()
-        val med = s[s.size / 2]
+        val med = median(x.map { it.toDouble() })
         return x.map { abs(it - med) }.average()
     }
 
@@ -188,14 +201,25 @@ object Analysis {
     /** Your baseline sleep need: 7 h 30 min. */
     const val SLEEP_BASE_MIN = 450
 
+    /** What a night needs: the baseline, extra after a hard day, and half of what's still owed. */
+    data class Need(val total: Int, val strainMin: Int, val payBackMin: Int, val owedMin: Int)
+
+    /**
+     * Need = 7 h 30 min + 4 min per strain point above 10 (max 45) + half of the sleep still owed from the
+     * last 3 nights (max 60). Owed is the NET shortfall: a long night pays back a short one, so the debt
+     * really does reset as you catch up (one long night only repays part of a run of short ones).
+     */
+    fun sleepNeed(strainPrev: Double?, prevNightsMin: List<Int>): Need {
+        val forStrain = if (strainPrev != null && strainPrev > 10) ((strainPrev - 10) * 4).coerceAtMost(45.0) else 0.0
+        val owed = prevNightsMin.sumOf { SLEEP_BASE_MIN - it }.coerceAtLeast(0)
+        val payBack = (owed * 0.5).coerceAtMost(60.0)
+        return Need((SLEEP_BASE_MIN + forStrain + payBack).roundToInt(), forStrain.roundToInt(), payBack.roundToInt(), owed)
+    }
+
     fun sleep(days: List<HealthDay>, i: Int, strainPrev: Double?, zone: ZoneId): SleepResult? {
         val s = days[i].sleep ?: return null
-        var need = SLEEP_BASE_MIN.toDouble()
-        val forStrain = if (strainPrev != null && strainPrev > 10) ((strainPrev - 10) * 4).coerceAtMost(45.0) else 0.0
-        need += forStrain
-        val prev = (1..3).mapNotNull { k -> days.getOrNull(i - k)?.sleep }
-        val debt = prev.sumOf { (SLEEP_BASE_MIN - it.totalMin).coerceAtLeast(0) } * 0.5
-        need += debt.coerceAtMost(60.0)
+        val nd = sleepNeed(strainPrev, (1..3).mapNotNull { k -> days.getOrNull(i - k)?.sleep?.totalMin })
+        val need = nd.total.toDouble()
         val recent = (0..3).mapNotNull { k -> days.getOrNull(i - k)?.sleep }
         val consistency = if (recent.size >= 3) {
             val spread = (mad(recent.map { bedMinutes(it.start, zone) }) + mad(recent.map { wakeMinutes(it.end, zone) })) / 2
@@ -205,18 +229,19 @@ object Analysis {
         val staged = s.deepMin + s.remMin + s.lightMin > 0
         val perf = (s.totalMin * 100.0 / need).roundToInt().coerceIn(0, 100)
         val eff = if (staged) (s.totalMin * 100 / inBed).coerceIn(0, 100) else null
-        val restorative = if (staged && s.totalMin > 0) (s.deepMin + s.remMin) * 100 / s.totalMin else null
-        val (score, parts) = sleepScore(perf, consistency, eff, restorative)
+        val deepPct = if (staged && s.totalMin > 0) (s.deepMin * 100.0 / s.totalMin).roundToInt() else null
+        val remPct = if (staged && s.totalMin > 0) (s.remMin * 100.0 / s.totalMin).roundToInt() else null
+        val (score, parts) = sleepScore(perf, consistency, eff, deepPct, remPct)
         return SleepResult(
             score = score, scoreParts = parts,
-            needMin = need.roundToInt(), asleepMin = s.totalMin,
+            needMin = nd.total, asleepMin = s.totalMin,
             performance = perf,
-            debtMin = debt.roundToInt(), consistency = consistency,
-            efficiency = if (staged) (s.totalMin * 100 / inBed).coerceIn(0, 100) else null,
-            deepPct = if (staged && s.totalMin > 0) s.deepMin * 100 / s.totalMin else null,
-            remPct = if (staged && s.totalMin > 0) s.remMin * 100 / s.totalMin else null,
+            debtMin = nd.owedMin, consistency = consistency,
+            efficiency = eff,
+            deepPct = deepPct,
+            remPct = remPct,
             bed = s.start, wake = s.end,
-            needStrainMin = forStrain.roundToInt(), needDebtMin = debt.coerceAtMost(60.0).roundToInt(),
+            needStrainMin = nd.strainMin, needDebtMin = nd.payBackMin,
             deepMin = s.deepMin, remMin = s.remMin, lightMin = s.lightMin, awakeMin = s.awakeMin, stages = s.stages,
         )
     }
@@ -397,19 +422,26 @@ object Analysis {
         return WeightResult(last.avgKg, prev?.avgKg, ch, pct, verdict, rate)
     }
 
-    fun nutrition(meals: Map<LocalDate, List<MealEntry>>, health: Map<LocalDate, HealthDay>, today: LocalDate, kg: Double?): NutritionResult? {
-        val logged = meals.filterKeys { it < today && it >= today.minusDays(7) }.filterValues { it.isNotEmpty() }
-        if (logged.isEmpty()) return null
+    /**
+     * Last 7 days of food. Averages use fully logged days when there are any (a day with a forgotten
+     * meal would drag every average down), and the balance uses the scale-corrected burn, like the Net tab.
+     */
+    fun nutrition(meals: Map<LocalDate, List<MealEntry>>, energy: Energy.Result, today: LocalDate, kg: Double?): NutritionResult? {
+        val any = meals.filterKeys { it < today && it >= today.minusDays(7) }.filterValues { it.isNotEmpty() }
+        if (any.isEmpty()) return null
+        val complete = energy.days.filter { it.logged && it.date in any.keys }
+        val logged = if (complete.isNotEmpty()) any.filterKeys { d -> complete.any { it.date == d } } else any
         val tot = logged.mapValues { MealStore.totals(it.value) }
-        val bal = logged.keys.mapNotNull { d -> health[d]?.kcalTotal?.let { tot.getValue(d).kcal - it } }
+        val bal = complete.mapNotNull { it.net }
         val avgBal = bal.takeIf { it.size >= 3 }?.average()
         val avgP = tot.values.map { it.protein }.average()
+        val proteinGoal = kg?.let { Targets.PROTEIN_G_PER_KG * it * 0.9 } ?: 110.0
         return NutritionResult(
             days = logged.size,
             avgKcal = tot.values.map { it.kcal }.average().roundToInt(),
             avgProtein = avgP.roundToInt(),
             avgFat = tot.values.map { it.fat }.average().roundToInt(),
-            proteinDaysHit = tot.values.count { it.protein >= Targets.protein.start },
+            proteinDaysHit = tot.values.count { it.protein >= proteinGoal },
             proteinPerKg = kg?.let { avgP / it },
             avgBalance = avgBal?.roundToInt(),
             predictedKgPerWeek = avgBal?.let { it * 7 / 7700 },
@@ -423,12 +455,15 @@ object Analysis {
             // a habit on day d is compared with recovery on the morning of d+1
             val with = byDay.filter { it.value }.keys.mapNotNull { recovery[it.plusDays(1)]?.toDouble() }
             val without = byDay.filter { !it.value }.keys.mapNotNull { recovery[it.plusDays(1)]?.toDouble() }
-            if (with.size < 4 || without.size < 4) return@mapNotNull null
+            if (with.size < MIN_EACH || without.size < MIN_EACH) return@mapNotNull null
             fun v(x: List<Double>) = x.sumOf { (it - x.average()) * (it - x.average()) } / (x.size - 1)
             val se = sqrt(v(with) / with.size + v(without) / without.size)
             val delta = with.average() - without.average()
-            Effect(name, with.average(), without.average(), with.size, without.size, se > 0 && abs(delta) > 2 * se)
+            // 2.5, not 2: six habits are tested at once, so plain 2 would flag a fluke about 1 time in 4
+            Effect(name, with.average(), without.average(), with.size, without.size, se > 0 && abs(delta) > 2.5 * se)
         }.sortedByDescending { abs(it.delta) }
+
+    private const val MIN_EACH = 5
 
     // ---- everything -------------------------------------------------------------------------------
 
@@ -494,14 +529,15 @@ object Analysis {
         habit("Net calories in surplus") { d -> netByDay[d]?.let { it >= 0 } }
         habit("Gym session") { d -> (vol[d]?.second ?: 0) > 0 }
         habit("10,000+ steps") { d -> healthMap[d]?.steps?.let { it >= 10_000 } }
-        habit("Strain 14+") { d -> healthMap[d]?.load?.let { strainOf(it.trimp) >= 14 } }
+        val strainByDay = out.associate { it.date to it.strain?.strain }
+        habit("Strain 14+") { d -> strainByDay[d]?.let { it >= 14 } }
         habit("Asleep before midnight") { d ->
             healthMap[d.plusDays(1)]?.sleep?.let { bedMinutes(it.start, zone) < 0 }
         }
         val effects = effects(habits, recMap)
 
-        val nutrition = nutrition(meals, healthMap, today, lastKg)
         val weight = weight(weights, today, goalKgPerWeek)
+        val nutrition = nutrition(meals, energy, today, weight.trendKg ?: lastKg)
 
         // headline
         val head = ArrayList<String>()
@@ -512,7 +548,7 @@ object Analysis {
         } ?: run { if (health.isNotEmpty()) head += "Recovery needs 5+ days of HRV/resting HR from the Fitbit to compare against." }
         todayDay?.sleep?.let { s ->
             head += "Slept ${s.asleepMin / 60}h${s.asleepMin % 60}m of a ${s.needMin / 60}h${s.needMin % 60}m need (${s.performance}%)" +
-                (if (s.debtMin >= 30) ", carrying ${s.debtMin} min of debt" else "") + "."
+                (if (s.debtMin >= 60) ", owing ${s.debtMin} min from the last 3 nights" else "") + "."
         }
         energy.avgNet?.let { n ->
             val goal = energy.netFor(goalKgPerWeek)

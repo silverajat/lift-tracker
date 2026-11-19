@@ -40,6 +40,8 @@ class HubTest {
         assertEquals(124, t.protein)          // 2.2 g/kg
         assertEquals(60, t.fat)               // 20% of calories
         assertTrue(t.carbs.toString(), t.carbs in 410..430)   // the rest
+        assertEquals(37, t.fibre)             // 14 g per 1,000 kcal
+        assertEquals(26, com.silverajat.lifttracker.meals.Targets.day(56.6, 1500.0, 0.0).fibre)   // never under HPB's 26 g
     }
 
     @Test fun weekAveragesOnlyCompletedWeeks() {
@@ -94,14 +96,47 @@ class HubTest {
     }
 
     @Test fun sleepScoreIsMoreThanHours() {
-        val (full, _) = Analysis.sleepScore(100, 100, 95, 45)
+        val (full, _) = Analysis.sleepScore(100, 100, 95, 18, 24)
         assertEquals(100, full)
         // enough hours but messy timing, restless and light: not a great night
-        val (messy, parts) = Analysis.sleepScore(100, 40, 78, 25)
+        val (messy, parts) = Analysis.sleepScore(100, 40, 78, 8, 15)
         assertTrue(messy.toString(), messy in 60..75)
-        assertEquals(4, parts.size)
+        assertEquals(5, parts.size)
         // only hours known: the score is just hours
-        assertEquals(80, Analysis.sleepScore(80, null, null, null).first)
+        assertEquals(80, Analysis.sleepScore(80, null, null, null, null).first)
+    }
+
+    /** Lots of REM can't make up for very little deep: they're scored separately. */
+    @Test fun deepAndRemScoredSeparately() {
+        val (balanced, _) = Analysis.sleepScore(100, 100, 94, 16, 22)
+        val (remHeavy, parts) = Analysis.sleepScore(100, 100, 94, 3, 36)
+        assertEquals(100, balanced)
+        assertEquals(0, parts.first { it.name == "Deep" }.score)
+        assertTrue("$remHeavy", remHeavy <= 92)
+        // last night on the screenshot: 10% deep, 25% REM, 94% efficient
+        val (n, p2) = Analysis.sleepScore(100, 90, 94, 10, 25)
+        assertEquals(50, p2.first { it.name == "Deep" }.score)
+        assertTrue("$n", n in 90..97)
+    }
+
+    /** Debt is the NET shortfall: a long night pays back a short one. */
+    @Test fun sleepDebtResetsWhenYouCatchUp() {
+        val short = Analysis.sleepNeed(null, listOf(390, 390, 390))      // 3 nights an hour short
+        assertEquals(180, short.owedMin)
+        assertEquals(60, short.payBackMin)                                // half of it, at most 60
+        val caughtUp = Analysis.sleepNeed(null, listOf(570, 390, 390))   // then a 9.5 h night
+        assertEquals(0, caughtUp.owedMin)
+        assertEquals(450, caughtUp.total)
+        assertEquals(450 + 24, Analysis.sleepNeed(16.0, emptyList()).total)   // strain 16: +24 min
+    }
+
+    /** One wild HRV reading mustn't stretch "normal" so much that later warnings look normal. */
+    @Test fun oneOutlierDoesntWidenTheBaseline() {
+        val start = LocalDate.of(2026, 10, 1)
+        val base = (0 until 25).map { i -> day(start.plusDays(i.toLong()), if (i == 10) 140.0 else 40.0 + (i % 3) * 2, 50 + (i % 2)) }
+        val low = base + day(start.plusDays(25), 34.0, 51, 450)
+        val r = Analysis.recovery(low, 25, 90)!!
+        assertEquals(r.score.toString(), Analysis.Zone.RED, r.zone)
     }
 
     @Test fun recoveryZones() {
