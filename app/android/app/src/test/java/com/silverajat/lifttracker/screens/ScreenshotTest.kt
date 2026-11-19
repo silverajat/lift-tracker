@@ -218,6 +218,13 @@ class ScreenshotTest {
     @Test fun recoveryDetail() = shoot("detail_recovery") { com.silverajat.lifttracker.ui.RecoveryDetail(analysis, days) {} }
     @Test fun strainDetail() = shoot("detail_strain") { com.silverajat.lifttracker.ui.StrainDetail(analysis, days, items, 0.0, {}, {}, {}) }
     @Test fun sleepDetail() = shoot("detail_sleep") { com.silverajat.lifttracker.ui.SleepDetail(analysis, days) {} }
+    @Test fun bodyDetail() = shoot("detail_body") {
+        val d0 = today.minusDays(31)
+        fun n(i: Int, sick: Boolean) = HealthDay(d0.plusDays(i.toLong()), 8000, 2700.0, 600.0, if (sick) 59 else 52 + i % 3,
+            if (sick) 32.0 else 42.0 + (i % 3) * 3, 97.0, if (sick) 16.6 else 15.0 + (i % 3) * 0.2, null, emptyList(), null)
+        val b = com.silverajat.lifttracker.health.BodyCheck.run((0..31).map { n(it, it >= 30) }, emptyMap(), today)
+        com.silverajat.lifttracker.ui.BodyDetail(analysis.copy(body = b)) {}
+    }
     @Test fun runDetail() = shoot("run_detail") { com.silverajat.lifttracker.ui.RunDetail(acts[0], items.first { it.manualId == "r1" }, {}, {}) }
     private fun journal(): com.silverajat.lifttracker.ui.DayUi {
         val J = com.silverajat.lifttracker.journal.Journal

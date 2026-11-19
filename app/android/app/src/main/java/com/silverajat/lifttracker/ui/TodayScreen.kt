@@ -299,7 +299,9 @@ private fun BodyCard(b: com.silverajat.lifttracker.health.BodyCheck.Result, onCl
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Body: " + b.state.label.replaceFirstChar { it.lowercase() }, style = MaterialTheme.typography.titleMedium, color = bodyColor(b.state))
                 Text(b.reasons.firstOrNull()?.takeIf { b.state != com.silverajat.lifttracker.health.BodyCheck.State.NORMAL }?.let { r ->
-                    r.title + (r.evidence.firstOrNull()?.let { e -> ": " + e.substringBefore(",") + " " + e.substringAfterLast("(", "").removeSuffix(")") } ?: "")
+                    // the reason's name only when it says more than the label above; then the evidence, short
+                    val ev = r.evidence.take(2).joinToString(" · ") { e -> e.substringBefore(", normal") + (e.substringAfterLast("(", "").removeSuffix(")").takeIf { e.contains(", normal") }?.let { " ($it)" } ?: "") }
+                    if (r.title.equals(b.state.label, ignoreCase = true)) ev else "${r.title} · $ev"
                 } ?: b.headline, style = MaterialTheme.typography.bodyMedium, color = C.Muted, maxLines = 2)
             }
             Text("›", style = MaterialTheme.typography.headlineMedium, color = C.Muted)
