@@ -505,10 +505,15 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
             if (tn?.bed != null && tn.wake != null) {
                 val need = tn.needMin; val bed = tn.bed; val wake = tn.wake
                 Card(Modifier.fillMaxWidth(), border = SleepPurple.copy(alpha = 0.4f)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Tonight", style = MaterialTheme.typography.titleLarge)
-                        Text("Lights out by ${bed.format(hhmm)} to get ${hmin(need)} before your usual ${wake.format(hhmm)} wake-up.",
-                            style = MaterialTheme.typography.bodyLarge)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text("Tonight", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                            Text("lights out ${bed.format(hhmm)}", style = MaterialTheme.typography.headlineSmall.merge(Tnum), color = SleepPurple)
+                        }
+                        Kv("Sleep needed", hmin(need), listOfNotNull("7h 30m base", tn.strainMin.takeIf { it > 0 }?.let { "+${it}m strain" },
+                            tn.debtMin.takeIf { it > 0 }?.let { "+${it}m debt" }, tn.sickMin.takeIf { it > 0 }?.let { "+${it}m body" }).joinToString(" "))
+                        Kv("In bed", hmin(tn.inBedMin + Analysis.FALL_ASLEEP_MIN))
+                        Kv("Wake-up", wake.format(hhmm), "your usual, ${tn.wakeFrom}")
                     }
                 }
             }

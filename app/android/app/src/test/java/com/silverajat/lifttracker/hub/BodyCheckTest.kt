@@ -52,6 +52,20 @@ class BodyCheckTest {
         assertTrue(r.reasons.toString(), r.reasons.any { it.title == "Stress, alcohol or an injury" })
     }
 
+    /** Small blips every other night don't add up to "off since" two weeks ago. */
+    @Test fun scatteredBlipsDontMakeARun() {
+        val blippy = (0 until 30).map { i -> if (i >= 20 && i % 2 == 0) night(i, rhr = 56) else night(i) }
+        val r = BodyCheck.run(blippy + night(30) + night(31, rhr = 59, hrv = 32.0), emptyMap(), today)!!
+        assertEquals(null, r.since)
+    }
+
+    /** Skin temperature from the Fitbit counts even before there's a week of it. */
+    @Test fun feverWithoutHistory() {
+        val r = BodyCheck.run(normal + night(30) + night(31, rr = 16.0).copy(skinTempC = 1.1), emptyMap(), today)!!
+        assertTrue(r.night!!.tempUp)
+        assertEquals(State.SICK, r.state)
+    }
+
     /** After a sick spell: which signs are back and which aren't yet. */
     @Test fun settlingDown() {
         val sick = { i: Int -> night(i, rr = 16.6, rhr = 59, hrv = 32.0) }

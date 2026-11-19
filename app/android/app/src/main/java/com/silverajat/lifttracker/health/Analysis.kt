@@ -217,21 +217,48 @@ object Analysis {
         return Need((SLEEP_BASE_MIN + forStrain + payBack).roundToInt(), forStrain.roundToInt(), payBack.roundToInt(), owed)
     }
 
-    /** Tonight: what you need, and when to turn the lights out for your usual wake-up. */
-    data class Tonight(val needMin: Int, val bed: LocalTime?, val wake: LocalTime?)
+    /**
+     * Tonight: how much sleep you need and when to turn the lights out.
+     * [inBedMin] = need ÷ your sleep efficiency (the time awake in the night), [wakeFrom] says which wake-ups it's based on.
+     */
+    data class Tonight(
+        val needMin: Int, val bed: LocalTime?, val wake: LocalTime?,
+        val inBedMin: Int = needMin, val wakeFrom: String = "", val strainMin: Int = 0, val debtMin: Int = 0, val sickMin: Int = 0,
+    )
+
+    /** Minutes to fall asleep, added before the time in bed. */
+    const val FALL_ASLEEP_MIN = 15
 
     /**
-     * Need from today's full strain (gym included) and the last 3 nights; bedtime = usual wake-up − need ÷ your
-     * usual sleep efficiency (nobody sleeps 100% of the night) − 15 min to fall asleep.
+     * Need = 7 h 30 + today's strain so far (gym included) + half of what's owed from the last 3 nights, + 30 min
+     * when your body looks like it's fighting something off (+15 while it's settling).
+     * Wake-up = your median wake time on the same weekday over the last 6 weeks (2+ of them), else weekdays vs
+     * weekends, else the last 2 weeks. Bedtime = wake-up − need ÷ your efficiency (last 7 nights) − 15 min to fall asleep.
      */
     fun tonight(r: Result, date: LocalDate, zone: ZoneId, strainFallback: Double? = null): Tonight {
         val strain = r.days.lastOrNull { it.date == date }?.strain?.strain ?: strainFallback
-        val need = sleepNeed(strain, r.days.filter { it.date <= date }.takeLast(3).mapNotNull { it.sleep?.asleepMin }).total
-        val wakes = r.days.takeLast(7).mapNotNull { it.sleep?.wake?.atZone(zone)?.toLocalTime() }
-        if (wakes.size < 3) return Tonight(need, null, null)
-        val wake = wakes.map { it.toSecondOfDay() }.sorted()[wakes.size / 2].let { LocalTime.ofSecondOfDay(it.toLong()) }
+        val nd = sleepNeed(strain, r.days.filter { it.date <= date }.takeLast(3).mapNotNull { it.sleep?.asleepMin })
+        val sick = when (r.body?.state) { BodyCheck.State.SICK -> 30; BodyCheck.State.SETTLING -> 15; else -> 0 }
+        val need = nd.total + sick
+        // wake-ups by the morning they happened on
+        val wakes = r.days.filter { it.date > date.minusDays(42) && it.date <= date }
+            .mapNotNull { d -> d.sleep?.let { d.date to it.wake.atZone(zone).toLocalTime() } }
+        fun med(x: List<LocalTime>) = x.map { it.toSecondOfDay() }.sorted().let { s -> LocalTime.ofSecondOfDay(((s[(s.size - 1) / 2] + s[s.size / 2]) / 2).toLong()) }
+        val tomorrow = date.plusDays(1).dayOfWeek
+        fun isWeekend(d: java.time.DayOfWeek) = d == java.time.DayOfWeek.SATURDAY || d == java.time.DayOfWeek.SUNDAY
+        val sameDay = wakes.filter { it.first.dayOfWeek == tomorrow }.map { it.second }
+        val sameKind = wakes.filter { isWeekend(it.first.dayOfWeek) == isWeekend(tomorrow) }.map { it.second }
+        val recent = wakes.filter { it.first > date.minusDays(14) }.map { it.second }
+        val dayName = tomorrow.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.UK)
+        val (wake, from) = when {
+            sameDay.size >= 2 -> med(sameDay) to "${dayName}s"
+            sameKind.size >= 3 -> med(sameKind) to (if (isWeekend(tomorrow)) "weekends" else "weekdays")
+            recent.size >= 3 -> med(recent) to "lately"
+            else -> return Tonight(need, null, null, need, "", nd.strainMin, nd.payBackMin, sick)
+        }
         val eff = r.days.takeLast(7).mapNotNull { it.sleep?.efficiency }.takeIf { it.size >= 3 }?.average()?.div(100.0) ?: 0.9
-        return Tonight(need, wake.minusMinutes((need / eff.coerceIn(0.75, 1.0)).roundToInt() + 15L), wake)
+        val inBed = (need / eff.coerceIn(0.75, 1.0)).roundToInt()
+        return Tonight(need, wake.minusMinutes((inBed + FALL_ASLEEP_MIN).toLong()), wake, inBed, from, nd.strainMin, nd.payBackMin, sick)
     }
 
     fun sleep(days: List<HealthDay>, i: Int, strainPrev: Double?, zone: ZoneId): SleepResult? {

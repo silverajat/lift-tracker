@@ -73,7 +73,7 @@ Heart-rate zones are minutes at each share of max HR. Zones 2–3 build your bas
 ## Sleep
 
 - **Need:** 7 h 30 min, plus up to 45 min after a hard day (+4 min per strain point above 10, today's full strain including the gym), plus half of what's still owed from the last 3 nights (max 60 min). Owed is the net shortfall against 7 h 30: a long night pays back a short one, so it really does reset as you catch up.
-- **Bedtime (night notification):** your usual wake-up minus need ÷ your usual sleep efficiency (nobody sleeps 100% of the night) minus 15 min to fall asleep.
+- **Tonight's lights-out:** tomorrow's wake-up minus need ÷ your sleep efficiency (last 7 nights; nobody sleeps 100% of the night) minus 15 min to fall asleep. Tomorrow's wake-up is your median wake time on that same weekday over the last 6 weeks (needs 2), else weekdays vs weekends, else the last 2 weeks. Tonight's need uses today's strain so far, so it moves through the day, and adds 30 min when Body says you're fighting something off (15 while settling).
 - **Performance:** time asleep ÷ need.
 - **Score:**
 

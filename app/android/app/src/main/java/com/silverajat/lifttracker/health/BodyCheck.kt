@@ -133,7 +133,12 @@ object BodyCheck {
             out += Reading(s, today, m, change, z, level(s, change, z))
         }
         add(Signal.BREATHING, d.respRate, past.mapNotNull { it.respRate }, 0.3)
-        add(Signal.TEMPERATURE, d.skinTempC, past.mapNotNull { it.skinTempC }, 0.15)
+        // the Fitbit's temperature is already a change from its own baseline, so until there's a week of
+        // your own nights, 0 is normal with a typical night-to-night spread of 0.3 °C
+        if (d.skinTempC != null && normal(past.mapNotNull { it.skinTempC }, 0.15) == null) {
+            val z = d.skinTempC / 0.3
+            out += Reading(Signal.TEMPERATURE, d.skinTempC, 0.0, d.skinTempC, z, level(Signal.TEMPERATURE, d.skinTempC, z))
+        } else add(Signal.TEMPERATURE, d.skinTempC, past.mapNotNull { it.skinTempC }, 0.15)
         add(Signal.RESTING_HR, d.restingHr?.toDouble(), past.mapNotNull { it.restingHr?.toDouble() }, 1.5)
         // HRV on a log scale (it's skewed), shown as a percentage change
         d.hrvMs?.takeIf { it > 0 }?.let { v ->
@@ -172,19 +177,15 @@ object BodyCheck {
         fun offLines(vararg s: Signal) = s.mapNotNull { n[it]?.takeIf { r -> r.off }?.line() }
 
         // how long it's been going: nights in a row (one normal night allowed in between) with a sign off
-        fun runStart(): LocalDate {
-            var start = n.date
+        // how long it's been going: nights IN A ROW that were clearly off (one sign well off, or two a bit off).
+        // A lone small blip doesn't start or extend a run.
+        fun clearlyOff(k: Night) = listOf(Signal.BREATHING, Signal.TEMPERATURE, Signal.RESTING_HR, Signal.HRV, Signal.OXYGEN).sumOf { k.pts(it) } >= 2
+        var start = n.date
+        var nightsOff = if (clearlyOff(n)) 1 else 0
+        if (nightsOff == 1) {
             var d = n.date.minusDays(1)
-            var gap = 0
-            while (true) {
-                val k = all.firstOrNull { it.date == d }
-                if (k != null && k.anyOff) { start = d; gap = 0 } else if (++gap > 1) break
-                d = d.minusDays(1)
-            }
-            return start
+            while (all.firstOrNull { it.date == d }?.let(::clearlyOff) == true) { start = d; nightsOff++; d = d.minusDays(1) }
         }
-        val start = runStart()
-        val nightsOff = all.count { it.date >= start && it.anyOff }
 
         // 1. getting sick
         val ill = illness(n, prev)

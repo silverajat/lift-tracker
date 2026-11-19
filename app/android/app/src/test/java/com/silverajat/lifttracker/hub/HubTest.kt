@@ -106,6 +106,21 @@ class HubTest {
         assertEquals(80, Analysis.sleepScore(80, null, null, null, null).first)
     }
 
+    /** Bedtime follows tomorrow's usual wake-up: a lie-in Saturday means a later lights-out on Friday. */
+    @Test fun bedtimeFollowsTomorrow() {
+        val fri = LocalDate.of(2026, 11, 20)
+        val h = (0 until 28).map { i -> fri.minusDays(27L - i) }.map { d -> day(d, 45.0, 52, if (d.dayOfWeek == java.time.DayOfWeek.SATURDAY) 570 else 450) }
+        val r = Analysis.run(h, emptyList(), emptyMap(), emptyList(), fri, zone)
+        val sat = Analysis.tonight(r, fri, zone)
+        assertEquals("Saturdays", sat.wakeFrom)
+        assertEquals(java.time.LocalTime.of(9, 20), sat.wake)
+        val thu = Analysis.tonight(r, fri.minusDays(1), zone)
+        assertEquals("Fridays", thu.wakeFrom)
+        assertEquals(java.time.LocalTime.of(7, 20), thu.wake)
+        // lights out = wake − need ÷ efficiency − 15 min
+        assertTrue("${thu.bed}", thu.bed!! in java.time.LocalTime.of(23, 0)..java.time.LocalTime.of(23, 30))
+    }
+
     /** Lots of REM can't make up for very little deep: they're scored separately. */
     @Test fun deepAndRemScoredSeparately() {
         val (balanced, _) = Analysis.sleepScore(100, 100, 94, 16, 22)

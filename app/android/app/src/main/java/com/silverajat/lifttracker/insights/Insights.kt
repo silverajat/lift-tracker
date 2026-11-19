@@ -306,7 +306,7 @@ object Insights {
         val tn = Analysis.tonight(a, date, zone, today?.load?.let { Analysis.strainOf(it.trimp) })
         val need = tn.needMin
         if (tn.bed != null && tn.wake != null) {
-            lines += "Tonight you need ${hm(need)}: lights out by ${clock(tn.bed)} for your usual ${clock(tn.wake)} wake-up."
+            lines += "Tonight you need ${hm(need)}: lights out by ${clock(tn.bed)} for your usual ${clock(tn.wake)} wake-up (${tn.wakeFrom})."
         } else lines += "Tonight you need about ${hm(need)} of sleep."
         val title = when {
             gym.isNotEmpty() && steps >= 10_000 -> pick(seed, "🌙 Gym + 10k steps. Big day.", "🌙 What a day: lifted and walked")

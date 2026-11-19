@@ -225,7 +225,8 @@ class HealthRepo(private val context: Context) {
         return types.map { (name, t) ->
             if (HealthPermission.getReadPermission(t) !in g) return@map DataCheck(name, false, 0, null, emptySet(), false)
             @Suppress("UNCHECKED_CAST") val kc = t as KClass<Record>
-            val r = runCatching { client.readRecords(ReadRecordsRequest(kc, TimeRangeFilter.between(start, end), pageSize = 1000)) }.getOrNull()
+            // newest first, so "latest" is right even when there are more than one page of readings
+            val r = runCatching { client.readRecords(ReadRecordsRequest(kc, TimeRangeFilter.between(start, end), ascendingOrder = false, pageSize = 1000)) }.getOrNull()
             val recs = r?.records.orEmpty()
             val latest = recs.mapNotNull { rec ->
                 when (rec) {
