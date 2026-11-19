@@ -310,7 +310,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var countdownJob: Job? = null
     private var pendingStart: (() -> Unit)? = null
 
-    /** ▶ pressed: count down 3 s, then start the set (and the pod recording). */
+    /** ▶ pressed: count down 10 s, then start the set (and the pod recording). */
     fun requestSet(
         ex: Exercise, setNo: Int, weight: Double, addons: Int, warmup: Boolean, calibration: Boolean = false,
         countdownMs: Long = COUNTDOWN_MS, auto: Boolean = false,
