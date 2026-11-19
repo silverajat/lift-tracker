@@ -113,6 +113,19 @@ class RepEngineTest {
         assertEquals(few.params(1), few.params(1, warmup = true))
     }
 
+    /** 12 even presses, then racking the bar and reaching for the phone: two swings 5x the size. Only the 12 count. */
+    @Test
+    fun handsOffTheBarAreNotReps() {
+        fun swing(n: Int, amp: Double) = List(n) { i -> amp * kotlin.math.sin(2 * Math.PI * i / n) }
+        val x = (List(25) { 0.0 } + (1..12).flatMap { swing(45, 1.0) } + (1..2).flatMap { swing(40, 5.0) } + List(25) { 0.0 }).toDoubleArray()
+        val ws = (0 until 12).map { intArrayOf(25 + 45 * it, 25 + 45 * (it + 1)) } + (0 until 2).map { intArrayOf(565 + 40 * it, 565 + 40 * (it + 1)) }
+        assertEquals(12, RepEngine.trimEnd(x, ws).size)
+        // a normal set (last rep a bit slower and smaller, like a hard last rep) is left alone
+        val y = (List(25) { 0.0 } + (1..9).flatMap { swing(45, 1.0) } + swing(60, 0.8)).toDoubleArray()
+        val wy = (0 until 9).map { intArrayOf(25 + 45 * it, 25 + 45 * (it + 1)) } + listOf(intArrayOf(430, 490))
+        assertEquals(10, RepEngine.trimEnd(y, wy).size)
+    }
+
     /** The set, then the wrist turning over to reach for the phone (a quick 90 degree roll) and holding there. */
     private fun withReach(d: List<FloatArray>): List<FloatArray> {
         // the resting wrist: last sample, accelerometer averaged over the last 10 (one sample is noisy)

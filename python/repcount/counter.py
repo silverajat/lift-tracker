@@ -246,6 +246,21 @@ def clean_runs(rs, min_len):
             rs[k - 1:k + 2] = [[a[0], a[1], b[2], a[3] + b[3]]]
 
 
+def trim_end(x, ws):
+    """Racking / reaching for the phone at the end looks like extra reps, but much bigger (2.5x a typical
+    rep), or bigger and quicker (1.3x the size in 0.85x the time). Drop them; needs 4+ reps, keeps 3."""
+    ws = list(ws)
+    while len(ws) >= 4:
+        area = [np.abs(x[a:b]).sum() for a, b in ws]
+        dur = [b - a for a, b in ws]
+        ta, td = np.median(area[:-1]), np.median(dur[:-1])
+        if ta > 0 and (area[-1] >= 2.5 * ta or (area[-1] >= 1.3 * ta and dur[-1] <= 0.85 * td)):
+            ws.pop()
+        else:
+            break
+    return ws
+
+
 def count_v1(data, hz=25, p=DEFAULT, return_info=False, cands=None):
     if len(data) < hz:
         return (0, None) if return_info else 0
@@ -262,6 +277,7 @@ def count_v1(data, hz=25, p=DEFAULT, return_info=False, cands=None):
     amp = (np.percentile(x, 95) - np.percentile(x, 5)) / 2
     rs = clean_runs(runs(x, p["h"] * amp), p["gap"] * T)
     reps = int(np.ceil((len(rs) - 1) / 2)) if rs else 0
+    reps = len(trim_end(x, [(rs[2 * k][1], rs[2 * k + 2][1] if 2 * k + 2 < len(rs) else len(x)) for k in range(reps)]))
     if return_info:
         return reps, dict(signal=name, T=T / hz, swings=[r[1] for r in rs[1:]], x=x)
     return reps

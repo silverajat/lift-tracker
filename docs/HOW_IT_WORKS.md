@@ -128,6 +128,7 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
 - **What it counts:** reps from the pod's motion. It picks the signal that repeats most cleanly, then counts swings with hysteresis.
 - **Learning:** from every corrected set. Each exercise gets its own settings after 3. Warm-ups learn separately, because they're lighter and quicker.
 - **Stop-button reach:** reaching for the phone is cut off at the end of the set: a short burst of movement under about 1.6 s, after the set has gone still for 0.3 s or more.
+- **Hands off the bar:** racking, letting go and reaching for the phone with no still moment in between can look like 1–3 extra reps. They're nothing like the set's reps, so the last "rep" is dropped while it's 2.5× the size of a typical rep in the set, or 1.3× the size in 0.85× the time. Needs 4+ reps and never goes below 3.
 
 ## Garden
 

@@ -243,12 +243,38 @@ object RepEngine {
         val amp = sig.amplitude(c.name, w)
         val rs = cleanRuns(runs(x, p.h * amp), p.gap * t)
         val reps = if (rs.isEmpty()) 0 else ceil((rs.size - 1) / 2.0).toInt()
-        val windows = (0 until reps).map { k ->
+        val windows = trimEnd(x, (0 until reps).map { k ->
             val a = rs[2 * k][1]
             val b = if (2 * k + 2 < rs.size) rs[2 * k + 2][1] else x.size
             intArrayOf(a, b)
+        })
+        return CountResult(windows.size, c.name, t, x, windows, sig.turns())
+    }
+
+    /**
+     * Racking the bar, taking your hands off and reaching for the phone can look like one or two more
+     * "reps" at the end, but they're nothing like the set's reps: much bigger (often several times the
+     * range), or bigger AND quicker. The last rep goes while it's 2.5x the size of a typical rep before it,
+     * or 1.3x the size in 0.85x the time. Needs 4+ reps, and never drops below 3.
+     * (Tuned in python/repcount: changes none of the recorded test sets or 96 normal simulated ones.)
+     */
+    fun trimEnd(x: DoubleArray, windows: List<IntArray>): List<IntArray> {
+        val ws = windows.toMutableList()
+        while (ws.size >= 4) {
+            val area = ws.map { (a, b) -> var s = 0.0; for (i in a until min(b, x.size)) s += abs(x[i]); s }
+            val dur = ws.map { (a, b) -> (b - a).toDouble() }
+            val typA = median(area.dropLast(1))
+            val typD = median(dur.dropLast(1))
+            val lastA = area.last()
+            if (typA > 0 && (lastA >= 2.5 * typA || (lastA >= 1.3 * typA && dur.last() <= 0.85 * typD))) ws.removeAt(ws.size - 1)
+            else break
         }
-        return CountResult(reps, c.name, t, x, windows, sig.turns())
+        return ws
+    }
+
+    private fun median(v: List<Double>): Double {
+        val s = v.sorted()
+        return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2
     }
 
     /** Stretches clearly high (+1) or low (-1), with hysteresis.
