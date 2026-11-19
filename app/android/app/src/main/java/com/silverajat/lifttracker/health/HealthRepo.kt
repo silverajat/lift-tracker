@@ -46,6 +46,8 @@ class HealthRepo(private val context: Context) {
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(RespiratoryRateRecord::class),
         HealthPermission.getReadPermission(DistanceRecord::class),
+        HealthPermission.getReadPermission(androidx.health.connect.client.records.SkinTemperatureRecord::class),
+        HealthPermission.getReadPermission(androidx.health.connect.client.records.Vo2MaxRecord::class),
     )
 
     /** Lets the hourly check read new data while the app is closed (Android 14+). */
@@ -130,6 +132,19 @@ class HealthRepo(private val context: Context) {
                 .mapValues { (_, v) -> v.map { it.rate }.average() }
         }.getOrDefault(emptyMap()) else emptyMap()
 
+        // skin temperature: the night's average change from the watch's own baseline, on the day you wake up
+        val skin = if (has(androidx.health.connect.client.records.SkinTemperatureRecord::class)) runCatching {
+            readAll(androidx.health.connect.client.records.SkinTemperatureRecord::class, start.minus(Duration.ofDays(1)), end)
+                .groupBy { dayOf(it.endTime) }
+                .mapValues { (_, v) -> v.flatMap { r -> r.deltas.map { it.delta.inCelsius } } }
+                .filterValues { it.isNotEmpty() }.mapValues { it.value.average() }
+        }.getOrDefault(emptyMap()) else emptyMap()
+
+        val vo2 = if (has(androidx.health.connect.client.records.Vo2MaxRecord::class)) runCatching {
+            readAll(androidx.health.connect.client.records.Vo2MaxRecord::class, start, end).groupBy { dayOf(it.time) }
+                .mapValues { (_, v) -> v.last().vo2MillilitersPerMinuteKilogram }
+        }.getOrDefault(emptyMap()) else emptyMap()
+
         // sleep counts for the day you wake up; start a day early to catch last night
         val sleep = if (has(SleepSessionRecord::class)) runCatching {
             readAll(SleepSessionRecord::class, start.minus(Duration.ofDays(1)), end)
@@ -170,6 +185,7 @@ class HealthRepo(private val context: Context) {
                 restingHr = rhr[d] ?: restingFromHr(hr[d].orEmpty() + hr[d.minusDays(1)].orEmpty(), sleep[d]), hrvMs = hrv[d], spo2 = spo2[d], respRate = resp[d], sleep = sleep[d],
                 workouts = workouts[d] ?: emptyList(),
                 load = hr[d]?.let { Scores.load(it, rhr[d], hrMax) },
+                skinTempC = skin[d], vo2max = vo2[d],
             )
         }.toList()
     }
@@ -203,6 +219,8 @@ class HealthRepo(private val context: Context) {
             "Steps" to StepsRecord::class, "Calories burned" to TotalCaloriesBurnedRecord::class,
             "Workouts" to ExerciseSessionRecord::class, "Breathing rate" to RespiratoryRateRecord::class,
             "Blood oxygen" to OxygenSaturationRecord::class, "Weight" to WeightRecord::class,
+            "Skin temperature" to androidx.health.connect.client.records.SkinTemperatureRecord::class,
+            "Cardio fitness (VO2 max)" to androidx.health.connect.client.records.Vo2MaxRecord::class,
         )
         return types.map { (name, t) ->
             if (HealthPermission.getReadPermission(t) !in g) return@map DataCheck(name, false, 0, null, emptySet(), false)
@@ -221,6 +239,8 @@ class HealthRepo(private val context: Context) {
                     is RespiratoryRateRecord -> rec.time
                     is OxygenSaturationRecord -> rec.time
                     is WeightRecord -> rec.time
+                    is androidx.health.connect.client.records.SkinTemperatureRecord -> rec.endTime
+                    is androidx.health.connect.client.records.Vo2MaxRecord -> rec.time
                     else -> null
                 }
             }.maxOrNull()

@@ -36,6 +36,8 @@ data class HealthDay(
     val sleep: SleepSummary?,          // the sleep that ENDED this morning
     val workouts: List<Workout>,
     val load: Load?,                   // from this day's heart rate
+    val skinTempC: Double? = null,     // overnight skin temperature, as the change from the watch's own baseline (°C)
+    val vo2max: Double? = null,        // cardio fitness, ml/kg/min
 )
 
 /** Training load from heart rate (see Scores.load). */

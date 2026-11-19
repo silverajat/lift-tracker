@@ -39,6 +39,7 @@ Each night, five signals are compared with your normal: the median and robust sp
 | Signal | A bit off | Well off |
 |---|---|---|
 | Breathing rate (up) | +0.5/min and 1.5 spreads | +1.0/min and 2.5 spreads |
+| Skin temperature (up) | +0.5 °C and 1.5 spreads | +1.0 °C and 2.5 spreads |
 | Resting HR (up) | +3 bpm and 1.5 spreads | +5 bpm and 2.5 spreads |
 | HRV (either way) | 12% and 1.5 spreads | 25% and 2.5 spreads |
 | Blood oxygen (down) | −1 point and 1.5 spreads | −2 points and 2.5 spreads |
@@ -46,7 +47,7 @@ Each night, five signals are compared with your normal: the median and robust sp
 
 Then the pattern is read together with what you did, and each possible reason gets its evidence:
 
-- **Getting sick:** breathing rate up is the strongest early sign (it rose before symptoms in WHOOP's and others' studies). Points: breathing 2–3, resting HR, HRV, oxygen and longer sleep 1–2 each, +1 if the night before was off too. It only counts with breathing or oxygen off, or resting HR and HRV off together. 3+ points: possible; 5+ with breathing or oxygen: likely.
+- **Getting sick:** breathing rate and skin temperature up are the strongest early signs (both rose before symptoms in WHOOP's, Oura's and others' studies). Points: breathing 2–3, temperature 2–3, resting HR, HRV, oxygen and longer sleep 1–2 each, +1 if the night before was off too. It only counts with breathing, temperature or oxygen off, or resting HR and HRV off together. 3+ points: possible; 5+ with breathing, temperature or oxygen: likely. Skin temperature only shows up if the Fitbit shares it with Health Connect.
 - **Recovering from yesterday's training:** resting HR up or HRV off, breathing normal, after a day with strain 14+, a gym day 120%+ of your usual, or muscular strain 12+.
 - **A heavy week adding up:** HRV's 7-day average 10%+ below normal (or 25%+ above, which in hard training can mean deep fatigue) while this week's strain is 30%+ above the month's.
 - **Short on sleep:** the same heart signs after under 75% of your need, or 2+ hours short over 3 nights.

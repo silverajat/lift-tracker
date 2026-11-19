@@ -326,6 +326,18 @@ fun StrainDetail(a: Analysis.Result?, days: List<HealthDay>, items: List<Activit
         days.lastOrNull()?.load?.zones?.takeIf { it.sum() > 0 }?.let { z ->
             block("Heart-rate zones today") { Zones(z) }
         }
+        days.takeLast(90).filter { it.vo2max != null }.takeIf { it.isNotEmpty() }?.let { v ->
+            block("Cardio fitness") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val now = v.last().vo2max!!
+                    Text("VO2 max %.1f".format(now), style = MaterialTheme.typography.titleMedium)
+                    if (v.size >= 2) {
+                        TrendLine(v.map { it.vo2max }, StrainBlue)
+                        Axis(v.first().date, v.last().date.format(dShort))
+                    }
+                }
+            }
+        }
         val ds = a?.days?.takeLast(14).orEmpty()
         if (ds.isNotEmpty()) block("Last 14 days", ds.mapNotNull { it.strain?.strain }.takeIf { it.isNotEmpty() }?.let { "Average %.1f a day.".format(it.average()) }) {
             Column {

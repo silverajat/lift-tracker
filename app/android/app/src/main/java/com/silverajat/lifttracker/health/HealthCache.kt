@@ -53,6 +53,8 @@ class HealthCache(root: File) {
         d.hrvMs?.let { put("hrv", it) }
         d.spo2?.let { put("spo2", it) }
         d.respRate?.let { put("resp", it) }
+        d.skinTempC?.let { put("temp", it) }
+        d.vo2max?.let { put("vo2", it) }
         d.sleep?.let { s ->
             put("sleep", JSONObject().put("s", s.start.ms()).put("e", s.end.ms()).put("tot", s.totalMin).put("deep", s.deepMin)
                 .put("rem", s.remMin).put("light", s.lightMin).put("awake", s.awakeMin)
@@ -88,6 +90,7 @@ class HealthCache(root: File) {
             date = LocalDate.parse(o.getString("date")), steps = if (o.has("steps")) o.getLong("steps") else null,
             kcalTotal = dbl("kcal"), kcalActive = dbl("kcalA"), restingHr = int("rhr"), hrvMs = dbl("hrv"), spo2 = dbl("spo2"),
             respRate = dbl("resp"), sleep = sleep, workouts = workouts, load = load,
+            skinTempC = dbl("temp"), vo2max = dbl("vo2"),
         )
     }
 }

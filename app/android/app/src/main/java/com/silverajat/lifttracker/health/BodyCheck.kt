@@ -12,7 +12,7 @@ import kotlin.math.roundToInt
  *
  * Each night, five signals are compared with YOUR normal (median and robust spread of the
  * nights 4 to 33 days before, so a few rough days don't become the new normal):
- *   breathing rate (up), resting HR (up), HRV (off either way), blood oxygen (down), time asleep (up).
+ *   breathing rate (up), skin temperature (up), resting HR (up), HRV (off either way), blood oxygen (down), time asleep (up).
  * Each is normal, a bit off, or well off (needs both a big-enough change and a big-enough z).
  *
  * Then the pattern is read with what you did (strain, gym, sleep, last meal) and turned into
@@ -31,7 +31,7 @@ import kotlin.math.roundToInt
  */
 object BodyCheck {
     enum class Signal(val label: String) {
-        BREATHING("Breathing rate"), RESTING_HR("Resting HR"), HRV("HRV"), OXYGEN("Blood oxygen"), SLEEP("Time asleep")
+        BREATHING("Breathing rate"), TEMPERATURE("Skin temperature"), RESTING_HR("Resting HR"), HRV("HRV"), OXYGEN("Blood oxygen"), SLEEP("Time asleep")
     }
 
     enum class Level { NORMAL, MILD, STRONG }
@@ -42,6 +42,7 @@ object BodyCheck {
         val points get() = when (level) { Level.STRONG -> 2; Level.MILD -> 1; Level.NORMAL -> 0 }
         fun valueText() = when (signal) {
             Signal.BREATHING -> "%.1f".format(value)
+            Signal.TEMPERATURE -> "%+.1f°C".format(value)
             Signal.RESTING_HR -> "${value.roundToInt()} bpm"
             Signal.HRV -> "${value.roundToInt()} ms"
             Signal.OXYGEN -> "%.1f%%".format(value)
@@ -49,6 +50,7 @@ object BodyCheck {
         }
         fun normalText() = when (signal) {
             Signal.BREATHING -> "%.1f".format(normal)
+            Signal.TEMPERATURE -> "%+.1f".format(normal)
             Signal.RESTING_HR -> "${normal.roundToInt()}"
             Signal.HRV -> "${normal.roundToInt()}"
             Signal.OXYGEN -> "%.1f%%".format(normal)
@@ -56,6 +58,7 @@ object BodyCheck {
         }
         fun changeText() = when (signal) {
             Signal.BREATHING -> "%+.1f".format(change)
+            Signal.TEMPERATURE -> "%+.1f°C".format(change)
             Signal.RESTING_HR -> "%+d".format(change.roundToInt())
             Signal.HRV -> "%+d%%".format(change.roundToInt())
             Signal.OXYGEN -> "%+.1f".format(change)
@@ -73,8 +76,9 @@ object BodyCheck {
         val hrvOff get() = off(Signal.HRV)
         val hrvDown get() = get(Signal.HRV)?.let { it.off && it.change < 0 } == true
         val o2Down get() = off(Signal.OXYGEN)
+        val tempUp get() = off(Signal.TEMPERATURE)
         val heartOff get() = rhrUp || hrvOff
-        val anyOff get() = rrUp || rhrUp || hrvOff || o2Down
+        val anyOff get() = rrUp || tempUp || rhrUp || hrvOff || o2Down
         fun pts(s: Signal) = get(s)?.points ?: 0
     }
 
@@ -110,6 +114,7 @@ object BodyCheck {
 
     private fun level(s: Signal, change: Double, z: Double): Level = when (s) {
         Signal.BREATHING -> when { change >= 1.0 && z >= 2.5 -> Level.STRONG; change >= 0.5 && z >= 1.5 -> Level.MILD; else -> Level.NORMAL }
+        Signal.TEMPERATURE -> when { change >= 1.0 && z >= 2.5 -> Level.STRONG; change >= 0.5 && z >= 1.5 -> Level.MILD; else -> Level.NORMAL }
         Signal.RESTING_HR -> when { change >= 5 && z >= 2.5 -> Level.STRONG; change >= 3 && z >= 1.5 -> Level.MILD; else -> Level.NORMAL }
         Signal.HRV -> when { abs(change) >= 25 && abs(z) >= 2.5 -> Level.STRONG; abs(change) >= 12 && abs(z) >= 1.5 -> Level.MILD; else -> Level.NORMAL }
         Signal.OXYGEN -> when { change <= -2 && z <= -2.5 -> Level.STRONG; change <= -1 && z <= -1.5 -> Level.MILD; else -> Level.NORMAL }
@@ -128,6 +133,7 @@ object BodyCheck {
             out += Reading(s, today, m, change, z, level(s, change, z))
         }
         add(Signal.BREATHING, d.respRate, past.mapNotNull { it.respRate }, 0.3)
+        add(Signal.TEMPERATURE, d.skinTempC, past.mapNotNull { it.skinTempC }, 0.15)
         add(Signal.RESTING_HR, d.restingHr?.toDouble(), past.mapNotNull { it.restingHr?.toDouble() }, 1.5)
         // HRV on a log scale (it's skewed), shown as a percentage change
         d.hrvMs?.takeIf { it > 0 }?.let { v ->
@@ -142,13 +148,13 @@ object BodyCheck {
         return if (out.isEmpty()) null else Night(d.date, out)
     }
 
-    /** How sick a night looks on its own: breathing counts most; heart signs need breathing or oxygen (or each other) to count. */
+    /** How sick a night looks on its own: breathing and temperature count most; heart signs need one of those, oxygen, or each other. */
     fun illness(n: Night, prev: Night?): Int {
-        val rr = when (n[Signal.BREATHING]?.level) { Level.STRONG -> 3; Level.MILD -> 2; else -> 0 }
-        val core = n.rrUp || n.o2Down || (n.rhrUp && n.hrvOff)
+        fun big(s: Signal) = when (n[s]?.level) { Level.STRONG -> 3; Level.MILD -> 2; else -> 0 }
+        val core = n.rrUp || n.tempUp || n.o2Down || (n.rhrUp && n.hrvOff)
         if (!core) return 0
-        return rr + n.pts(Signal.RESTING_HR) + n.pts(Signal.HRV) + n.pts(Signal.OXYGEN) + n.pts(Signal.SLEEP) +
-            (if (prev != null && (prev.rrUp || prev.rhrUp || prev.o2Down)) 1 else 0)
+        return big(Signal.BREATHING) + big(Signal.TEMPERATURE) + n.pts(Signal.RESTING_HR) + n.pts(Signal.HRV) + n.pts(Signal.OXYGEN) + n.pts(Signal.SLEEP) +
+            (if (prev != null && (prev.rrUp || prev.tempUp || prev.rhrUp || prev.o2Down)) 1 else 0)
     }
 
     private fun prevOf(nights: List<Night>, n: Night) = nights.firstOrNull { it.date == n.date.minusDays(1) }
@@ -184,15 +190,15 @@ object BodyCheck {
         val ill = illness(n, prev)
         val sick = ill >= 3
         if (sick) {
-            val ev = offLines(Signal.BREATHING, Signal.RESTING_HR, Signal.HRV, Signal.OXYGEN, Signal.SLEEP).toMutableList()
+            val ev = offLines(Signal.BREATHING, Signal.TEMPERATURE, Signal.RESTING_HR, Signal.HRV, Signal.OXYGEN, Signal.SLEEP).toMutableList()
             if (nightsOff >= 2) ev += "$nightsOff nights in a row"
-            reasons += Reason("Getting sick", ill >= 5 && (n.rrUp || n.o2Down), ev,
+            reasons += Reason("Getting sick", ill >= 5 && (n.rrUp || n.tempUp || n.o2Down), ev,
                 "Rest day: no hard training. Sleep long, drink plenty. If it's still up after 3 nights or you feel worse, see a doctor.")
         }
 
         // 2. yesterday's training
         val bigDay = y != null && ((y.strain ?: 0.0) >= 14 || (y.gymPct ?: 0) >= 120 || (y.liftStrain ?: 0.0) >= 12)
-        if (n.heartOff && !n.rrUp && bigDay) {
+        if (n.heartOff && !n.rrUp && !n.tempUp && bigDay) {
             val ev = offLines(Signal.RESTING_HR, Signal.HRV).toMutableList()
             y?.strain?.let { ev += "Yesterday's strain %.1f".format(it) }
             y?.gymPct?.takeIf { it >= 100 }?.let { ev += "Yesterday's gym: $it% of your usual" }
@@ -228,7 +234,7 @@ object BodyCheck {
         // 5. late meal (one night only)
         val late = y?.lastFood?.let { it >= LocalTime.of(21, 30) } == true
         val oneNight = prev == null || !prev.heartOff
-        if (n.heartOff && !n.rrUp && late && oneNight) {
+        if (n.heartOff && !n.rrUp && !n.tempUp && late && oneNight) {
             reasons += Reason("Late meal", false, offLines(Signal.RESTING_HR, Signal.HRV) + "Last food at ${y!!.lastFood!!.let { "%d:%02d".format(it.hour, it.minute) }}",
                 "Digesting keeps your heart rate up overnight. Finish eating by 9:30 PM.")
         }
@@ -247,7 +253,7 @@ object BodyCheck {
         val recentSick = all.filter { it.date < n.date && it.date >= n.date.minusDays(10) }.filter { illness(it, prevOf(all, it)) >= 3 }
         if (!sick && recentSick.isNotEmpty()) {
             val peak = recentSick.maxBy { illness(it, prevOf(all, it)) }
-            val ev = listOf(Signal.BREATHING, Signal.RESTING_HR, Signal.HRV, Signal.OXYGEN).mapNotNull { s ->
+            val ev = listOf(Signal.BREATHING, Signal.TEMPERATURE, Signal.RESTING_HR, Signal.HRV, Signal.OXYGEN).mapNotNull { s ->
                 val was = peak[s]?.takeIf { it.off } ?: return@mapNotNull null
                 val now = n[s]
                 if (now == null || !now.off) "${s.label} back to normal (was ${was.changeText()})" else "${s.label} still ${now.changeText()}"
@@ -260,7 +266,7 @@ object BodyCheck {
         // 8. all good
         val hrv = n[Signal.HRV]
         val rhr = n[Signal.RESTING_HR]
-        if (reasons.isEmpty() && hrv != null && hrv.change > 0 && hrv.z >= 1.0 && (rhr == null || rhr.change <= 0) && !n.rrUp) {
+        if (reasons.isEmpty() && hrv != null && hrv.change > 0 && hrv.z >= 1.0 && (rhr == null || rhr.change <= 0) && !n.rrUp && !n.tempUp) {
             reasons += Reason("Recovering well", true, listOfNotNull("HRV ${hrv.valueText()}, %+d%% vs normal".format(hrv.change.roundToInt()),
                 rhr?.let { "Resting HR ${it.valueText()}, normal ${it.normalText()}" }), "A good day to push.")
         }

@@ -479,6 +479,9 @@ fun FitbitDataDialog(hub: HubViewModel, onDismiss: () -> Unit) {
         checks = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { hub.health.check() }.getOrDefault(emptyList()) }
     }
     val zone = ZoneId.systemDefault()
+    // new kinds of data (skin temperature, VO2 max) need allowing once
+    val ask = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()) { round++; hub.refreshHealth(full = true) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Surface,
@@ -487,7 +490,12 @@ fun FitbitDataDialog(hub: HubViewModel, onDismiss: () -> Unit) {
             Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val list = checks
                 if (list == null) Text("Checking…", color = C.Muted)
-                else list.forEach { c ->
+                else {
+                    if (list.any { !it.allowed }) androidx.compose.material3.TextButton(onClick = { ask.launch(hub.health.requested) }) {
+                        Text("Allow the missing ones", color = C.Accent)
+                    }
+                }
+                list?.forEach { c ->
                     Row(verticalAlignment = Alignment.Top) {
                         Box(Modifier.padding(top = 6.dp).size(8.dp).clip(CircleShape).background(when {
                             !c.allowed -> RedZ; c.count == 0 -> Yellow; else -> Recover }))
