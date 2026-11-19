@@ -277,7 +277,7 @@ object BodyCheck {
             else -> State.WATCH
         }
         val headline = when (state) {
-            State.SICK -> "Your body looks like it's fighting something off."
+            State.SICK -> "Several signs are off at once."
             State.SETTLING -> "Coming back after being run down."
             State.STRAINED -> "Your body is carrying hard training."
             State.WATCH -> if (n.anyOff) "A few signs are off." else "Nothing big, worth a look."
