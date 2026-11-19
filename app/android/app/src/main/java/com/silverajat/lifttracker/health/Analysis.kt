@@ -141,6 +141,7 @@ object Analysis {
         val energy: Energy.Result,           // net calories, checked against the scale
         val goalKgPerWeek: Double,
         val headline: List<String>,          // short plain-language summary for today
+        val body: BodyCheck.Result? = null,  // what last night's signals say together
     )
 
     // ---- helpers -----------------------------------------------------------------------
@@ -214,6 +215,23 @@ object Analysis {
         val owed = prevNightsMin.sumOf { SLEEP_BASE_MIN - it }.coerceAtLeast(0)
         val payBack = (owed * 0.5).coerceAtMost(60.0)
         return Need((SLEEP_BASE_MIN + forStrain + payBack).roundToInt(), forStrain.roundToInt(), payBack.roundToInt(), owed)
+    }
+
+    /** Tonight: what you need, and when to turn the lights out for your usual wake-up. */
+    data class Tonight(val needMin: Int, val bed: LocalTime?, val wake: LocalTime?)
+
+    /**
+     * Need from today's full strain (gym included) and the last 3 nights; bedtime = usual wake-up − need ÷ your
+     * usual sleep efficiency (nobody sleeps 100% of the night) − 15 min to fall asleep.
+     */
+    fun tonight(r: Result, date: LocalDate, zone: ZoneId, strainFallback: Double? = null): Tonight {
+        val strain = r.days.lastOrNull { it.date == date }?.strain?.strain ?: strainFallback
+        val need = sleepNeed(strain, r.days.filter { it.date <= date }.takeLast(3).mapNotNull { it.sleep?.asleepMin }).total
+        val wakes = r.days.takeLast(7).mapNotNull { it.sleep?.wake?.atZone(zone)?.toLocalTime() }
+        if (wakes.size < 3) return Tonight(need, null, null)
+        val wake = wakes.map { it.toSecondOfDay() }.sorted()[wakes.size / 2].let { LocalTime.ofSecondOfDay(it.toLong()) }
+        val eff = r.days.takeLast(7).mapNotNull { it.sleep?.efficiency }.takeIf { it.size >= 3 }?.average()?.div(100.0) ?: 0.9
+        return Tonight(need, wake.minusMinutes((need / eff.coerceIn(0.75, 1.0)).roundToInt() + 15L), wake)
     }
 
     fun sleep(days: List<HealthDay>, i: Int, strainPrev: Double?, zone: ZoneId): SleepResult? {
@@ -560,7 +578,16 @@ object Analysis {
             head += "Pattern: ${e.habit.lowercase()} → next-day recovery ${if (e.delta > 0) "+" else ""}${e.delta.roundToInt()} points."
         }
 
+        val ctx = out.associate { d ->
+            d.date to BodyCheck.Context(d.strain?.strain, d.muscular?.vsAvgPct, d.muscular?.strain, d.sleep?.performance, d.sleep?.debtMin,
+                meals[d.date]?.takeIf { it.isNotEmpty() }?.maxOf { it.timeMs }?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() })
+        }
+        val body = BodyCheck.run(health, ctx, today)
+        body?.takeIf { it.state != BodyCheck.State.NORMAL && it.state != BodyCheck.State.ADAPTING }?.let { b ->
+            head += "Body: ${b.state.label.lowercase()}" + (b.reasons.firstOrNull()?.let { r -> " (${r.title.lowercase()}: ${r.evidence.take(3).joinToString("; ")})" } ?: "") + "."
+        }
+
         return Result(out, todayDay, exerciseTrends(sessions, today, zone).sortedByDescending { it.changePct ?: -999.0 },
-            groupSets, nutrition, weight, effects, energy, goalKgPerWeek, head)
+            groupSets, nutrition, weight, effects, energy, goalKgPerWeek, head, body)
     }
 }

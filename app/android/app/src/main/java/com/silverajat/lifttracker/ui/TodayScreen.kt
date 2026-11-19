@@ -139,6 +139,7 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
             Detail.RECOVERY -> RecoveryDetail(a, days, onBack = { detail = null })
             Detail.STRAIN -> StrainDetail(a, days, items, goal, onBack = { detail = null }, onLog = { logging = true }, onOpen = { info = it })
             Detail.SLEEP -> SleepDetail(a, days, onBack = { detail = null })
+            Detail.BODY -> BodyDetail(a, onBack = { detail = null })
         }
         return
     }
@@ -216,6 +217,8 @@ fun TodayContent(
 
         item { Scoreboard(today, onDetail) }
 
+        a?.body?.let { b -> item { BodyCard(b) { onDetail(Detail.BODY) } } }
+
         u.plan?.let { p -> item { PlanGlance(p, u.now, onOpenDay, onTogglePlan) } }
 
         item { CoachTake(u, a, onRefreshTake, onAddKey) }
@@ -284,6 +287,23 @@ fun TodayContent(
             }
         }
 
+    }
+}
+
+/** What last night's signals say, in a line: tap for the reasons. */
+@Composable
+private fun BodyCard(b: com.silverajat.lifttracker.health.BodyCheck.Result, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth(), onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PixelGlyph(Glyphs.heart, bodyColor(b.state), modifier = Modifier.padding(end = 12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Body: " + b.state.label.replaceFirstChar { it.lowercase() }, style = MaterialTheme.typography.titleMedium, color = bodyColor(b.state))
+                Text(b.reasons.firstOrNull()?.takeIf { b.state != com.silverajat.lifttracker.health.BodyCheck.State.NORMAL }?.let { r ->
+                    r.title + (r.evidence.firstOrNull()?.let { e -> ": " + e.substringBefore(",") + " " + e.substringAfterLast("(", "").removeSuffix(")") } ?: "")
+                } ?: b.headline, style = MaterialTheme.typography.bodyMedium, color = C.Muted, maxLines = 2)
+            }
+            Text("›", style = MaterialTheme.typography.headlineMedium, color = C.Muted)
+        }
     }
 }
 

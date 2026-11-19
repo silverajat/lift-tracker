@@ -32,6 +32,31 @@ Why it's built this way:
   - Going outside the normal range in **either** direction is a reason for caution. High HRV can mean parasympathetic overreaching (Le Meur 2013).
   - The usual decision rule: one low day changes little; 2–3 low days in a row means swap hard sessions for easy ones.
 
+## Body (what last night's signals say together)
+
+Each night, five signals are compared with your normal: the median and robust spread (1.4826 × median absolute deviation) of the nights 4 to 33 days earlier. The last 3 days are left out so a few rough days don't become the new normal. Needs 7+ nights.
+
+| Signal | A bit off | Well off |
+|---|---|---|
+| Breathing rate (up) | +0.5/min and 1.5 spreads | +1.0/min and 2.5 spreads |
+| Resting HR (up) | +3 bpm and 1.5 spreads | +5 bpm and 2.5 spreads |
+| HRV (either way) | 12% and 1.5 spreads | 25% and 2.5 spreads |
+| Blood oxygen (down) | −1 point and 1.5 spreads | −2 points and 2.5 spreads |
+| Time asleep (up) | +60 min and 1.5 spreads | |
+
+Then the pattern is read together with what you did, and each possible reason gets its evidence:
+
+- **Getting sick:** breathing rate up is the strongest early sign (it rose before symptoms in WHOOP's and others' studies). Points: breathing 2–3, resting HR, HRV, oxygen and longer sleep 1–2 each, +1 if the night before was off too. It only counts with breathing or oxygen off, or resting HR and HRV off together. 3+ points: possible; 5+ with breathing or oxygen: likely.
+- **Recovering from yesterday's training:** resting HR up or HRV off, breathing normal, after a day with strain 14+, a gym day 120%+ of your usual, or muscular strain 12+.
+- **A heavy week adding up:** HRV's 7-day average 10%+ below normal (or 25%+ above, which in hard training can mean deep fatigue) while this week's strain is 30%+ above the month's.
+- **Short on sleep:** the same heart signs after under 75% of your need, or 2+ hours short over 3 nights.
+- **Late meal:** the same, one night only, after last food past 9:30 PM.
+- **Stress, alcohol or an injury:** heart signs clearly off with nothing above to explain them. After 3+ nights it's flagged more strongly: injuries and inflammation raise resting HR too.
+- **Settling down:** after a sick-looking night in the last 10 days, which signs are back to normal and which aren't yet.
+- **Recovering well:** HRV up, resting HR normal or lower, breathing normal.
+
+None of this is a diagnosis: it says the body is under some load and what fits best.
+
 ## Strain (0–21)
 
 Heart rate load is Banister TRIMP: for each minute, `HRr × 0.64 × e^(1.92 × HRr)`. HRr is (HR − resting) ÷ (max − resting), and only minutes at 30%+ of reserve count.

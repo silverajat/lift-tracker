@@ -52,7 +52,7 @@ private val dShort = DateTimeFormatter.ofPattern("d MMM")
 private val dDay = DateTimeFormatter.ofPattern("EEE d MMM")
 private val hhmm = DateTimeFormatter.ofPattern("H:mm")
 
-enum class Detail { RECOVERY, STRAIN, SLEEP }
+enum class Detail { RECOVERY, STRAIN, SLEEP, BODY }
 
 // Sleep stage colours (awake, light, deep, REM)
 private val StageAwake = Plate.Chalk
@@ -489,11 +489,9 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
             Column { Schedule(nights, zone); Axis(nights.firstOrNull()?.date) }
         }
         item {
-            val wakes = nights.mapNotNull { it.sleep?.wake?.atZone(zone)?.toLocalTime() }
-            if (wakes.size >= 3) {
-                val wake = wakes.map { it.toSecondOfDay() }.sorted()[wakes.size / 2].let { java.time.LocalTime.ofSecondOfDay(it.toLong()) }
-                val need = Analysis.SLEEP_BASE_MIN + s.needDebtMin
-                val bed = wake.minusMinutes(need + 15L)
+            val tn = a?.let { Analysis.tonight(it, LocalDate.now(), zone) }
+            if (tn?.bed != null && tn.wake != null) {
+                val need = tn.needMin; val bed = tn.bed; val wake = tn.wake
                 Card(Modifier.fillMaxWidth(), border = SleepPurple.copy(alpha = 0.4f)) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Tonight", style = MaterialTheme.typography.titleLarge)
@@ -586,3 +584,91 @@ private fun Schedule(nights: List<Analysis.Day>, zone: ZoneId) {
 }
 
 @Suppress("unused") private fun keep() = abs(1) + ActivityLog.pace(300).length
+
+// ================================================================================================
+// Body: what last night's signals say together
+
+fun bodyColor(st: com.silverajat.lifttracker.health.BodyCheck.State) = when (st) {
+    com.silverajat.lifttracker.health.BodyCheck.State.SICK -> RedZ
+    com.silverajat.lifttracker.health.BodyCheck.State.WATCH, com.silverajat.lifttracker.health.BodyCheck.State.STRAINED,
+    com.silverajat.lifttracker.health.BodyCheck.State.SETTLING -> Yellow
+    else -> Recover
+}
+
+private fun levelColor(l: com.silverajat.lifttracker.health.BodyCheck.Level) = when (l) {
+    com.silverajat.lifttracker.health.BodyCheck.Level.STRONG -> RedZ
+    com.silverajat.lifttracker.health.BodyCheck.Level.MILD -> Yellow
+    com.silverajat.lifttracker.health.BodyCheck.Level.NORMAL -> Recover
+}
+
+@Composable
+fun BodyDetail(a: Analysis.Result?, onBack: () -> Unit) {
+    val b = a?.body
+    DetailPage("Body", b?.night?.date?.let { "last night, ${it.minusDays(1).format(dShort)}" }, onBack) {
+        if (b == null) { item { Text("Needs about 10 nights from the Fitbit to know your normal.", color = C.Muted) }; return@DetailPage }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(b.state.label, style = MaterialTheme.typography.displaySmall, color = bodyColor(b.state))
+                Text(b.headline, style = MaterialTheme.typography.bodyLarge)
+                b.since?.let { Text("Since ${it.format(dDay)}", style = MaterialTheme.typography.titleSmall, color = C.Muted) }
+            }
+        }
+        if (b.reasons.isNotEmpty()) block("What it could be") {
+            Column {
+                b.reasons.forEachIndexed { i, r ->
+                    if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 12.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(r.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            Text(if (r.likely) "likely" else "possible", style = MaterialTheme.typography.labelLarge,
+                                color = if (r.likely) C.Text else C.Muted,
+                                modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(if (r.likely) C.Raised else Color.Transparent).padding(horizontal = 8.dp, vertical = 2.dp))
+                        }
+                        r.evidence.forEach { Text("· $it", style = MaterialTheme.typography.bodyMedium, color = C.Muted) }
+                        Text(r.advice, style = MaterialTheme.typography.bodyMedium, color = C.Accent, modifier = Modifier.padding(top = 2.dp))
+                    }
+                }
+            }
+        }
+        b.night?.let { n ->
+            block("Last night vs your normal") {
+                Column {
+                    n.readings.forEachIndexed { i, r ->
+                        if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
+                        Kv(r.signal.label, r.valueText(), "normal ${r.normalText()} · ${r.changeText()}", if (r.off) levelColor(r.level) else C.Text)
+                    }
+                }
+            }
+        }
+        if (b.nights.size >= 2) block("Last 14 nights") { SignalGrid(b.nights) }
+    }
+}
+
+/** One row per signal, one square per night: green normal, yellow a bit off, red well off. */
+@Composable
+private fun SignalGrid(nights: List<com.silverajat.lifttracker.health.BodyCheck.Night>) {
+    val last = nights.maxOf { it.date }
+    val dates = (13 downTo 0).map { last.minusDays(it.toLong()) }
+    val byDate = nights.associateBy { it.date }
+    val signals = com.silverajat.lifttracker.health.BodyCheck.Signal.entries.filter { s -> nights.any { it[s] != null } }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        signals.forEach { s ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(s.label, style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.width(96.dp), maxLines = 1)
+                Canvas(Modifier.weight(1f).height(16.dp)) {
+                    val gap = 3.dp.toPx()
+                    val w = (size.width - gap * (dates.size - 1)) / dates.size
+                    dates.forEachIndexed { i, d ->
+                        val r = byDate[d]?.get(s)
+                        val col = if (r == null) C.Raised.copy(alpha = 0.4f) else if (r.off) levelColor(r.level) else Recover.copy(alpha = 0.35f)
+                        drawRoundRect(col, Offset(i * (w + gap), 0f), Size(w, size.height), CornerRadius(3.dp.toPx()))
+                    }
+                }
+            }
+        }
+        Row(Modifier.padding(start = 96.dp)) {
+            Text(dates.first().format(dShort), style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.weight(1f))
+            Text("last night", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+        }
+    }
+}

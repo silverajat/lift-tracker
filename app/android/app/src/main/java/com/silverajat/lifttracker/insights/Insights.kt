@@ -164,7 +164,10 @@ object Insights {
         val s = d?.sleep
         if (r == null && s == null && weather == null) return null
         val seed = date.toString()
+        val body = a.body?.takeIf { it.night?.date == date }
         val title = when {
+            body?.state == com.silverajat.lifttracker.health.BodyCheck.State.SICK ->
+                "🤒 Your body looks like it's fighting something" + (r?.let { " · recovery ${it.score}%" } ?: "")
             r != null && r.zone == Analysis.Zone.GREEN -> pick(seed, "🟢 Recovery ${r.score}%: green light", "🟢 ${r.score}% recovered: go get it", "🟢 Fully charged: ${r.score}%")
             r != null && r.zone == Analysis.Zone.YELLOW -> pick(seed, "🟡 Recovery ${r.score}%: steady day", "🟡 ${r.score}% recovered: train smart", "🟡 Recovery ${r.score}%: not bad, not peak")
             r != null -> pick(seed, "🔴 Recovery ${r.score}%: take it easy", "🔴 ${r.score}%: your body wants a chill day", "🔴 Low battery: ${r.score}%")
@@ -177,6 +180,8 @@ object Insights {
             s.performance >= 80 -> "Slept ${hm(s.asleepMin)} of ${hm(s.needMin)} needed: close enough."
             else -> "Slept ${hm(s.asleepMin)} of ${hm(s.needMin)} needed: ${hm(s.needMin - s.asleepMin)} short."
         } + (if (s.debtMin >= 60) " ${hm(s.debtMin)} short over the last 3 nights." else "")
+        body?.takeIf { it.state != com.silverajat.lifttracker.health.BodyCheck.State.NORMAL && it.state != com.silverajat.lifttracker.health.BodyCheck.State.ADAPTING }
+            ?.reasons?.firstOrNull()?.let { rs -> lines += "${rs.title}: ${rs.evidence.take(2).joinToString("; ")}. ${rs.advice}" }
         if (r != null) {
             r.contributors.firstOrNull { it.name == "HRV" && it.good != null }?.let {
                 val (norm, how) = it.vsNormal.split(" · ").let { p -> p[0] to p.getOrElse(1) { "" } }
@@ -297,18 +302,11 @@ object Insights {
                 (if (abs(t.endOfDay - goal) <= 250) 1 else 0)
             if (streak >= 3) lines += "$streak days on target in a row 🔥"
         } else lines += "No food logged today, so no net calories."
-        // when to sleep: tonight's need, against your usual wake-up
-        val wakes = a.days.takeLast(7).mapNotNull { it.sleep?.wake?.atZone(zone)?.toLocalTime() }
-        // the same need formula as the Sleep page, with today's full strain (gym included)
-        val todayStrain = a.days.lastOrNull { it.date == date }?.strain?.strain ?: today?.load?.let { Analysis.strainOf(it.trimp) }
-        val lastNights = a.days.filter { it.date <= date }.takeLast(3).mapNotNull { it.sleep?.asleepMin }
-        val need = Analysis.sleepNeed(todayStrain, lastNights).total
-        if (wakes.size >= 3) {
-            val wake = wakes.map { it.toSecondOfDay() }.sorted()[wakes.size / 2].let { LocalTime.ofSecondOfDay(it.toLong()) }
-            // time in bed = need ÷ your usual efficiency (nobody sleeps 100% of the night), plus ~15 min to fall asleep
-            val eff = a.days.takeLast(7).mapNotNull { it.sleep?.efficiency }.takeIf { it.size >= 3 }?.average()?.div(100.0) ?: 0.9
-            val bed = wake.minusMinutes((need / eff.coerceIn(0.75, 1.0)).roundToInt() + 15L)
-            lines += "Tonight you need ${hm(need)}: lights out by ${clock(bed)} for your usual ${clock(wake)} wake-up."
+        // the same need and bedtime as the Sleep page
+        val tn = Analysis.tonight(a, date, zone, today?.load?.let { Analysis.strainOf(it.trimp) })
+        val need = tn.needMin
+        if (tn.bed != null && tn.wake != null) {
+            lines += "Tonight you need ${hm(need)}: lights out by ${clock(tn.bed)} for your usual ${clock(tn.wake)} wake-up."
         } else lines += "Tonight you need about ${hm(need)} of sleep."
         val title = when {
             gym.isNotEmpty() && steps >= 10_000 -> pick(seed, "🌙 Gym + 10k steps. Big day.", "🌙 What a day: lifted and walked")
