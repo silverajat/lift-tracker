@@ -302,7 +302,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- the set flow ------------------------------------------------------------
 
-    // ---- 3-2-1 countdown before a set (time to get into position) ----------
+    // ---- 10 s countdown before a set (time to get into position) ----------
     private val _countdownEndsAt = MutableStateFlow<Long?>(null)
     val countdownEndsAt: StateFlow<Long?> = _countdownEndsAt
     private val _countdownSeconds = MutableStateFlow(3)
@@ -727,7 +727,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
-        const val COUNTDOWN_MS = 3_000L
+        const val COUNTDOWN_MS = 10_000L   // same as after rest: time to get into position
         const val AUTO_COUNTDOWN_MS = 10_000L
         /** Bump when the counter's method changes (older ROM numbers then aren't compared). */
         const val RepEngineVersion = 1
