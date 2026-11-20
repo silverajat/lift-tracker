@@ -15,8 +15,8 @@ class PodV2Test {
     private fun le(n: Int) = ByteBuffer.allocate(n).order(ByteOrder.LITTLE_ENDIAN)
 
     private fun status(proto: Int, flags: Int, size: Int) = le(size).apply {
-        put(proto.toByte()); put(flags.toByte()); putShort(3900); putShort(4); putShort(3); putInt(0)
-        put(42); put(3); if (size > 14) put(2); if (size > 15) put(1)
+        put(proto.toByte()); put(flags.toByte()); putShort(3900.toShort()); putShort(4.toShort()); putShort(3.toShort()); putInt(0)
+        put(42.toByte()); put(3.toByte()); if (size > 14) put(2.toByte()); if (size > 15) put(1.toByte())
     }.array()
 
     @Test
@@ -40,14 +40,14 @@ class PodV2Test {
     }
 
     private fun header(labelled: Boolean): ByteArray = le(8 + 38).apply {
-        putShort(3); put(0); put(0); putInt(0)
-        putInt(3); putInt(250); putInt(50); putInt(1234); putShort(100)
+        putShort(3.toShort()); put(0.toByte()); put(0.toByte()); putInt(0)
+        putInt(3); putInt(250); putInt(50); putInt(1234); putShort(100.toShort())
         if (labelled) {
-            putInt(1_795_000_000); putInt(1_794_990_000); putShort(625); put(11); put(0); put(2); put(1 or 2)
+            putInt(1_795_000_000); putInt(1_794_990_000); putShort(625.toShort()); put(11.toByte()); put(0.toByte()); put(2.toByte()); put((1 or 2).toByte())
         } else {
             repeat(16) { put(0xff.toByte()) }
         }
-        if (labelled) { putShort(0); put(12); put(11); putShort(0) } else repeat(4) { put(0xff.toByte()) }
+        if (labelled) { putShort(0.toShort()); put(12.toByte()); put(11.toByte()); putShort(0.toShort()) } else repeat(4) { put(0xff.toByte()) }
     }.array()
 
     @Test
@@ -61,8 +61,8 @@ class PodV2Test {
         assertNull(u.exercise); assertNull(u.weightKg); assertNull(u.repsLive)
 
         val pk = le(8 + 2 * 14).apply {
-            putShort(3); put(1); put(2); putInt(10)
-            repeat(2) { k -> putShort((65000 + k).toShort()); putShort(-12); putShort(5); putShort(1000); putShort(1); putShort(-2); putShort(3) }
+            putShort(3.toShort()); put(1.toByte()); put(2.toByte()); putInt(10)
+            repeat(2) { k -> putShort((65000 + k).toShort()); putShort((-12).toShort()); putShort(5.toShort()); putShort(1000.toShort()); putShort(1.toShort()); putShort((-2).toShort()); putShort(3.toShort()) }
         }.array()
         val p = PodDataPacket.parse(pk)!!
         assertEquals(10L, p.index)
