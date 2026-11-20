@@ -100,9 +100,13 @@ Heart-rate zones are minutes at each share of max HR. Zones 2–3 build your bas
 ## Gym
 
 - **Add-ons:** 1 kg each. They count as weight everywhere: graphs, records, volume, one-rep max.
-- **Est. one-rep max:** Epley, `weight × (1 + reps / 30)`. Most accurate up to about 10 reps; above that it overestimates, but every lift is only compared with itself, so the trend is still right.
+- **Est. one-rep max:** `weight × (1 + reps / k)`, with k per lift. Epley uses k = 30 for everything, but how many reps a kilo is worth differs by exercise: at 80% of max, about 9 reps on the bench press but about 13 on the leg press (Nuzzo et al. 2023, 269 studies), and a fixed k fits light and isolation lifts worst (2026 analysis of 303,000 logged sets).
+  - Starting k: upper-body compounds 34, lower-body compounds 50, isolation 38.
+  - Then learned from your sessions: every time the weight changed from one session to the next, how many reps you gained or lost says what a kilo is worth on that lift. k is the value that keeps est. 1RM steadiest across those changes, pulled toward the start value (session-to-session noise 2.5%, start value ±30%).
+- **Heavier, fewer reps:** after a weight jump, the reps you'd expect if you were exactly as strong as last time: `k × (last 1RM ÷ new weight − 1)`. Within ¾ of a rep: on track; up to 2 short: normal; more: a big step for this lift.
+- **What a step costs:** the same +1.25 kg is +15% on an 8 kg raise (about 6 reps) but +2% on a 62 kg pec dec (under 1). "Next time" says go heavier only when you'd still land in the rep range (top − 3) at the new weight; otherwise it says how many reps to build to first.
 - **"Next time":**
-  - If every working set hit the top of the rep range, go up one step.
+  - If every working set hit the top of the rep range, go up one step, unless that step would drop you below the range on this lift (then build reps first).
   - If a set fell 3+ reps short of the range, build back to it.
   - Otherwise, add a rep per set.
 - **Strength arrow:** change in your best set's one-rep max over about 3 weeks.

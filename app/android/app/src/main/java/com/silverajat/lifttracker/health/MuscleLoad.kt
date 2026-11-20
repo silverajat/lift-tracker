@@ -43,26 +43,27 @@ object MuscleLoad {
     }
 
     /** Reps in reserve from how much the reps slowed (pod), else from your 1RM. */
-    fun rir(l: SetLog, e1rm: Double?): Double? {
+    fun rir(l: SetLog, e1rm: Double?, k: Double = 30.0): Double? {
         l.speedDrop?.let { return (5.0 - it / 10.0).coerceIn(0.0, 5.0) }
         if (e1rm == null || l.load <= 0) return null
         // add-ons count, like everywhere else (the 1RM includes them too)
-        val maxReps = 30 * (e1rm / l.load - 1)
+        val maxReps = k * (e1rm / l.load - 1)
         return (maxReps - l.reps).coerceIn(0.0, 8.0)
     }
 
     fun score(s: Session, history: List<Session>): SessionLoad {
         // best estimated 1RM per lift from earlier sessions; this session's best if it's new
+        val ks = s.sets.map { it.exerciseId }.distinct().associateWith { com.silverajat.lifttracker.data.Strength.kFor(it, history) }
         val before = history.filter { it.startMs < s.startMs && it.id != s.id }.flatMap { it.sets }.filter { !it.warmup && it.weight > 0 }
-            .groupBy { it.exerciseId }.mapValues { (_, v) -> v.maxOf { Stats.oneRm(it.load, it.reps) } }
+            .groupBy { it.exerciseId }.mapValues { (id, v) -> v.maxOf { Stats.oneRm(it.load, it.reps, ks[id] ?: 30.0) } }
         val own = s.sets.filter { !it.warmup && it.weight > 0 }.groupBy { it.exerciseId }
-            .mapValues { (_, v) -> v.maxOf { Stats.oneRm(it.load, it.reps) } }
+            .mapValues { (id, v) -> v.maxOf { Stats.oneRm(it.load, it.reps, ks[id] ?: 30.0) } }
         val scores = s.sets.map { l ->
             val ex = runCatching { Routines.byId(l.exerciseId) }.getOrNull()
             val e1 = before[l.exerciseId] ?: own[l.exerciseId]
             val bodyweight = ex?.bodyweight == true || l.weight <= 0
             val inten = if (bodyweight || e1 == null) 0.7 else (l.load / e1).coerceIn(0.2, 1.05)
-            val r = rir(l, if (bodyweight) null else e1)
+            val r = rir(l, if (bodyweight) null else e1, ks[l.exerciseId] ?: 30.0)
             val effort = 1 + 1.5 * exp(-(r ?: 3.0) / 2)
             val m = ex?.let { muscle(Routines.group(it)) } ?: 1.0
             val sides = if (ex != null && Routines.isOneArm(ex)) 2 else 1

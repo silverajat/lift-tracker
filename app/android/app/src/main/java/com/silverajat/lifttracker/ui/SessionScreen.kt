@@ -69,9 +69,12 @@ fun SessionContent(s: Session, history: List<Session>, onBack: () -> Unit = {}, 
     fun vol(l: SetLog) = l.load * l.reps * (if (Routines.isOneArm(l.exerciseId)) 2 else 1)
     val volume = work.sumOf { vol(it) }
     val quality = work.mapNotNull { it.quality }.takeIf { it.isNotEmpty() }?.average()?.roundToInt()
+    // each lift's own reps-for-weight trade-off (Strength), worked out once
+    val ks = androidx.compose.runtime.remember(history) { HashMap<Int, Double>() }
+    fun kOf(id: Int) = ks.getOrPut(id) { com.silverajat.lifttracker.data.Strength.kFor(id, history) }
     // best estimated 1RM per exercise before this session, to mark PRs
     val before = history.filter { it.id != s.id && it.startMs < s.startMs }.flatMap { it.sets }.filter { !it.warmup }
-        .groupBy { it.exerciseId }.mapValues { (_, v) -> v.maxOf { Stats.oneRm(it.load, it.reps) } }
+        .groupBy { it.exerciseId }.mapValues { (id, v) -> v.maxOf { Stats.oneRm(it.load, it.reps, kOf(id)) } }
     // the last time you did each exercise, and the last workout of the same day type
     val earlier = history.filter { it.id != s.id && it.startMs < s.startMs && it.sets.isNotEmpty() }.sortedByDescending { it.startMs }
     val lastSame = earlier.firstOrNull { it.day == s.day }
@@ -102,7 +105,7 @@ fun SessionContent(s: Session, history: List<Session>, onBack: () -> Unit = {}, 
                 }
             }
             if (lastSame != null) item {
-                CompareCard(s, lastSame, groups.map { it.first }.mapNotNull { id -> lastTime(id)?.let { id to it } }.toMap(), ::vol)
+                CompareCard(s, lastSame, groups.map { it.first }.mapNotNull { id -> lastTime(id)?.let { id to it } }.toMap(), ::vol, ::kOf)
             }
             if (s.sets.isNotEmpty()) item {
                 val ml = com.silverajat.lifttracker.health.MuscleLoad.score(s, history)
@@ -119,7 +122,7 @@ fun SessionContent(s: Session, history: List<Session>, onBack: () -> Unit = {}, 
             items(groups, key = { it.first }) { (exId, sets) ->
                 val ex = runCatching { Routines.byId(exId) }.getOrNull()
                 val oneArm = ex != null && Routines.isOneArm(ex)
-                val best = sets.filter { !it.warmup }.maxOfOrNull { Stats.oneRm(it.load, it.reps) }
+                val best = sets.filter { !it.warmup }.maxOfOrNull { Stats.oneRm(it.load, it.reps, kOf(exId)) }
                 val pr = best != null && before[exId]?.let { best > it + 0.01 } == true
                 Card(Modifier.fillMaxWidth()) {
                     Column {
@@ -148,7 +151,7 @@ fun SessionContent(s: Session, history: List<Session>, onBack: () -> Unit = {}, 
                         }
                         if (best != null) Text("Best set ≈ ${best.roundToInt()} kg one-rep max" + (before[exId]?.let { " (before: ${it.roundToInt()} kg)" } ?: ""),
                             style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(top = 12.dp))
-                        lastTime(exId)?.let { prev -> VsLast(sets, prev, exId) }
+                        lastTime(exId)?.let { prev -> VsLast(sets, prev, exId, kOf(exId)) }
                     }
                 }
             }
@@ -213,7 +216,7 @@ private fun pct(now: Double, was: Double) = if (was <= 0) 0 else ((now - was) / 
 
 /** This workout against the last one of the same day type: totals, then how many lifts went up or down. */
 @Composable
-private fun CompareCard(s: Session, last: Session, lastByEx: Map<Int, Session>, vol: (SetLog) -> Double) {
+private fun CompareCard(s: Session, last: Session, lastByEx: Map<Int, Session>, vol: (SetLog) -> Double, kOf: (Int) -> Double) {
     val now = s.sets.filter { !it.warmup }; val was = last.sets.filter { !it.warmup }
     val vNow = now.sumOf(vol); val vWas = was.sumOf(vol)
     val qNow = now.mapNotNull { it.quality }.takeIf { it.isNotEmpty() }?.average()
@@ -221,8 +224,9 @@ private fun CompareCard(s: Session, last: Session, lastByEx: Map<Int, Session>, 
     // per lift: best estimated one-rep max now vs last time (1% either way counts as the same)
     var up = 0; var down = 0; var same = 0
     s.sets.groupBy { it.exerciseId }.forEach { (ex, sets) ->
-        val b = sets.filter { !it.warmup }.maxOfOrNull { Stats.oneRm(it.load, it.reps) } ?: return@forEach
-        val p = lastByEx[ex]?.sets?.filter { it.exerciseId == ex && !it.warmup }?.maxOfOrNull { Stats.oneRm(it.load, it.reps) } ?: return@forEach
+        val k = kOf(ex)
+        val b = sets.filter { !it.warmup }.maxOfOrNull { Stats.oneRm(it.load, it.reps, k) } ?: return@forEach
+        val p = lastByEx[ex]?.sets?.filter { it.exerciseId == ex && !it.warmup }?.maxOfOrNull { Stats.oneRm(it.load, it.reps, k) } ?: return@forEach
         when { b > p * 1.01 -> up++; b < p * 0.99 -> down++; else -> same++ }
     }
     Card(Modifier.fillMaxWidth()) {
@@ -258,21 +262,21 @@ private fun Delta(value: String, label: String, change: String, sign: Int) {
 
 /** Under each lift: what you did last time, and what changed. */
 @Composable
-private fun VsLast(sets: List<SetLog>, prev: Session, exId: Int) {
+private fun VsLast(sets: List<SetLog>, prev: Session, exId: Int, k: Double) {
     val was = prev.sets.filter { it.exerciseId == exId && !it.warmup }.sortedBy { it.setNo }
     val now = sets.filter { !it.warmup }
     if (was.isEmpty() || now.isEmpty()) return
     fun line(l: List<SetLog>) = l.groupBy { it.weight to it.addons }.entries.joinToString(", ") { (k, v) ->
         fmtW(k.first) + (if (k.second > 0) " +${k.second}" else "") + " × " + v.joinToString(",") { it.reps.toString() }
     }
-    val bNow = now.maxBy { Stats.oneRm(it.load, it.reps) }; val bWas = was.maxBy { Stats.oneRm(it.load, it.reps) }
+    val bNow = now.maxBy { Stats.oneRm(it.load, it.reps, k) }; val bWas = was.maxBy { Stats.oneRm(it.load, it.reps, k) }
     val change = when {
         bNow.load > bWas.load -> "+" + fmtW(bNow.load - bWas.load) + " kg on the best set"
         bNow.load < bWas.load -> "−" + fmtW(bWas.load - bNow.load) + " kg on the best set"
         bNow.reps != bWas.reps -> "%+d reps on the best set".format(bNow.reps - bWas.reps)
         else -> "same best set"
     }
-    val e = pct(Stats.oneRm(bNow.weight, bNow.reps), Stats.oneRm(bWas.weight, bWas.reps))
+    val e = pct(Stats.oneRm(bNow.load, bNow.reps, k), Stats.oneRm(bWas.load, bWas.reps, k))
     Column(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(C.Raised).padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("Last time (${Instant.ofEpochMilli(prev.startMs).atZone(ZoneId.systemDefault()).format(dFmt)}): ${line(was)}",

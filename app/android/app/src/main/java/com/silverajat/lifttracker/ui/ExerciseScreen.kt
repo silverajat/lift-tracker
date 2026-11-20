@@ -107,7 +107,7 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                         style = MaterialTheme.typography.bodyMedium, color = C.Accent,
                     )
                 }
-                ProgressStory(Stats.topSets(ex, sessions))
+                ProgressStory(Stats.topSets(ex, sessions), ex.step, ex.bodyweight)
                 LineChart(pts, Modifier.fillMaxWidth().height(200.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Metric.entries.forEach { m ->
@@ -279,39 +279,55 @@ fun LineChart(points: List<Point>, modifier: Modifier) {
 
 
 /**
- * Progress in a line or two, from each session's strongest set: whether it was weight or reps that moved,
- * and overall strength (est. 1RM, which goes up with either) since the start.
+ * Progress in a line or two, from each session's strongest set, judged with this lift's own reps-for-weight
+ * trade-off (Strength): after going heavier, fewer reps is expected; the question is how many fewer.
  */
 @Composable
-private fun ProgressStory(t: List<com.silverajat.lifttracker.data.TopSet>) {
+private fun ProgressStory(t: List<com.silverajat.lifttracker.data.TopSet>, step: Double, bodyweight: Boolean) {
     if (t.size < 2) return
+    val S = com.silverajat.lifttracker.data.Strength
     val first = t.first(); val last = t.last(); val prev = t[t.size - 2]
+    val k = last.k
     val bestBefore = t.dropLast(1).maxOf { it.e1rm }
     val bestAt = t.indices.maxBy { t[it].e1rm }
     val sinceBest = t.lastIndex - bestAt
     fun pct(a: Double, b: Double) = if (b == 0.0) 0 else ((a - b) / b * 100).roundToInt()
-    val sameKg = kotlin.math.abs(last.load - prev.load) < 1e-6
+    val heavier = last.load > prev.load + 1e-6
+    val lighter = last.load < prev.load - 1e-6
+    val sameKg = !heavier && !lighter
+    // reps you'd expect at the new weight if you were exactly as strong as last time
+    val expected = if (heavier) S.repsAt(prev.e1rm, last.load, k) else null
+    val gap = expected?.let { last.reps - it }
+    val newBest = last.e1rm > bestBefore + 1e-9
     val (head, color) = when {
-        last.load > prev.load + 1e-6 && last.e1rm > bestBefore + 1e-9 -> "New best: heavier at ${last.text} (was ${prev.text})" to Plate.Green
-        sameKg && last.reps > prev.reps && last.e1rm > bestBefore + 1e-9 -> "New best: +${last.reps - prev.reps} reps at ${Stats.fmt(last.load)} kg" to Plate.Green
-        last.e1rm > bestBefore + 1e-9 -> "New best: ${last.text} (was ${prev.text})" to Plate.Green
-        last.load > prev.load + 1e-6 && pct(last.e1rm, prev.e1rm) >= -3 -> "Heavier: ${prev.text} → ${last.text}" to Plate.Green
+        newBest && heavier -> "New best: heavier at ${last.text} (was ${prev.text})" to Plate.Green
+        newBest && sameKg && last.reps > prev.reps -> "New best: +${last.reps - prev.reps} reps at ${Stats.fmt(last.load)} kg" to Plate.Green
+        newBest -> "New best: ${last.text} (was ${prev.text})" to Plate.Green
+        heavier && gap!! >= -0.75 -> "Heavier: ${prev.text} → ${last.text}, right on track" to Plate.Green
+        heavier && gap!! >= -2.0 -> "Heavier: ${prev.text} → ${last.text} (about ${expected!!.roundToInt()} expected)" to C.Text
+        heavier -> "Heavier: ${prev.text} → ${last.text}, ${(-gap!!).roundToInt()} reps under what ${Stats.fmt(last.load)} kg should give" to Plate.Yellow
         sameKg && last.reps > prev.reps -> "+${last.reps - prev.reps} reps at ${Stats.fmt(last.load)} kg" to Plate.Green
+        lighter -> "Lighter: ${prev.text} → ${last.text}" to C.Text
         pct(last.e1rm, prev.e1rm) <= -3 -> "Down from last time: ${prev.text} → ${last.text}" to Plate.Yellow
         sinceBest >= 3 -> "No new best for $sinceBest sessions" to Plate.Yellow
         else -> "Holding at ${last.text}" to C.Text
     }
+    // two sessions in a row clearly below the one before, at the same or a lower weight
+    val twoOff = t.size >= 3 && !heavier && listOf(t[t.size - 3] to prev, prev to last).all { (a, b) -> b.load <= a.load + 1e-6 && pct(b.e1rm, a.e1rm) <= -3 }
     val tip = when {
-        last.e1rm > bestBefore + 1e-9 -> null
-        pct(last.e1rm, prev.e1rm) <= -3 -> "Two off sessions in a row: go a bit lighter for a week."
-        sinceBest >= 3 -> "Stalled: add a rep to each set before adding weight, or drop 5–10% and build back up."
+        newBest -> null
+        heavier && gap!! < -2.0 -> "A big step for this lift: stay here and build reps before the next one."
+        twoOff -> "Two off sessions in a row: go a bit lighter for a week."
+        sinceBest >= 3 && !heavier -> "Stalled: add a rep to each set before adding weight, or drop 5–10% and build back up."
         else -> null
     }
     val start = first.timeMs?.let { shortDate.format(Date(it)) } ?: "before the app"
+    val cost = if (bodyweight || step <= 0) null else S.stepCost(last.load, last.reps, step, k)
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Surface).padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(head, style = MaterialTheme.typography.titleMedium, color = color)
         Text("Strength since $start: ${Stats.fmt(first.e1rm)} → ${Stats.fmt(last.e1rm)} kg (%+d%%), ${first.text} → ${last.text}".format(pct(last.e1rm, first.e1rm)),
             style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+        cost?.takeIf { it > 0 }?.let { Text("Here +${Stats.fmt(step)} kg ≈ ${it} rep${if (it == 1) "" else "s"}", style = MaterialTheme.typography.bodyMedium, color = C.Muted) }
         tip?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
 }

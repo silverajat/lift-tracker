@@ -113,7 +113,7 @@ object Insights {
             .filter { t -> work.any { it.exerciseId == t.exerciseId } }
         val bestBefore = { exId: Int ->
             history.filter { it.id != s.id && it.startMs < s.startMs }.flatMap { it.sets }
-                .filter { it.exerciseId == exId && !it.warmup }.maxOfOrNull { Stats.oneRm(it.load, it.reps) }
+                .filter { it.exerciseId == exId && !it.warmup }.maxOfOrNull { Stats.oneRm(it.load, it.reps, com.silverajat.lifttracker.data.Strength.kFor(exId, history)) }
         }
         val prs = trends.filter { t -> bestBefore(t.exerciseId)?.let { t.e1rmNow > it + 0.01 } == true }
         val pct = usual?.let { (volume / it * 100).roundToInt() }

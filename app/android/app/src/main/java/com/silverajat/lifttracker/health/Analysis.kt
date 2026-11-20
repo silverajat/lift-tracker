@@ -378,27 +378,40 @@ object Analysis {
             }
             if (bySession.isEmpty()) return@mapNotNull null
             val (lastDate, lastSets) = bySession.last()
-            val e1 = lastSets.maxOf { Stats.oneRm(it.load, it.reps) }
+            // this lift's own reps-for-weight trade-off (see Strength)
+            val k = com.silverajat.lifttracker.data.Strength.k(ex, sessions)
+            val e1 = lastSets.maxOf { Stats.oneRm(it.load, it.reps, k) }
             val old = bySession.lastOrNull { it.first <= lastDate.minusDays(21) } ?: bySession.firstOrNull()?.takeIf { it.first < lastDate }
-            val e1Then = old?.second?.maxOf { Stats.oneRm(it.load, it.reps) }
-                ?: Stats.value(com.silverajat.lifttracker.data.Metric.ONE_RM, ex.last)
+            val e1Then = old?.second?.maxOf { Stats.oneRm(it.load, it.reps, k) }
+                ?: Stats.value(com.silverajat.lifttracker.data.Metric.ONE_RM, ex.last, k)
             val top = (ex.last.filter { !it.warmup }.maxOfOrNull { it.reps } ?: 10).coerceAtLeast(8)
             val heaviest = lastSets.maxOf { it.weight }
             val atTop = lastSets.filter { it.weight == heaviest }
             // range of motion: the third lever. Short reps first get fixed, before more reps or more weight
             val romLast = lastSets.flatMap { it.romPct }.takeIf { it.isNotEmpty() }?.average()?.roundToInt()
             val shortRom = romLast != null && romLast < ROM_FULL
+            // what the next step up costs on THIS lift: a step that's big next to the weight (1.25 kg on a light raise)
+            // costs several reps, so build further past the top of the range first
+            val bottom = top - 3
+            val ref = atTop.minBy { it.reps }
+            val nextLoad = ref.load + ex.step
+            val expectNext = com.silverajat.lifttracker.data.Strength.repsAt(Stats.oneRm(ref.load, ref.reps, k), nextLoad, k).roundToInt()
+            val repsFirst = kotlin.math.ceil(com.silverajat.lifttracker.data.Strength.repsAt(Stats.oneRm(nextLoad, bottom, k), ref.load, k)).toInt()
+            val readyUp = atTop.all { it.reps >= top } && expectNext >= bottom
+            val bigStep = atTop.all { it.reps >= top } && !readyUp
             val suggestion = when {
                 shortRom -> "Stay at ${fmt(heaviest)} kg and use the full range (ROM $romLast%, aim $ROM_FULL%+)"
                 ex.bodyweight -> "Add reps: aim ${atTop.maxOf { it.reps } + 1}+"
-                atTop.all { it.reps >= top } -> "Hit $top+ on every set: go up to ${fmt(heaviest + ex.step)} kg"
+                readyUp -> "Hit $top+ on every set: go up to ${fmt(heaviest + ex.step)} kg (expect about $expectNext reps)"
+                bigStep -> "+${fmt(ex.step)} kg costs about ${ref.reps - expectNext} reps here: get to $repsFirst at ${fmt(heaviest)} kg first"
                 atTop.any { it.reps < top - 3 } -> "Stay at ${fmt(heaviest)} kg, build back to $top reps"
                 else -> "Stay at ${fmt(heaviest)} kg, add a rep per set (target $top)"
             }
             val (nextKg, nextReps, nextWhy) = when {
                 shortRom -> Triple<Double?, Int?, String>(if (ex.bodyweight) null else heaviest, null, "full range")
                 ex.bodyweight -> Triple<Double?, Int?, String>(null, atTop.maxOf { it.reps } + 1, "add a rep")
-                atTop.all { it.reps >= top } -> Triple(heaviest + ex.step, null, "go heavier")
+                readyUp -> Triple(heaviest + ex.step, expectNext, "go heavier")
+                bigStep -> Triple(heaviest, repsFirst, "big step: reps first")
                 atTop.any { it.reps < top - 3 } -> Triple(heaviest, top, "build back up")
                 else -> Triple(heaviest, top, "add reps")
             }

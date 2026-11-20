@@ -19,23 +19,23 @@ enum class Metric(val label: String, val unit: String) {
 data class Point(val label: String, val timeMs: Long?, val value: Double, val note: String? = null)
 
 /** A session's best set by est. 1RM. */
-data class TopSet(val timeMs: Long?, val load: Double, val reps: Int) {
-    val e1rm get() = Stats.oneRm(load, reps)
+data class TopSet(val timeMs: Long?, val load: Double, val reps: Int, val k: Double = 30.0) {
+    val e1rm get() = Strength.oneRm(load, reps, k)
     val text get() = "${Stats.fmt(load)}×$reps"
 }
 
 object Stats {
-    /** Epley: weight x (1 + reps / 30). */
-    fun oneRm(weight: Double, reps: Int) = if (reps <= 1) weight else weight * (1 + reps / 30.0)
+    /** Est. 1RM: weight × (1 + reps / k). k = 30 is Epley; each lift's own k comes from [Strength]. */
+    fun oneRm(weight: Double, reps: Int, k: Double = 30.0) = Strength.oneRm(weight, reps, k)
 
     /** Null when there are no working sets (warm-ups only). */
-    fun value(m: Metric, sets: List<PlanSet>): Double? {
+    fun value(m: Metric, sets: List<PlanSet>, k: Double = 30.0): Double? {
         val work = sets.filter { !it.warmup }
         if (work.isEmpty()) return null
         return when (m) {
             Metric.HEAVIEST -> work.maxOf { it.load }
             Metric.TOP_REPS -> work.maxOf { it.load }.let { top -> work.filter { it.load >= top - 1e-9 }.maxOf { it.reps }.toDouble() }
-            Metric.ONE_RM -> work.maxOf { oneRm(it.load, it.reps) }
+            Metric.ONE_RM -> work.maxOf { oneRm(it.load, it.reps, k) }
             Metric.BEST_SET -> work.maxOf { it.load * it.reps }
             Metric.VOLUME -> work.sumOf { it.load * it.reps }
             Metric.REPS -> work.sumOf { it.reps }.toDouble()
@@ -48,30 +48,32 @@ object Stats {
      * before the app) come first, labelled "before".
      */
     fun series(m: Metric, ex: Exercise, sessions: List<Session>): List<Point> {
+        val k = Strength.k(ex, sessions)
         val pts = mutableListOf<Point>()
-        value(m, ex.last)?.let { pts += Point("before", null, it, note(m, ex.last)) }
+        value(m, ex.last, k)?.let { pts += Point("before", null, it, note(m, ex.last, k)) }
         sessions.forEach { s ->
             val sets = s.sets.filter { it.exerciseId == ex.id }
                 .map { PlanSet(it.weight, it.reps, it.warmup, it.addons) }
-            value(m, sets)?.let { pts += Point("", s.startMs, it, note(m, sets)) }
+            value(m, sets, k)?.let { pts += Point("", s.startMs, it, note(m, sets, k)) }
         }
         return pts
     }
 
     /** The set behind a session's point: the strongest set, or the top-weight set for weight/reps charts. */
-    private fun note(m: Metric, sets: List<PlanSet>): String? {
+    private fun note(m: Metric, sets: List<PlanSet>, k: Double): String? {
         val work = sets.filter { !it.warmup }.takeIf { it.isNotEmpty() } ?: return null
         val s = when (m) {
             Metric.HEAVIEST, Metric.TOP_REPS -> work.maxOf { it.load }.let { top -> work.filter { it.load >= top - 1e-9 }.maxBy { it.reps } }
             Metric.VOLUME, Metric.REPS -> return "${work.size} sets"
-            else -> work.maxBy { oneRm(it.load, it.reps) }
+            else -> work.maxBy { oneRm(it.load, it.reps, k) }
         }
         return "${fmt(s.load)}×${s.reps}"
     }
 
     /** Each session's strongest set (est. 1RM), oldest first; "before the app" first if there is one. */
     fun topSets(ex: Exercise, sessions: List<Session>): List<TopSet> {
-        fun top(sets: List<PlanSet>, t: Long?) = sets.filter { !it.warmup }.maxByOrNull { oneRm(it.load, it.reps) }?.let { TopSet(t, it.load, it.reps) }
+        val k = Strength.k(ex, sessions)
+        fun top(sets: List<PlanSet>, t: Long?) = sets.filter { !it.warmup }.maxByOrNull { oneRm(it.load, it.reps, k) }?.let { TopSet(t, it.load, it.reps, k) }
         return listOfNotNull(top(ex.last, null)) + sessions.mapNotNull { s ->
             top(s.sets.filter { it.exerciseId == ex.id }.map { PlanSet(it.weight, it.reps, it.warmup, it.addons) }, s.startMs)
         }
@@ -92,13 +94,14 @@ object Stats {
         }
         val work = all.filter { !it.warmup }
         if (work.isEmpty()) return emptyList()
+        val k = Strength.k(ex, sessions)
         val heaviest = work.maxBy { it.load }
-        val best1rm = work.maxBy { oneRm(it.load, it.reps) }
+        val best1rm = work.maxBy { oneRm(it.load, it.reps, k) }
         val bestSet = work.maxBy { it.load * it.reps }
         val mostReps = work.maxBy { it.reps }
         return listOf(
             Record("Heaviest weight", "%s kg".format(fmt(heaviest.load))),
-            Record("Best est. 1RM", "%s kg".format(fmt(oneRm(best1rm.load, best1rm.reps)))),
+            Record("Best est. 1RM", "%s kg".format(fmt(oneRm(best1rm.load, best1rm.reps, k)))),
             Record("Best set", "%s kg × %d".format(fmt(bestSet.load), bestSet.reps)),
             Record("Most reps", "%d × %s kg".format(mostReps.reps, fmt(mostReps.load))),
         )
