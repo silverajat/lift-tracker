@@ -58,12 +58,17 @@ class SessionStore(context: Context) {
             ?.sortedByDescending { it.startMs }
             ?: emptyList()
 
-    /** Runs [AddonRepair] once on the stored sessions. */
-    fun repairDoubleAddons() {
-        val flag = File(dir.parentFile, "repair_addons_20261113.done")
-        if (flag.exists()) return
-        AddonRepair.repair(all(), java.time.ZoneId.systemDefault()).forEach { save(it) }
+    /**
+     * One-off: 13 Nov 2026 was logged before add-ons existed (add-on kg typed into the weight), and the numbers
+     * never lined up with the sessions around it, so that day's sessions are removed. Returns the ids removed.
+     */
+    fun removeNov13(): List<Long> {
+        val flag = File(dir.parentFile, "remove_20261113.done")
+        if (flag.exists()) return emptyList()
+        val ids = BadDay.sessionsOn(all(), java.time.ZoneId.systemDefault()).map { it.id }
+        ids.forEach { delete(it) }
         runCatching { flag.writeText("done") }
+        return ids
     }
 
     fun delete(id: Long) {
@@ -142,30 +147,10 @@ class SessionStore(context: Context) {
     }
 }
 
-/**
- * One-off repair for 13 Nov 2026: add-ons were typed into the weight (+1 kg each) AND recorded as add-ons,
- * so once add-ons counted as weight they counted twice (9.3 kg + 1 add-on = 10.3). Takes them back out of
- * the weight, when that brings the set in line with the lift's usual weight in other sessions (or there's
- * nothing to compare with), so a set that was already fixed by hand is left alone.
- */
-object AddonRepair {
+/** The sessions on 13 Nov 2026 (the day logged before add-ons existed). */
+object BadDay {
     val DAY: java.time.LocalDate = java.time.LocalDate.of(2026, 11, 13)
 
-    /** The sessions that changed, repaired. */
-    fun repair(all: List<Session>, zone: java.time.ZoneId, day: java.time.LocalDate = DAY): List<Session> {
-        fun dateOf(s: Session) = java.time.Instant.ofEpochMilli(s.startMs).atZone(zone).toLocalDate()
-        val usual = all.filter { dateOf(it) != day }.flatMap { it.sets }.filter { !it.warmup }.groupBy { it.exerciseId }
-            .mapValues { (_, v) -> v.map { it.weight }.sorted().let { w -> w[w.size / 2] } }
-        return all.filter { dateOf(it) == day }.mapNotNull { s ->
-            var changed = false
-            val sets = s.sets.map { l ->
-                if (l.addons <= 0) return@map l
-                val fixed = Math.round((l.weight - l.addons * Routines.ADDON_KG) * 100) / 100.0
-                val u = usual[l.exerciseId]
-                if (fixed < 0 || (u != null && kotlin.math.abs(fixed - u) >= kotlin.math.abs(l.weight - u))) l
-                else { changed = true; l.copy(weight = fixed) }
-            }
-            if (changed) s.copy(sets = sets) else null
-        }
-    }
+    fun sessionsOn(all: List<Session>, zone: java.time.ZoneId, day: java.time.LocalDate = DAY): List<Session> =
+        all.filter { java.time.Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate() == day }
 }

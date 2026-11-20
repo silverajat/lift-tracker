@@ -72,7 +72,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val modelFile = File(app.filesDir, "rep_model.json")
     private val prefs = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    private val _history = MutableStateFlow(store.also { runCatching { it.repairDoubleAddons() } }.all())
+    private val _history = MutableStateFlow(store.also { st ->
+        runCatching { st.removeNov13().forEach { id -> runCatching { raw.deleteSession(id) } } }
+    }.all())
     val history: StateFlow<List<Session>> = _history
 
     private val _session = MutableStateFlow<Session?>(null)
