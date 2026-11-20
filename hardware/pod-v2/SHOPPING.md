@@ -54,6 +54,13 @@ PUI HD-EM0802-LW15-R 276-753 (S$3.36, 8 x 2 mm). Not 276-754 (3 mm thick).
 - No more laptop dumps: sets already reach the phone live over Bluetooth, so the new firmware should
   (a) send any set the phone missed over BLE when it reconnects, then (b) free that space on the
   pod's flash automatically. Add an erase-over-BLE command for the app.
+- **Low power from day one** (the XIAO prototype lasts only ~2 sessions because it never sleeps: IMU at 100 Hz
+  with the gyro on, fast BLE advertising, LED blips, USB shell and logs all the time). On v2: IMU wake-on-motion
+  with the gyro off when still, CPU asleep until the IMU interrupt, slow advertising (~1 s) when idle and none
+  after ~20 min still, LED off, no shell/logs in the battery build. Fast sampling + fast BLE only when moving
+  or when the app opens a workout. Measure the idle current on the board (target tens of µA).
+- **Updates over Bluetooth from the first flash** (MCUboot + mcumgr/SMP), with an "Update pod" button in the
+  app that sends the new image, so a laptop is never needed after the first flash over SWD.
 
 ## Assembly walkthrough (when everything arrives)
 Practise first on one of the 3 bare boards: tin a pad, solder a 30 AWG wire to it.
