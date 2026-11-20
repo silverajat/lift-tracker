@@ -58,6 +58,14 @@ class SessionStore(context: Context) {
             ?.sortedByDescending { it.startMs }
             ?: emptyList()
 
+    /** Runs [AddonRepair] once on the stored sessions. */
+    fun repairDoubleAddons() {
+        val flag = File(dir.parentFile, "repair_addons_20261113.done")
+        if (flag.exists()) return
+        AddonRepair.repair(all(), java.time.ZoneId.systemDefault()).forEach { save(it) }
+        runCatching { flag.writeText("done") }
+    }
+
     fun delete(id: Long) {
         File(dir, "$id.json").delete()
     }
@@ -131,5 +139,33 @@ class SessionStore(context: Context) {
             endMs = if (o.isNull("endMs")) null else o.getLong("endMs"),
             sets = sets,
         )
+    }
+}
+
+/**
+ * One-off repair for 13 Nov 2026: add-ons were typed into the weight (+1 kg each) AND recorded as add-ons,
+ * so once add-ons counted as weight they counted twice (9.3 kg + 1 add-on = 10.3). Takes them back out of
+ * the weight, when that brings the set in line with the lift's usual weight in other sessions (or there's
+ * nothing to compare with), so a set that was already fixed by hand is left alone.
+ */
+object AddonRepair {
+    val DAY: java.time.LocalDate = java.time.LocalDate.of(2026, 11, 13)
+
+    /** The sessions that changed, repaired. */
+    fun repair(all: List<Session>, zone: java.time.ZoneId, day: java.time.LocalDate = DAY): List<Session> {
+        fun dateOf(s: Session) = java.time.Instant.ofEpochMilli(s.startMs).atZone(zone).toLocalDate()
+        val usual = all.filter { dateOf(it) != day }.flatMap { it.sets }.filter { !it.warmup }.groupBy { it.exerciseId }
+            .mapValues { (_, v) -> v.map { it.weight }.sorted().let { w -> w[w.size / 2] } }
+        return all.filter { dateOf(it) == day }.mapNotNull { s ->
+            var changed = false
+            val sets = s.sets.map { l ->
+                if (l.addons <= 0) return@map l
+                val fixed = Math.round((l.weight - l.addons * Routines.ADDON_KG) * 100) / 100.0
+                val u = usual[l.exerciseId]
+                if (fixed < 0 || (u != null && kotlin.math.abs(fixed - u) >= kotlin.math.abs(l.weight - u))) l
+                else { changed = true; l.copy(weight = fixed) }
+            }
+            if (changed) s.copy(sets = sets) else null
+        }
     }
 }
