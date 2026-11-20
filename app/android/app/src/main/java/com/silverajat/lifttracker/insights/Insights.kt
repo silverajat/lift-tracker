@@ -320,30 +320,11 @@ object Insights {
 
     // ---- Monday: last week ------------------------------------------------------------------------
 
-    fun weekly(a: Analysis.Result, sessions: List<Session>, today: LocalDate, zone: ZoneId, now: Long): Insight? {
-        val monday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
-        val from = monday.minusDays(7)
-        fun inWeek(d: LocalDate) = d >= from && d < monday
-        val gym = sessions.filter { inWeek(Instant.ofEpochMilli(it.startMs).atZone(zone).toLocalDate()) && it.sets.isNotEmpty() }
-        val days = a.days.filter { inWeek(it.date) }
-        val rec = days.mapNotNull { it.recovery?.score }
-        val sleep = days.mapNotNull { it.sleep?.asleepMin }
-        val nets = a.energy.days.filter { inWeek(it.date) }.mapNotNull { it.net }
-        if (gym.isEmpty() && rec.isEmpty() && nets.isEmpty()) return null
-        val lines = ArrayList<String>()
-        lines += "🏋️ ${gym.size} gym session${if (gym.size == 1) "" else "s"}" +
-            (if (gym.isNotEmpty()) ", ${"%,d".format(gym.sumOf { s -> s.sets.filter { !it.warmup }.sumOf { it.load * it.reps } }.roundToInt())} kg total" else "") + "."
-        if (rec.isNotEmpty()) lines += "💚 Recovery averaged ${rec.average().roundToInt()}%."
-        if (sleep.isNotEmpty()) lines += "😴 Sleep averaged ${hm(sleep.average().roundToInt())}."
-        if (nets.isNotEmpty()) {
-            val goal = a.energy.netFor(a.goalKgPerWeek)
-            lines += "🍽️ Net ${signed(nets.average().roundToInt())} a day (goal ${signed(goal)}), ${nets.size}/7 days logged."
-        }
-        a.energy.trendKgPerWeek?.let { lines += "⚖️ Scale trend ${"%+.2f".format(it)} kg/week" + (a.energy.scaleNet?.let { n -> " (≈ ${signed(n)} a day)" } ?: "") + "." }
-        a.exercises.firstOrNull { (it.changePct ?: 0.0) > 0 }?.let { lines += "📈 Biggest gain: ${it.name} +${"%.1f".format(it.changePct)}%." }
-        a.effects.firstOrNull { it.clear }?.let { lines += "🔍 Pattern: ${it.habit.lowercase()} → next-day recovery ${if (it.delta >= 0) "+" else ""}${it.delta.roundToInt()}." }
-        return Insight("week-$monday", Kind.WEEKLY, pick(monday.toString(), "📊 Your week in numbers", "📊 Last week, wrapped", "📊 Weekly recap"),
-            lines.joinToString(" "), now)
+    /** Monday morning: last week in a line and what to change. Tapping it opens Your week. */
+    fun weekly(r: Weekly.Report, now: Long): Insight? {
+        if (r.days.none { it.recovery != null || it.gym || it.sleepH != null }) return null
+        return Insight("week-${r.start}", Kind.WEEKLY, "📊 Last week: " + r.headline.removeSuffix(".").replaceFirstChar { it.lowercase() },
+            r.next.take(2).joinToString(" "), now)
     }
 
     /** True if a Fitbit workout overlaps a pod gym session (that one already has its own summary). */

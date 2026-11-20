@@ -50,6 +50,18 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     private val chatStore = ChatStore(app.filesDir)
     private val sessions = SessionStore(app)
     private val prefs = app.getSharedPreferences("hub", Context.MODE_PRIVATE)
+    private val files = app.filesDir
+
+    /** The week starting on [monday] (Monday to Sunday, or to today), next to the week before. */
+    fun weekly(monday: LocalDate): com.silverajat.lifttracker.insights.Weekly.Report? {
+        val a = _analysis.value ?: return null
+        val today = LocalDate.now(zone)
+        return runCatching {
+            com.silverajat.lifttracker.insights.Weekly.build(a, _days.value, sessions.all(), meals.days(monday.minusDays(7), minOf(monday.plusDays(6), today)),
+                com.silverajat.lifttracker.garden.FocusStore(files).sessions(), com.silverajat.lifttracker.journal.ReadingStore(files).sessions(),
+                monday, today, zone)
+        }.getOrNull()
+    }
 
     // ---- settings ---------------------------------------------------------------
     private val _apiKey = MutableStateFlow(prefs.getString("openai_key", "") ?: "")

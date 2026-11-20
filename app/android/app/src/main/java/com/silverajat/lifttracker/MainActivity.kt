@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
         when (t) {
             "INSIGHTS" -> startPanel.value = "notifications"
             "GYM", "SPORTS" -> startTab.value = Tab.MOVE
+            "WEEK" -> { startTab.value = Tab.TODAY; com.silverajat.lifttracker.ui.TodayNav.open.value = com.silverajat.lifttracker.ui.Detail.WEEK }
             else -> startTab.value = runCatching { Tab.valueOf(t) }.getOrNull()
         }
     }

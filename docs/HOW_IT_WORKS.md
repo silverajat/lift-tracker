@@ -135,6 +135,27 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
 - **Stop-button reach:** reaching for the phone is cut off at the end of the set: a short burst of movement under about 1.6 s, after the set has gone still for 0.3 s or more.
 - **Hands off the bar:** racking, letting go and reaching for the phone with no still moment in between can look like 1–3 extra reps. They're nothing like the set's reps, so the last "rep" is dropped while it's 2.5× the size of a typical rep in the set, or 1.3× the size in 0.85× the time. Needs 4+ reps and never goes below 3.
 
+## Your week
+
+Monday to Sunday (or to today), each number next to the week before. Opens from Today; on Monday morning a notification sums up the week that ended.
+
+- **Training:** gym sessions, working sets, volume (add-ons included, one-arm lifts ×2), average daily strain.
+- **Lifts:** each lift's best set this week against your last session before the week, in est. 1RM with the lift's own k. "New best" when it beats everything before.
+- **Recovery:** average score, green/yellow/red days, HRV (geometric mean) and resting HR against the 30 days before the week.
+- **Sleep:** asleep and needed per night, nights that met 95% of the need, sleep score, usual bedtime and its spread.
+- **Food:** fully logged days only. Calories, protein, carbs, fat and fibre against each day's own targets.
+- **Weight:** trend change over the week against the goal pace, and weigh-ins.
+- **Body:** nights with one sign well off or two a bit off.
+- **What to change (at most 4, most important first):**
+  1. Lighter week if 3+ red days or HRV 10%+ below your month.
+  2. Earlier bedtime if 30+ min short a night, or steadier bedtimes if they spread more than ±45 min.
+  3. Protein under 90% of target: how many more shakes.
+  4. Log full days if under 3.
+  5. Weight off the goal pace by 0.2+ kg/week: the kcal a day to change.
+  6. Fewer gym sessions than your usual (last 4 weeks).
+  7. Two or more lifts not moving.
+  8. Fibre under 85% of target.
+
 ## Garden
 
 Level n starts at 100 × n(n−1)/2 points.

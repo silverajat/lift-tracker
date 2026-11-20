@@ -93,7 +93,11 @@ data class TodayUi(
     val now: LocalTime = LocalTime.now(),
     val items: List<com.silverajat.lifttracker.activity.ActivityItem> = emptyList(),
     val plan: com.silverajat.lifttracker.journal.DayPage? = null,
+    val week: com.silverajat.lifttracker.insights.Weekly.Report? = null,
 )
+
+/** A page another part of the app wants opened on Today (from a notification). */
+object TodayNav { val open = kotlinx.coroutines.flow.MutableStateFlow<Detail?>(null) }
 
 @Composable
 fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Unit, onConnectPod: () -> Unit, onOpenGym: () -> Unit, onOpenNet: () -> Unit,
@@ -123,6 +127,14 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
         }
     }
     var detail by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<Detail?>(null) }
+    // a notification can ask for a page (the Monday review opens Your week)
+    val wantDetail by TodayNav.open.collectAsStateWithLifecycle()
+    LaunchedEffect(wantDetail) { wantDetail?.let { detail = it; TodayNav.open.value = null } }
+    val week by androidx.compose.runtime.produceState<com.silverajat.lifttracker.insights.Weekly.Report?>(null, a) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            hub.weekly(com.silverajat.lifttracker.insights.Weekly.monday(LocalDate.now()))
+        }
+    }
     var logging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var info by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.silverajat.lifttracker.activity.ActivityItem?>(null) }
     if (logging) LogActivityDialog(com.silverajat.lifttracker.activity.Sport.FOOTBALL, onDismiss = { logging = false }) { sp, st, m, km, note ->
@@ -140,6 +152,7 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
             Detail.STRAIN -> StrainDetail(a, days, items, goal, onBack = { detail = null }, onLog = { logging = true }, onOpen = { info = it })
             Detail.SLEEP -> SleepDetail(a, days, onBack = { detail = null })
             Detail.BODY -> BodyDetail(a, onBack = { detail = null })
+            Detail.WEEK -> WeekDetail({ hub.weekly(it) }, onBack = { detail = null })
         }
         return
     }
@@ -156,6 +169,7 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
             food = food, goalKg = goal, take = take, taking = taking, takeError = takeError, hasKey = key.isNotEmpty(),
             items = items,
             plan = jToday?.let { d -> jPages?.get(d) ?: com.silverajat.lifttracker.journal.DayPage(d) },
+            week = week,
         ),
         onOpenDay = onOpenDay, onTogglePlan = { id -> journal?.toggle(id) },
         onDetail = { detail = it },
@@ -218,6 +232,7 @@ fun TodayContent(
         item { Scoreboard(today, onDetail) }
 
         a?.body?.let { b -> item { BodyCard(b) { onDetail(Detail.BODY) } } }
+        u.week?.let { w -> item { WeekCard(w) { onDetail(Detail.WEEK) } } }
 
         u.plan?.let { p -> item { PlanGlance(p, u.now, onOpenDay, onTogglePlan) } }
 
@@ -287,6 +302,20 @@ fun TodayContent(
             }
         }
 
+    }
+}
+
+/** The week so far in a line: tap for the full report. */
+@Composable
+private fun WeekCard(w: com.silverajat.lifttracker.insights.Weekly.Report, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth(), onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Your week", style = MaterialTheme.typography.titleMedium)
+                Text(w.headline, style = MaterialTheme.typography.bodyMedium, color = C.Muted, maxLines = 2)
+            }
+            Text("›", style = MaterialTheme.typography.headlineMedium, color = C.Muted)
+        }
     }
 }
 

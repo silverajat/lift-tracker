@@ -52,7 +52,7 @@ private val dShort = DateTimeFormatter.ofPattern("d MMM")
 private val dDay = DateTimeFormatter.ofPattern("EEE d MMM")
 private val hhmm = DateTimeFormatter.ofPattern("H:mm")
 
-enum class Detail { RECOVERY, STRAIN, SLEEP, BODY }
+enum class Detail { RECOVERY, STRAIN, SLEEP, BODY, WEEK }
 
 // Sleep stage colours (awake, light, deep, REM)
 private val StageAwake = Plate.Chalk
@@ -687,5 +687,111 @@ private fun SignalGrid(nights: List<com.silverajat.lifttracker.health.BodyCheck.
             Text(dates.first().format(dShort), style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.weight(1f))
             Text("last night", style = MaterialTheme.typography.bodySmall, color = C.Muted)
         }
+    }
+}
+
+// ================================================================================================
+// Your week: Monday to Sunday next to the week before, and what to change
+
+private val WeekUp = Color(0xFF4CC38A)
+private val WeekDown = Color(0xFFE5645A)
+
+@Composable
+fun WeekDetail(load: (LocalDate) -> com.silverajat.lifttracker.insights.Weekly.Report?, onBack: () -> Unit) {
+    val thisMonday = com.silverajat.lifttracker.insights.Weekly.monday(LocalDate.now())
+    var back by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
+    val monday = thisMonday.minusWeeks(back.toLong())
+    val r by androidx.compose.runtime.produceState<com.silverajat.lifttracker.insights.Weekly.Report?>(null, monday) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { load(monday) }
+    }
+    val fmt = java.time.format.DateTimeFormatter.ofPattern("d MMM")
+    DetailPage("Your week", "${monday.format(fmt)} – ${monday.plusDays(6).format(fmt)}", onBack) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("This week" to 0, "Last week" to 1, "2 weeks ago" to 2).forEach { (label, n) ->
+                    val on = back == n
+                    Text(label, style = MaterialTheme.typography.labelLarge, color = if (on) C.Bg else C.Text,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) C.Text else C.Raised)
+                            .clickable { back = n }.padding(horizontal = 14.dp, vertical = 8.dp))
+                }
+            }
+        }
+        val rep = r
+        if (rep == null) { item { Text("Working it out…", color = C.Muted) }; return@DetailPage }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(rep.headline, style = MaterialTheme.typography.headlineSmall)
+                if (!rep.complete) Text("So far, to ${rep.end.format(fmt)}", style = MaterialTheme.typography.bodyMedium, color = C.Muted)
+            }
+        }
+        item { Card(Modifier.fillMaxWidth()) { WeekStrip(rep.days) } }
+        block(if (rep.complete) "Next week" else "For the rest of the week") {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                rep.next.forEach { n ->
+                    Row { Text("›  ", style = MaterialTheme.typography.bodyLarge, color = C.Accent); Text(n, style = MaterialTheme.typography.bodyLarge) }
+                }
+            }
+        }
+        weekLines("Training", rep.training)
+        if (rep.lifts.isNotEmpty()) block("Lifts vs last time") {
+            Column {
+                rep.lifts.forEachIndexed { i, l ->
+                    if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(l.name + if (l.best) "  · new best" else "", style = MaterialTheme.typography.titleSmall, color = if (l.best) WeekUp else C.Text)
+                            Text((l.was?.let { "$it → " } ?: "") + l.now, style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                        }
+                        l.pct?.let { p ->
+                            Text(if (p == 0) "same" else "%+d%%".format(p), style = MaterialTheme.typography.titleMedium.merge(Tnum),
+                                color = when { p > 1 -> WeekUp; p < -2 -> WeekDown; else -> C.Muted })
+                        }
+                    }
+                }
+            }
+        }
+        weekLines("Recovery", rep.recovery)
+        weekLines("Sleep", rep.sleep)
+        weekLines("Food", rep.food)
+        weekLines("Weight", rep.weight)
+        weekLines("Body", rep.body)
+        weekLines("Focus and reading", rep.mind)
+    }
+}
+
+private fun LazyListScope.weekLines(title: String, lines: List<com.silverajat.lifttracker.insights.Weekly.Line>) {
+    if (lines.isEmpty()) return
+    block(title) {
+        Column {
+            lines.forEachIndexed { i, l ->
+                if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
+                Kv(l.label, l.value, l.change, when (l.good) { true -> WeekUp; false -> WeekDown; null -> C.Text })
+            }
+        }
+    }
+}
+
+/** Mon to Sun: recovery colour, hours asleep, strain, and a mark on gym days. */
+@Composable
+private fun WeekStrip(days: List<com.silverajat.lifttracker.insights.Weekly.DayMark>) {
+    val today = LocalDate.now()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        @Composable fun row(label: String, cell: @Composable (com.silverajat.lifttracker.insights.Weekly.DayMark) -> Unit) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.width(64.dp))
+                days.forEach { d -> Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { if (d.date <= today) cell(d) } }
+            }
+        }
+        Row {
+            Spacer(Modifier.width(64.dp))
+            days.forEach { d ->
+                Text(d.date.dayOfWeek.name.take(1), style = MaterialTheme.typography.labelLarge,
+                    color = if (d.date == today) C.Accent else C.Muted, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }
+        row("Recovery") { d -> Box(Modifier.size(14.dp).clip(RoundedCornerShape(4.dp)).background(d.recovery?.let { zoneColor(it) } ?: C.Raised)) }
+        row("Sleep") { d -> Text(d.sleepH?.let { "%.1f".format(it) } ?: "–", style = MaterialTheme.typography.bodySmall.merge(Tnum)) }
+        row("Strain") { d -> Text(d.strain?.let { "%.0f".format(it) } ?: "–", style = MaterialTheme.typography.bodySmall.merge(Tnum), color = StrainBlue) }
+        row("Gym") { d -> if (d.gym) PixelGlyph(Glyphs.dumbbell, C.Text, px = 2.dp) }
     }
 }
