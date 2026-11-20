@@ -699,11 +699,12 @@ private val WeekDown = Color(0xFFE5645A)
 @Composable
 fun WeekDetail(load: (LocalDate) -> com.silverajat.lifttracker.insights.Weekly.Report?, onBack: () -> Unit) {
     val thisMonday = com.silverajat.lifttracker.insights.Weekly.monday(LocalDate.now())
-    var back by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
+    val backState = androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
+    val back = backState.intValue
     val monday = thisMonday.minusWeeks(back.toLong())
-    val r by androidx.compose.runtime.produceState<com.silverajat.lifttracker.insights.Weekly.Report?>(null, monday) {
+    val r = androidx.compose.runtime.produceState<com.silverajat.lifttracker.insights.Weekly.Report?>(null, monday) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { load(monday) }
-    }
+    }.value
     val fmt = java.time.format.DateTimeFormatter.ofPattern("d MMM")
     DetailPage("Your week", "${monday.format(fmt)} – ${monday.plusDays(6).format(fmt)}", onBack) {
         item {
@@ -712,7 +713,7 @@ fun WeekDetail(load: (LocalDate) -> com.silverajat.lifttracker.insights.Weekly.R
                     val on = back == n
                     Text(label, style = MaterialTheme.typography.labelLarge, color = if (on) C.Bg else C.Text,
                         modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) C.Text else C.Raised)
-                            .clickable { back = n }.padding(horizontal = 14.dp, vertical = 8.dp))
+                            .clickable { backState.intValue = n }.padding(horizontal = 14.dp, vertical = 8.dp))
                 }
             }
         }
