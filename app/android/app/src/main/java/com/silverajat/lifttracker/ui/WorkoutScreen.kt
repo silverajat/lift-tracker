@@ -163,7 +163,7 @@ fun WorkoutScreen(vm: AppViewModel, day: Day, onShare: (Session) -> Unit) {
                 }
             }
             if (conn != PodConn.READY) {
-                item { PodBar(conn, status) { vm.pod.connect() } }
+                item { PodBar(conn, status, onConnect = { vm.pod.connect() }) }
             }
             items(Routines.forDay(day), key = { it.id }) { ex ->
                 ExerciseCard(
