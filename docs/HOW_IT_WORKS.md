@@ -106,7 +106,8 @@ Heart-rate zones are minutes at each share of max HR. Zones 2–3 build your bas
   - If a set fell 3+ reps short of the range, build back to it.
   - Otherwise, add a rep per set.
 - **Strength arrow:** change in your best set's one-rep max over about 3 weeks.
-- **A lift's graph headline:** new best, down 3%+ from last time, no new best for 3+ sessions, or holding.
+- **A lift's graph:** opens on strength (est. 1RM), which goes up with more weight or more reps. Under each point is the set behind it (8.3×11), so you can see which one moved. "Reps at top weight" charts reps alone.
+- **A lift's headline:** from each session's strongest set: new best (heavier, or +N reps at the same weight), heavier, +N reps, down 3%+ in est. 1RM, no new best for 3+ sessions, or holding.
 - **Workout vs last:** compared with the last workout of the same day type. A lift counts as stronger or weaker when its best one-rep max moved more than 1%.
 
 ## Food targets

@@ -62,7 +62,7 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
     val model by vm.model.collectAsStateWithLifecycle()
     val training by vm.training.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(0) }
-    var metric by remember { mutableStateOf(Metric.HEAVIEST) }
+    var metric by remember { mutableStateOf(Metric.ONE_RM) }
 
     Column(Modifier.fillMaxSize()) {
         TopBar(title = ex.name, subtitle = null, onBack = { vm.back() })
@@ -107,7 +107,7 @@ fun ExerciseScreen(vm: AppViewModel, exerciseId: Int) {
                         style = MaterialTheme.typography.bodyMedium, color = C.Accent,
                     )
                 }
-                ProgressStory(pts, metric)
+                ProgressStory(Stats.topSets(ex, sessions))
                 LineChart(pts, Modifier.fillMaxWidth().height(200.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Metric.entries.forEach { m ->
@@ -223,7 +223,9 @@ fun LineChart(points: List<Point>, modifier: Modifier) {
     Canvas(modifier) {
         if (points.isEmpty()) return@Canvas
         val left = 44.dp.toPx()
-        val bottom = size.height - 22.dp.toPx()
+        val few = points.size <= 5
+        val notes = few && points.any { it.note != null }
+        val bottom = size.height - (if (notes) 40 else 22).dp.toPx()
         val top = 20.dp.toPx()
         val right = size.width - 14.dp.toPx()
         val vMin = points.minOf { it.value }
@@ -246,12 +248,11 @@ fun LineChart(points: List<Point>, modifier: Modifier) {
         }
         drawPath(path, C.Accent, style = Stroke(width = 2.5.dp.toPx()))
         val best = points.indices.maxBy { points[it].value }
-        val few = points.size <= 8
         points.forEachIndexed { i, p ->
             drawCircle(C.Accent, radius = 4.dp.toPx(), center = Offset(x(i), y(p.value)))
             // the best one gets a ring and says so; with few points every point shows its number
             if (i == best) drawCircle(Plate.Yellow, radius = 7.dp.toPx(), center = Offset(x(i), y(p.value)), style = Stroke(2.dp.toPx()))
-            if (few || i == best || i == points.lastIndex) {
+            if (points.size <= 8 || i == best || i == points.lastIndex) {
                 val t = Stats.fmt(p.value) + if (i == best && points.size > 1) " best" else ""
                 val st = if (i == best) bestStyle else valueStyle
                 val w = measurer.measure(t, st).size.width
@@ -261,44 +262,55 @@ fun LineChart(points: List<Point>, modifier: Modifier) {
         }
         fun label(p: Point) = p.timeMs?.let { shortDate.format(Date(it)) } ?: "before"
         // dates: under every point when there's room, else first and last
-        val show = if (points.size <= 5) points.indices.toList() else listOf(0, points.lastIndex)
+        val show = if (few) points.indices.toList() else listOf(0, points.lastIndex)
         show.forEach { i ->
             val t = label(points[i])
             val w = measurer.measure(t, labelStyle).size.width
             val tx = (x(i) - w / 2).coerceIn(0f, size.width - w)
             drawText(measurer, t, Offset(tx, bottom + 6.dp.toPx()), labelStyle)
+            // the set behind the point, so you can see whether it was weight or reps that moved
+            if (notes) points[i].note?.let { n ->
+                val nw = measurer.measure(n, valueStyle).size.width
+                drawText(measurer, n, Offset((x(i) - nw / 2).coerceIn(0f, size.width - nw), bottom + 22.dp.toPx()), valueStyle)
+            }
         }
     }
 }
 
 
-/** The chart in a sentence or two: where you are, which way it's going, and what to do about it. */
+/**
+ * Progress in a line or two, from each session's strongest set: whether it was weight or reps that moved,
+ * and overall strength (est. 1RM, which goes up with either) since the start.
+ */
 @Composable
-private fun ProgressStory(pts: List<Point>, metric: Metric) {
-    if (pts.size < 2) return
-    val unit = if (metric.unit == "kg") " kg" else if (metric == Metric.ROM) "%" else " ${metric.unit}"
-    val first = pts.first(); val last = pts.last(); val prev = pts[pts.size - 2]
-    val bestBefore = pts.dropLast(1).maxOf { it.value }
-    val bestAt = pts.indices.maxBy { pts[it].value }
-    val sinceBest = pts.lastIndex - bestAt
+private fun ProgressStory(t: List<com.silverajat.lifttracker.data.TopSet>) {
+    if (t.size < 2) return
+    val first = t.first(); val last = t.last(); val prev = t[t.size - 2]
+    val bestBefore = t.dropLast(1).maxOf { it.e1rm }
+    val bestAt = t.indices.maxBy { t[it].e1rm }
+    val sinceBest = t.lastIndex - bestAt
     fun pct(a: Double, b: Double) = if (b == 0.0) 0 else ((a - b) / b * 100).roundToInt()
+    val sameKg = kotlin.math.abs(last.load - prev.load) < 1e-6
     val (head, color) = when {
-        last.value > bestBefore + 1e-9 -> "New best last session: ${Stats.fmt(last.value)}$unit" to Plate.Green
-        pct(last.value, prev.value) <= -3 -> "Down from last time: ${Stats.fmt(prev.value)} → ${Stats.fmt(last.value)}$unit" to Plate.Yellow
+        last.load > prev.load + 1e-6 && last.e1rm > bestBefore + 1e-9 -> "New best: heavier at ${last.text} (was ${prev.text})" to Plate.Green
+        sameKg && last.reps > prev.reps && last.e1rm > bestBefore + 1e-9 -> "New best: +${last.reps - prev.reps} reps at ${Stats.fmt(last.load)} kg" to Plate.Green
+        last.e1rm > bestBefore + 1e-9 -> "New best: ${last.text} (was ${prev.text})" to Plate.Green
+        last.load > prev.load + 1e-6 && pct(last.e1rm, prev.e1rm) >= -3 -> "Heavier: ${prev.text} → ${last.text}" to Plate.Green
+        sameKg && last.reps > prev.reps -> "+${last.reps - prev.reps} reps at ${Stats.fmt(last.load)} kg" to Plate.Green
+        pct(last.e1rm, prev.e1rm) <= -3 -> "Down from last time: ${prev.text} → ${last.text}" to Plate.Yellow
         sinceBest >= 3 -> "No new best for $sinceBest sessions" to Plate.Yellow
-        pct(last.value, prev.value) >= 1 -> "Up from last time: ${Stats.fmt(prev.value)} → ${Stats.fmt(last.value)}$unit" to Plate.Green
-        else -> "Holding steady at ${Stats.fmt(last.value)}$unit" to C.Text
+        else -> "Holding at ${last.text}" to C.Text
     }
     val tip = when {
-        last.value > bestBefore + 1e-9 -> "Keep the same weight next time and add a rep before going heavier."
-        pct(last.value, prev.value) <= -3 -> "One off day is normal (sleep, food, a hard day before). Two in a row: take it a bit lighter for a week."
-        sinceBest >= 3 -> "You've stalled: add a rep to each set before adding weight, or drop 5–10% and build back up."
+        last.e1rm > bestBefore + 1e-9 -> null
+        pct(last.e1rm, prev.e1rm) <= -3 -> "Two off sessions in a row: go a bit lighter for a week."
+        sinceBest >= 3 -> "Stalled: add a rep to each set before adding weight, or drop 5–10% and build back up."
         else -> null
     }
     val start = first.timeMs?.let { shortDate.format(Date(it)) } ?: "before the app"
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Surface).padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(head, style = MaterialTheme.typography.titleMedium, color = color)
-        Text("Since $start: ${Stats.fmt(first.value)} → ${Stats.fmt(last.value)}$unit (%+d%%) over ${pts.size} sessions".format(pct(last.value, first.value)),
+        Text("Strength since $start: ${Stats.fmt(first.e1rm)} → ${Stats.fmt(last.e1rm)} kg (%+d%%), ${first.text} → ${last.text}".format(pct(last.e1rm, first.e1rm)),
             style = MaterialTheme.typography.bodyMedium, color = C.Muted)
         tip?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
