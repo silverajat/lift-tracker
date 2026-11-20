@@ -80,16 +80,18 @@ object Foods {
             Macros(700.0, 44.0, 73.0, 26.0, 10.0), "built from its parts"),
         Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(640.0, 38.0, 76.0, 21.0, 11.0), "built from its parts"),
         // HPB steamed chicken rice plate (488 kcal, ~21 g protein) + extra skinless chicken (~50 g, 14 g) + extra rice
-        // (~half a plate, chicken-rice style) + kailan in oyster sauce + braised egg + soup
+        // (~half a plate, chicken-rice style) + kailan in oyster sauce + braised egg + soup.
+        // Fibre: white rice is only ~0.4 g per 100 g cooked (~400 g: 1.6 g), a small side of kailan ~1 g, cucumber ~0.3 g
         Food("chicken_rice", "Chicken rice + extra chicken & rice, kailan, braised egg, soup",
-            Macros(920.0, 48.0, 122.0, 29.0, 4.0), "HPB plate + sides"),
+            Macros(920.0, 48.0, 122.0, 29.0, 3.0), "HPB plate + sides"),
         Food("chicken_rice_plain", "Chicken rice (no extras), kailan, braised egg, soup",
-            Macros(645.0, 31.0, 89.0, 21.0, 4.0), "HPB plate + sides"),
+            Macros(645.0, 31.0, 89.0, 21.0, 2.5), "HPB plate + sides"),
         // rice ~280 g, a big hawker cup (364 kcal, 8 g protein); 3 scoops thin brown curry chicken & mushroom, no coconut
         // (~60 g chicken: 150 kcal, 16 g, 6 g fat); tofu bricks, lightly oiled (120 kcal, 10 g, 6 g fat);
-        // watery tomato egg (90 kcal, 5 g, 6 g fat); stir-fried cabbage (50 kcal, 1 g, 3 g fat)
+        // watery tomato egg (90 kcal, 5 g, 6 g fat); stir-fried cabbage (50 kcal, 1 g, 3 g fat).
+        // Fibre: a full scoop of cabbage ~150 g (3.5 g), rice ~280 g (1.1 g), mushrooms (0.7 g), tomato (0.8 g), tofu (0.6 g)
         Food("mixed_rice", "Mixed rice: rice, curry chicken & mushroom, tofu, tomato egg, cabbage",
-            Macros(800.0, 40.0, 98.0, 25.0, 5.0), "built from its parts"),
+            Macros(800.0, 40.0, 98.0, 25.0, 6.5), "built from its parts"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
