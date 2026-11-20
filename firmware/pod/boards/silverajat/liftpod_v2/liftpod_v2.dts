@@ -1,0 +1,106 @@
+/*
+ * Lift pod v2 (hardware/pod-v2/SPEC.md): Ebyte E73 nRF52840 module, no USB, no button,
+ * no 32 kHz crystal. One SPI bus: LSM6DSV16X IMU (CS P0.30, INT1 P0.31) and W25Q16 2 MB flash
+ * (CS P0.13). Green status LED P0.02 (high = on), coin motor P1.09 (high = on, N-FET),
+ * charger STAT P0.24 (low = charging), battery on AIN5 through a 1M/1M divider.
+ */
+/dts-v1/;
+#include <nordic/nrf52840_qiaa.dtsi>
+#include <nordic/nrf52840_partition.dtsi>
+#include "liftpod_v2-pinctrl.dtsi"
+
+/ {
+	model = "Lift pod v2";
+	compatible = "silverajat,liftpod-v2";
+
+	leds {
+		compatible = "gpio-leds";
+		led0: led_0 {
+			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+			label = "Status LED";
+		};
+	};
+
+	aliases {
+		led0 = &led0;
+		rec-flash = &w25q16;
+		watchdog0 = &wdt0;
+	};
+
+	zephyr,user {
+		io-channels = <&adc 5>;
+		motor-gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+		chg-gpios = <&gpio0 24 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+		imu-int-gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&gpiote {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&adc {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	/* VBAT / 2 on P0.29; 1M/1M with 100 nF, so a long acquisition time */
+	channel@5 {
+		reg = <5>;
+		zephyr,gain = "ADC_GAIN_1_6";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40)>;
+		zephyr,input-positive = <NRF_SAADC_AIN5>;
+		zephyr,resolution = <12>;
+		zephyr,oversampling = <4>;
+	};
+};
+
+&spi1 {
+	compatible = "nordic,nrf-spim";
+	status = "okay";
+	pinctrl-0 = <&spi1_default>;
+	pinctrl-1 = <&spi1_sleep>;
+	pinctrl-names = "default", "sleep";
+	cs-gpios = <&gpio0 30 GPIO_ACTIVE_LOW>, <&gpio0 13 GPIO_ACTIVE_LOW>;
+
+	/* Driven by the firmware's own code (src/imu.c, ST's register library), not Zephyr's
+	 * sensor driver: it needs the low-power wake-up mode. */
+	imu: imu@0 {
+		compatible = "st,lsm6dsv16x";
+		status = "disabled";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+	};
+
+	w25q16: w25q16@1 {
+		compatible = "jedec,spi-nor";
+		reg = <1>;
+		spi-max-frequency = <8000000>;
+		jedec-id = [ef 40 15];
+		size = <DT_SIZE_M(16)>;   /* bits: 2 MB */
+		has-dpd;
+		t-enter-dpd = <3000>;
+		t-exit-dpd = <30000>;
+	};
+};
+
+&uart0 {
+	status = "disabled";
+};
+
+&i2c0 {
+	status = "disabled";
+};
+
+&usbd {
+	status = "disabled";
+};

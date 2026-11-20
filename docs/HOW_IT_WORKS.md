@@ -135,6 +135,16 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
 - **Stop-button reach:** reaching for the phone is cut off at the end of the set: a short burst of movement under about 1.6 s, after the set has gone still for 0.3 s or more.
 - **Hands off the bar:** racking, letting go and reaching for the phone with no still moment in between can look like 1–3 extra reps. They're nothing like the set's reps, so the last "rep" is dropped while it's 2.5× the size of a typical rep in the set, or 1.3× the size in 0.85× the time. Needs 4+ reps and never goes below 3.
 
+## The pod (v2)
+
+- Asleep unless a workout is open: the app switches it into gym mode when a set's countdown starts, and back to
+  sleep when you finish the workout (or by itself 5 min after the app goes away, or 45 min after the last set).
+- It buzzes once when rest is over and twice when a set starts.
+- After a workout the app copies the pod's full-rate recordings (100 Hz) to the phone and then clears the pod.
+  "Export N recordings" on the pod bar saves them as a zip in the same layout as the laptop dumps.
+- The live stream and the rep counter are unchanged from the prototype, so everything learned so far carries over.
+  First flash and updates: `firmware/pod/BRINGUP.md`.
+
 ## Your week
 
 Monday to Sunday (or to today), each number next to the week before. Opens from Today; on Monday morning a notification sums up the week that ended.

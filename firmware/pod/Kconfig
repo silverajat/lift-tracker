@@ -1,0 +1,10 @@
+# Lift pod v2 firmware
+config LIFTPOD
+	bool
+	default y
+	select HAS_STMEMSC
+	select USE_STDC_LSM6DSV16X
+	help
+	  Pulls in ST's LSM6DSV16X register library (hal_st) for src/imu.c.
+
+source "Kconfig.zephyr"

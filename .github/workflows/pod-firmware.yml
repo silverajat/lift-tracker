@@ -1,0 +1,91 @@
+name: Pod v2 firmware
+
+# Builds firmware/pod (nRF Connect SDK v3.4.1, MCUboot) for the pod-v2 board and publishes:
+#   liftpod-v2-full.hex          first flash over SWD (bootloader + app)
+#   liftpod-v2-update.zip        updates over Bluetooth (nRF Device Manager app)
+on:
+  push:
+    branches: [main]
+    paths: ['firmware/pod/**', 'firmware/logger/src/storage.*', '.github/workflows/pod-firmware.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NCS: v3.4.1
+  SDK: 1.0.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: lift-tracker
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tools
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build device-tree-compiler
+          pip install -q west
+      - name: Cache SDKs
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/ncs
+            ~/zephyr-sdk-${{ env.SDK }}
+          key: ncs-${{ env.NCS }}-sdk-${{ env.SDK }}-v1
+      - name: nRF Connect SDK (only the projects this build needs)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          west init -m https://github.com/nrfconnect/sdk-nrf --mr $NCS ~/ncs
+          cd ~/ncs
+          west config manifest.project-filter -- '-.*,+nrf,+zephyr,+hal_nordic,+cmsis,+cmsis_6,+picolibc,+nrfxlib,+segger,+oberon-psa-crypto,+mbedtls,+tf-m,+trusted-firmware-m,+mcuboot,+zcbor'
+          west update --narrow -o=--depth=1
+          # ST's sensor driver (LSM6DSV16X) isn't in the nRF manifest: Zephyr's pinned revision, as an extra module
+          REV=$(python3 -c "import yaml;p=[x for x in yaml.safe_load(open('zephyr/west.yml'))['manifest']['projects'] if x['name']=='hal_st'][0];print(p['revision'])")
+          git clone -q https://github.com/zephyrproject-rtos/hal_st modules/hal/st
+          git -C modules/hal/st checkout -q $REV
+      - name: Zephyr SDK (ARM toolchain only)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          cd ~
+          base=https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v$SDK
+          curl -sSL $base/zephyr-sdk-${SDK}_linux-x86_64_minimal.tar.xz | tar xJ
+          mkdir -p zephyr-sdk-$SDK/gnu
+          curl -sSL $base/toolchain_gnu_linux-x86_64_arm-zephyr-eabi.tar.xz | tar xJ -C zephyr-sdk-$SDK/gnu
+      - name: Python packages
+        run: |
+          cd ~/ncs
+          pip install -q -r zephyr/scripts/requirements-base.txt -r bootloader/mcuboot/scripts/requirements.txt
+          pip install -q cbor2 click ecdsa intelhex cryptography "zcbor~=0.8.0" imagesize construct
+      - name: Build
+        run: |
+          cd ~/ncs
+          export ZEPHYR_SDK_INSTALL_DIR=~/zephyr-sdk-$SDK
+          source zephyr/zephyr-env.sh
+          west build -p -b liftpod_v2 -d ~/b_pod $GITHUB_WORKSPACE/lift-tracker/firmware/pod -- \
+            -DBOARD_ROOT=$GITHUB_WORKSPACE/lift-tracker/firmware/pod -DZEPHYR_EXTRA_MODULES=$HOME/ncs/modules/hal/st
+          cd ~/b_pod
+          python3 ~/ncs/zephyr/scripts/build/mergehex.py -o liftpod-v2-full.hex mcuboot/zephyr/zephyr.hex pod/zephyr/zephyr.signed.hex
+          cp dfu_application.zip liftpod-v2-update.zip
+          ls -la liftpod-v2-full.hex liftpod-v2-update.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pod-v2-firmware
+          path: |
+            ~/b_pod/liftpod-v2-full.hex
+            ~/b_pod/liftpod-v2-update.zip
+      - name: Publish as the "pod-fw-latest" release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: lift-tracker
+        run: |
+          gh release delete pod-fw-latest --yes --cleanup-tag || true
+          gh release create pod-fw-latest ~/b_pod/liftpod-v2-full.hex ~/b_pod/liftpod-v2-update.zip \
+            --title "Pod v2 firmware (latest build)" --prerelease \
+            --notes "Built from ${GITHUB_SHA::7}. First flash: liftpod-v2-full.hex over SWD. After that: liftpod-v2-update.zip from the nRF Device Manager app. See firmware/pod/BRINGUP.md."

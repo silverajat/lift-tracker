@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -128,7 +129,18 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
                 TopActionIcons()
             }
         }
-        item { PodBar(conn, status, onConnect) }
+        item {
+            val sync by vm.podSync.collectAsStateWithLifecycle()
+            val saved by vm.podSaved.collectAsStateWithLifecycle()
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            PodBar(conn, status, onConnect, sync, saved, onExport = {
+                scope.launch {
+                    val name = vm.exportPodRecordings()
+                    android.widget.Toast.makeText(ctx, name?.let { "Saved to Downloads: $it" } ?: "Couldn't save", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            })
+        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 StatTile("Workouts", "${week.size}", "this week", Modifier.weight(1f))

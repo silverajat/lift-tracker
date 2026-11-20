@@ -13,7 +13,12 @@
 
 LOG_MODULE_REGISTER(storage, LOG_LEVEL_INF);
 
+/* The XIAO's QSPI flash, or the board's "rec-flash" (pod v2: W25Q16 on SPI). */
+#if DT_NODE_EXISTS(DT_ALIAS(rec_flash))
+#define FLASH_NODE  DT_ALIAS(rec_flash)
+#else
 #define FLASH_NODE  DT_NODELABEL(p25q16h)
+#endif
 #define FLASH_SIZE  (DT_PROP(FLASH_NODE, size) / 8)  /* DT size is in bits */
 #define PAGE_SIZE   256u
 #define MAX_RECS    512u

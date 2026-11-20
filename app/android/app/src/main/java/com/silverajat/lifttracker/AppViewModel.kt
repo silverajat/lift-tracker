@@ -69,6 +69,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val pod = PodClient(app, viewModelScope)
     private val store = SessionStore(app)
     private val raw = RawStore(app)
+    /** Full-rate recordings downloaded from pod v2 (dump_logs format). */
+    val podRecs = com.silverajat.lifttracker.data.PodRecStore(app.filesDir)
+    private val _podSaved = MutableStateFlow(runCatching { podRecs.count() }.getOrDefault(0))
+    val podSaved: StateFlow<Int> = _podSaved
+    private val _podSync = MutableStateFlow<String?>(null)
+    /** "Saving sets 3/12" while recordings come off the pod. */
+    val podSync: StateFlow<String?> = _podSync
+    private var syncJob: Job? = null
     private val modelFile = File(app.filesDir, "rep_model.json")
     private val prefs = app.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
@@ -167,7 +175,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             // Whenever the pod (re)connects, make sure it isn't auto-recording.
-            pod.conn.collect { if (it == PodConn.READY) pod.send(PodProtocol.auto(false)) }
+            pod.conn.collect {
+                if (it != PodConn.READY) return@collect
+                pod.send(PodProtocol.auto(false))
+                val st = withTimeoutOrNull(3_000) { pod.status.first { s -> s != null } }
+                if (st?.v2 == true) {
+                    // pod v2: back in gym mode if a workout is open, otherwise collect what it recorded
+                    if (_session.value != null) pod.send(PodProtocol.gym(true)) else syncPod()
+                }
+            }
         }
     }
 
@@ -320,6 +336,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (_phase.value != Phase.READY) return
         restJob?.cancel()
         _restEndsAt.value = null
+        syncJob?.cancel()
+        podV2 { pod.send(PodProtocol.gym(true)) }       // wake the full-rate sensor during the countdown
         // weight and add-ons are read when it starts: they can be changed during the countdown
         pendingStart = {
             val a = _active.value
@@ -387,6 +405,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _countdownEndsAt.value = null
         _phase.value = Phase.READY
         tick(250)
+        podV2 { pod.send(PodProtocol.buzz(2)) }
         pendingStart?.invoke()
         pendingStart = null
     }
@@ -618,6 +637,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.delete(id)
         raw.deleteSession(id)
         _history.value = store.all()
+        if (_session.value == null) podV2 { pod.send(PodProtocol.gym(false)) }
         retrain()
     }
 
@@ -680,7 +700,66 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         restJob?.cancel()
         _restEndsAt.value = null
         _nextUp.value = null
+        // pod v2: back to sleep, then copy the workout's full-rate recordings to the phone
+        podV2 {
+            pod.send(PodProtocol.gym(false))
+            syncPod()
+        }
         // The workout screen shows the "saved, share it?" dialog, then goes home.
+    }
+
+    // ---- pod v2 ---------------------------------------------------------------------
+
+    private fun podV2(block: suspend () -> Unit) {
+        if (pod.conn.value == PodConn.READY && pod.status.value?.v2 == true) viewModelScope.launch { block() }
+    }
+
+    /**
+     * Copy every recording the phone doesn't have yet off pod v2, then erase the pod once it's all here.
+     * Only between workouts; starting a set stops it (the recording being sent finishes on the pod first).
+     */
+    fun syncPod() {
+        if (syncJob?.isActive == true) return
+        syncJob = viewModelScope.launch {
+            try {
+                val st = pod.status.value ?: return@launch
+                if (!st.v2 || st.recordings == 0 || _session.value != null) return@launch
+                var all = true
+                for (id in 0 until st.recordings) {
+                    if (_session.value != null) { all = false; break }
+                    _podSync.value = "Saving sets ${id + 1}/${st.recordings}"
+                    val head = pod.readRecording(id, headerOnly = true)
+                    if (head == null) { all = false; break }
+                    if (podRecs.has(head.first.key)) continue
+                    val full = pod.readRecording(id)
+                    if (full == null) { all = false; break }
+                    withContext(Dispatchers.IO) { podRecs.save(full.first, full.second) }
+                    _podSaved.value = podRecs.count()
+                }
+                if (all && _session.value == null) pod.send(PodProtocol.erase())
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("AppViewModel", "pod sync", e)
+            } finally {
+                _podSync.value = null
+            }
+        }
+    }
+
+    /** Save every pod recording as a zip in Downloads; the file name, or null if it failed. */
+    suspend fun exportPodRecordings(): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val app = getApplication<Application>()
+            val name = "lift-pod-recordings-${java.time.LocalDate.now()}.zip"
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/zip")
+            }
+            val uri = app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)!!
+            app.contentResolver.openOutputStream(uri)!!.use { podRecs.zip(it) }
+            name
+        }.getOrNull()
     }
 
     // ---- rest timer ---------------------------------------------------------------
@@ -736,6 +815,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun buzz() {
+        podV2 { pod.send(PodProtocol.buzz(1)) }
         val vm = getApplication<Application>().getSystemService(VibratorManager::class.java) ?: return
         vm.defaultVibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 350, 150, 350, 150, 600), -1))
     }

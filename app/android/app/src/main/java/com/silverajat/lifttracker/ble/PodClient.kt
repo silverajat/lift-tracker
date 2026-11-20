@@ -58,6 +58,10 @@ class PodClient(private val context: Context, private val scope: CoroutineScope)
     private var control: BluetoothGattCharacteristic? = null
     private var scanJob: Job? = null
 
+    /** v2: where DATA notifications go while a recording is being read. */
+    @Volatile private var dataSink: ((PodDataPacket) -> Unit)? = null
+    private var hasData = false
+
     private val opLock = Mutex()
     @Volatile private var pending: CompletableDeferred<Int>? = null
 
@@ -164,6 +168,10 @@ class PodClient(private val context: Context, private val scope: CoroutineScope)
             }
         }
 
+        override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+            pending?.complete(status)
+        }
+
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
             pending?.complete(status)
         }
@@ -189,6 +197,7 @@ class PodClient(private val context: Context, private val scope: CoroutineScope)
             when (c.uuid) {
                 PodProtocol.STATUS -> PodStatus.parse(value)?.let { _status.value = it }
                 PodProtocol.STREAM -> PodSample.parse(value)?.let { _samples.tryEmit(it) }
+                PodProtocol.DATA -> PodDataPacket.parse(value)?.let { p -> dataSink?.invoke(p) }
             }
         }
     }
@@ -200,7 +209,10 @@ class PodClient(private val context: Context, private val scope: CoroutineScope)
         }
         val svc = g.getService(PodProtocol.SERVICE) ?: run { g.disconnect(); return }
         control = svc.getCharacteristic(PodProtocol.CONTROL)
-        for (uuid in listOf(PodProtocol.STATUS, PodProtocol.STREAM)) {
+        hasData = svc.getCharacteristic(PodProtocol.DATA) != null
+        // big packets for downloading recordings (v2); harmless on the prototype
+        if (hasData) gattOp { g.requestMtu(247) }
+        for (uuid in listOf(PodProtocol.STATUS, PodProtocol.STREAM, PodProtocol.DATA)) {
             val ch = svc.getCharacteristic(uuid) ?: continue
             g.setCharacteristicNotification(ch, true)
             val ccc = ch.getDescriptor(PodProtocol.CCC) ?: continue
@@ -212,6 +224,43 @@ class PodClient(private val context: Context, private val scope: CoroutineScope)
         svc.getCharacteristic(PodProtocol.STATUS)?.let { ch -> gattOp { g.readCharacteristic(ch) } }
         _conn.value = PodConn.READY
         Log.i(TAG, "pod ready")
+    }
+
+    /**
+     * v2: read one recording off the pod. [headerOnly] asks what it is without its samples.
+     * Null if the pod can't (prototype, disconnected, an error); the samples are complete or it's null.
+     */
+    suspend fun readRecording(recId: Int, headerOnly: Boolean = false): Pair<PodRecInfo, List<ShortArray>>? {
+        if (!hasData || _conn.value != PodConn.READY) return null
+        val ch = kotlinx.coroutines.channels.Channel<PodDataPacket>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+        dataSink = { p -> if (p.recId == recId) ch.trySend(p) }
+        try {
+            var info: PodRecInfo? = null
+            val out = ArrayList<ShortArray>()
+            var from = if (headerOnly) PodProtocol.HEADER_ONLY else 0L
+            repeat(3) {                       // a dropped packet: ask again from where it stopped
+                if (!send(PodProtocol.read(recId, from))) return null
+                while (true) {
+                    val p = withTimeoutOrNull(10_000) { ch.receive() } ?: return null
+                    when (p.kind) {
+                        PodProtocol.DATA_HEADER -> info = p.info() ?: return null
+                        PodProtocol.DATA_SAMPLES -> if (p.index == out.size.toLong()) out += p.samples() else break
+                        PodProtocol.DATA_END -> {
+                            val i = info ?: return null
+                            return if (headerOnly || out.size.toLong() >= i.samples) i to out else null
+                        }
+                        else -> return null
+                    }
+                }
+                // gap: drain what's left of this pass, then resume at the first missing sample
+                while (withTimeoutOrNull(2_000) { ch.receive() }?.kind?.let { it != PodProtocol.DATA_END } == true) { }
+                from = out.size.toLong()
+            }
+            return null
+        } finally {
+            dataSink = null
+            ch.close()
+        }
     }
 
     /** Run one GATT operation and wait for its callback (status), or -2 on timeout. */

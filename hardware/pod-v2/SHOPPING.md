@@ -48,6 +48,8 @@ RS Singapore alternatives if needed: Debug Probe 219-258 (S$27.40), motor
 PUI HD-EM0802-LW15-R 276-753 (S$3.36, 8 x 2 mm). Not 276-754 (3 mm thick).
 
 ## Firmware port to-do (when the boards arrive)
+Written: `firmware/pod` (builds in CI, release pod-fw-latest). Bring-up steps in `firmware/pod/BRINGUP.md`.
+Still open: measure the idle current on the board; an "Update pod" button in the app (the nRF Device Manager app does it for now).
 - Motor buzzes from the app: **1 buzz = rest done**, **2 buzzes = set starting**
   (new OP_BUZZ [op][count] command; the app sends it at rest end and when the countdown finishes).
 - Port the logger from the XIAO to the E73 + LSM6DSV16X (SPI), W25Q16 flash, LEDs, motor, charge status.

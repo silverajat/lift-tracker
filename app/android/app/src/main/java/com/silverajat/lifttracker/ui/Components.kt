@@ -142,7 +142,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
 // ---- pod status ---------------------------------------------------------------------
 
 @Composable
-fun PodBar(conn: PodConn, status: PodStatus?, onConnect: () -> Unit) {
+fun PodBar(conn: PodConn, status: PodStatus?, onConnect: () -> Unit, sync: String? = null, saved: Int = 0, onExport: (() -> Unit)? = null) {
     val (dot, title, sub) = when (conn) {
         PodConn.READY -> Triple(
             C.Pod, "Pod connected",
@@ -152,7 +152,9 @@ fun PodBar(conn: PodConn, status: PodStatus?, onConnect: () -> Unit) {
                     if (it.charging) append(" · charging")
                     if (it.recording) append(" · recording")
                     if (!it.imuOk) append(" · IMU not started")
-                    if (it.fault) append(" · flash full: dump it on the laptop")
+                    if (it.gym) append(" · gym mode")
+                    if (sync != null) append(" · $sync")
+                    if (it.fault) append(if (it.v2) " · flash full" else " · flash full: dump it on the laptop")
                     append(" · fw ${it.firmware}")
                 }
             } ?: "Reading status…",
@@ -167,7 +169,7 @@ fun PodBar(conn: PodConn, status: PodStatus?, onConnect: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         border = if (conn == PodConn.READY) C.Pod.copy(alpha = 0.5f) else C.Line,
         onClick = if (conn == PodConn.READY) null else onConnect,
-    ) {
+    ) { Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(10.dp).clip(CircleShape).background(dot))
             Spacer(Modifier.width(12.dp))
@@ -181,6 +183,11 @@ fun PodBar(conn: PodConn, status: PodStatus?, onConnect: () -> Unit) {
                 BatteryGlyph(status.batteryPct)
             }
         }
+        if (onExport != null && saved > 0) {
+            androidx.compose.material3.TextButton(onClick = onExport, modifier = Modifier.align(Alignment.End)) {
+                Text("Export $saved recordings", color = C.Pod)
+            }
+        } }
     }
 }
 

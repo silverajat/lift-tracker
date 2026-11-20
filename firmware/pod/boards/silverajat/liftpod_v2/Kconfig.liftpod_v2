@@ -1,0 +1,3 @@
+# Lift pod v2: Ebyte E73-2G4M08S1C (nRF52840), LSM6DSV16X, W25Q16 on one SPI bus
+config BOARD_LIFTPOD_V2
+	select SOC_NRF52840_QIAA

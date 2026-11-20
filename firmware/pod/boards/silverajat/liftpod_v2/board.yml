@@ -1,0 +1,6 @@
+board:
+  name: liftpod_v2
+  full_name: Lift pod v2
+  vendor: silverajat
+  socs:
+  - name: nrf52840
