@@ -92,16 +92,17 @@ object Foods {
         // Mixed rice, from a photo of the plate (Nov 2026). Per part, as ordered now:
         //  rice, one cup ~230 g cooked: white 300 kcal, 6 g protein, 66 g carbs, 0.7 g fat, 0.9 g fibre;
         //    red (a red/white mix) 290 kcal, 6 g, 61 g, 1.5 g fat, ~3.5 g fibre
-        //  ~3 scoops braised chicken & wood ear mushroom in dark sauce: ~130 g thigh meat (234 kcal, 32 g, 11 g fat)
-        //    + the glossy sauce with its oil and sugar (~100 kcal, 7 g fat, 9 g carbs) + mushrooms (15 kcal, 1.5 g fibre)
-        //  1 scoop tomato egg: ~1.5 eggs scrambled in oil with tomato in a sweet sauce (~165 kcal, 9.5 g, 12 g fat, 9 g carbs)
-        //  1 scoop tofu, lightly oiled (~120 kcal, 10 g, 6 g fat)
+        //  ~3 scoops braised chicken & wood ear mushroom in dark sauce: much of the pile is mushroom and sauce,
+        //    ~80 g chicken (145 kcal, 20 g, 7 g fat) + sauce with its oil and sugar (~80 kcal, 5 g fat, 8 g carbs)
+        //    + mushrooms (15 kcal, 1.5 g fibre)
+        //  1 scoop tomato egg: ~1 egg scrambled in oil, tomato in a sweet sauce (~145 kcal, 6.5 g, 9 g fat, 8 g carbs)
+        //  1 scoop braised tofu slices with wood ear and cucumber (~70 kcal, 6 g, 4 g fat, 1 g fibre)
         //  1 scoop stir-fried napa cabbage (~55 kcal, 1 g, 4 g fat, 1.2 g fibre)
-        // Good to ±15%: the sauce and oil are the guess.
+        // Good to ±15%: the chicken/sauce split and the oil are the guess.
         Food("mixed_rice", "Mixed rice: rice, braised chicken & mushroom, tofu, tomato egg, greens",
-            Macros(970.0, 58.0, 91.0, 40.0, 6.0), "photo, built from its parts"),
+            Macros(800.0, 39.5, 87.0, 29.5, 5.6), "photo, built from its parts"),
         Food("mixed_rice_red", "Mixed rice with red rice: braised chicken & mushroom, tofu, tomato egg, greens",
-            Macros(960.0, 58.0, 86.0, 41.0, 8.5), "photo, built from its parts"),
+            Macros(790.0, 39.5, 82.0, 30.5, 8.2), "photo, built from its parts"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
