@@ -79,13 +79,15 @@ object Foods {
         Food("salad_egg", "Salad bowl: citrus-lime chicken, brown rice, broccoli, chickpeas, edamame, egg, sesame dressing",
             Macros(700.0, 44.0, 73.0, 26.0, 10.0), "built from its parts"),
         Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(640.0, 38.0, 76.0, 21.0, 11.0), "built from its parts"),
-        // HPB steamed chicken rice plate (488 kcal, ~21 g protein) + extra skinless chicken (~50 g, 14 g) + extra rice
-        // (~half a plate, chicken-rice style) + kailan in oyster sauce + braised egg + soup.
+        // HPB steamed chicken rice plate (346 g, 488 kcal, ~21 g protein, 3.6 g fat per 100 g: ~12.5 g fat), ~half of it
+        // from the rice (cooked in chicken fat and stock). Skinless: the skin on ~70 g of chicken is ~3 g fat, ~30 kcal.
+        // + kailan in oyster sauce (~60 kcal, ~4 g fat from the oil) + braised egg (~80 kcal, 6 g protein, 5 g fat) + soup.
+        // Extras: skinless chicken ~50 g (75 kcal, 14 g protein, 2 g fat) + extra rice ~half a plate (~200 kcal, 4 g fat).
         // Fibre: white rice is only ~0.4 g per 100 g cooked (~400 g: 1.6 g), a small side of kailan ~1 g, cucumber ~0.3 g
-        Food("chicken_rice", "Chicken rice + extra chicken & rice, kailan, braised egg, soup",
-            Macros(920.0, 48.0, 122.0, 29.0, 3.0), "HPB plate + sides"),
-        Food("chicken_rice_plain", "Chicken rice (no extras), kailan, braised egg, soup",
-            Macros(645.0, 31.0, 89.0, 21.0, 2.5), "HPB plate + sides"),
+        Food("chicken_rice", "Chicken rice (steamed, no skin) + extra chicken & rice, kailan, braised egg, soup",
+            Macros(890.0, 47.0, 122.0, 25.0, 3.0), "HPB plate + sides"),
+        Food("chicken_rice_plain", "Chicken rice (steamed, no skin), kailan, braised egg, soup",
+            Macros(615.0, 30.0, 89.0, 18.0, 2.5), "HPB plate + sides"),
         // rice ~280 g, a big hawker cup (364 kcal, 8 g protein); 3 scoops thin brown curry chicken & mushroom, no coconut
         // (~60 g chicken: 150 kcal, 16 g, 6 g fat); tofu bricks, lightly oiled (120 kcal, 10 g, 6 g fat);
         // watery tomato egg (90 kcal, 5 g, 6 g fat); stir-fried cabbage (50 kcal, 1 g, 3 g fat).
