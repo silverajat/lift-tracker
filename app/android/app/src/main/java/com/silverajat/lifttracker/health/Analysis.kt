@@ -273,7 +273,7 @@ object Analysis {
         val inBed = (need / eff).roundToInt()
         val ideal = wake.minusMinutes((inBed + FALL_ASLEEP_MIN).toLong())
         // your usual time of falling asleep, as minutes from midnight (negative = the evening before)
-        val usual = r.days.filter { it.date > date.minusDays(14) && it.date <= date }.mapNotNull { d -> d.sleep?.let { bedMinutes(it.start, zone) } }
+        val usual = r.days.filter { it.date > date.minusDays(14) && it.date <= date }.mapNotNull { d -> d.sleep?.let { bedMinutes(it.bed, zone) } }
             .takeIf { it.size >= 5 }?.sorted()?.let { s -> (s[(s.size - 1) / 2] + s[s.size / 2]) / 2 }
         val wakeM = wake.hour * 60 + wake.minute
         val idealM = wakeM - inBed - FALL_ASLEEP_MIN
