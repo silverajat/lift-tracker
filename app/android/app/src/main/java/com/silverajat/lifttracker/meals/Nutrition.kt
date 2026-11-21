@@ -89,20 +89,20 @@ object Foods {
             Macros(850.0, 44.0, 122.0, 22.5, 3.0), "HPB plate + sides"),
         Food("chicken_rice_plain", "Chicken rice (steamed, no skin), kailan, half a braised egg, soup",
             Macros(575.0, 27.0, 89.0, 15.5, 2.5), "HPB plate + sides"),
-        // Mixed rice, from a photo of the plate (Nov 2026). Per part, as ordered now:
-        //  rice, one cup ~230 g cooked: white 300 kcal, 6 g protein, 66 g carbs, 0.7 g fat, 0.9 g fibre;
-        //    red (a red/white mix) 290 kcal, 6 g, 61 g, 1.5 g fat, ~3.5 g fibre
-        //  ~3 scoops braised chicken & wood ear mushroom in dark sauce: much of the pile is mushroom and sauce,
-        //    ~80 g chicken (145 kcal, 20 g, 7 g fat) + sauce with its oil and sugar (~80 kcal, 5 g fat, 8 g carbs)
-        //    + mushrooms (15 kcal, 1.5 g fibre)
-        //  1 scoop tomato egg: ~1 egg scrambled in oil, tomato in a sweet sauce (~145 kcal, 6.5 g, 9 g fat, 8 g carbs)
-        //  1 scoop braised tofu slices with wood ear and cucumber (~70 kcal, 6 g, 4 g fat, 1 g fibre)
-        //  1 scoop stir-fried napa cabbage (~55 kcal, 1 g, 4 g fat, 1.2 g fibre)
-        // Good to ±15%: the chicken/sauce split and the oil are the guess.
+        // Mixed rice (cai fan), from a photo of the plate, each scoop anchored to typical stall portions
+        // (Nutri Kaki's cai fan guide: rice scoop 180-200 kcal, braised chicken portion 140-180, braised tofu 80-100,
+        // braised cabbage 40-55), split into macros by what the food is. Calories = 4P + 4C + 9F + 2 fibre, so they add up.
+        //  rice, one cup (~1.3 scoops, ~210 g): red/white mix 5 g protein, 52 g carbs, 1.5 g fat, 3 g fibre;
+        //    white 5 g, 57 g, 0.6 g, 0.8 g
+        //  ~3 scoops braised chicken & wood ear mushroom, much of it mushroom and sauce: ~90 g thigh meat
+        //    (24 g protein, 8 g fat) + sauce (9 g carbs, 2 g fat) + mushrooms (1 g, 1.5 g fibre)
+        //  1 scoop tomato egg, about 1 egg: 6 g, 6 g carbs, 7 g fat
+        //  1 scoop braised tofu slices with wood ear and cucumber: 6 g, 2 g carbs, 3.5 g fat, 1 g fibre
+        //  1 scoop stir-fried napa cabbage: 1 g, 3 g carbs, 3 g fat, 1.2 g fibre
         Food("mixed_rice", "Mixed rice: rice, braised chicken & mushroom, tofu, tomato egg, greens",
-            Macros(800.0, 39.5, 87.0, 29.5, 5.6), "photo, built from its parts"),
+            Macros(710.0, 43.0, 77.0, 24.0, 4.8), "photo + stall portions"),
         Food("mixed_rice_red", "Mixed rice with red rice: braised chicken & mushroom, tofu, tomato egg, greens",
-            Macros(790.0, 39.5, 82.0, 30.5, 8.2), "photo, built from its parts"),
+            Macros(700.0, 43.0, 72.0, 25.0, 7.0), "photo + stall portions"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
