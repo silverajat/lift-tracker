@@ -89,16 +89,19 @@ object Foods {
             Macros(850.0, 44.0, 122.0, 22.5, 3.0), "HPB plate + sides"),
         Food("chicken_rice_plain", "Chicken rice (steamed, no skin), kailan, half a braised egg, soup",
             Macros(575.0, 27.0, 89.0, 15.5, 2.5), "HPB plate + sides"),
-        // rice ~280 g, a big hawker cup (364 kcal, 8 g protein); 3 scoops thin brown curry chicken & mushroom, no coconut
-        // (~60 g chicken: 150 kcal, 16 g, 6 g fat); tofu bricks, lightly oiled (120 kcal, 10 g, 6 g fat);
-        // watery tomato egg (90 kcal, 5 g, 6 g fat); stir-fried cabbage (50 kcal, 1 g, 3 g fat).
-        // Fibre: a full scoop of cabbage ~150 g (3.5 g), rice ~280 g (1.1 g), mushrooms (0.7 g), tomato (0.8 g), tofu (0.6 g)
-        Food("mixed_rice", "Mixed rice: rice, curry chicken & mushroom, tofu, tomato egg, cabbage",
-            Macros(800.0, 40.0, 98.0, 25.0, 6.5), "built from its parts"),
-        // the same with red rice: ~280 g cooked red rice is ~335 kcal, 7.5 g protein, 70 g carbs, 2.5 g fat, ~5 g fibre
-        // (whole grain, ~1.8 g per 100 g) instead of white rice's 364 kcal, 8 g, 80 g, 0.8 g fat, 1.1 g fibre
-        Food("mixed_rice_red", "Mixed rice with red rice: curry chicken & mushroom, tofu, tomato egg, greens",
-            Macros(770.0, 39.5, 88.0, 26.5, 10.5), "built from its parts"),
+        // Mixed rice, from a photo of the plate (Nov 2026). Per part, as ordered now:
+        //  rice, one cup ~230 g cooked: white 300 kcal, 6 g protein, 66 g carbs, 0.7 g fat, 0.9 g fibre;
+        //    red (a red/white mix) 290 kcal, 6 g, 61 g, 1.5 g fat, ~3.5 g fibre
+        //  ~3 scoops braised chicken & wood ear mushroom in dark sauce: ~130 g thigh meat (234 kcal, 32 g, 11 g fat)
+        //    + the glossy sauce with its oil and sugar (~100 kcal, 7 g fat, 9 g carbs) + mushrooms (15 kcal, 1.5 g fibre)
+        //  1 scoop tomato egg: ~1.5 eggs scrambled in oil with tomato in a sweet sauce (~165 kcal, 9.5 g, 12 g fat, 9 g carbs)
+        //  1 scoop tofu, lightly oiled (~120 kcal, 10 g, 6 g fat)
+        //  1 scoop stir-fried napa cabbage (~55 kcal, 1 g, 4 g fat, 1.2 g fibre)
+        // Good to ±15%: the sauce and oil are the guess.
+        Food("mixed_rice", "Mixed rice: rice, braised chicken & mushroom, tofu, tomato egg, greens",
+            Macros(970.0, 58.0, 91.0, 40.0, 6.0), "photo, built from its parts"),
+        Food("mixed_rice_red", "Mixed rice with red rice: braised chicken & mushroom, tofu, tomato egg, greens",
+            Macros(960.0, 58.0, 86.0, 41.0, 8.5), "photo, built from its parts"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
