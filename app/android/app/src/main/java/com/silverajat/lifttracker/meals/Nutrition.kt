@@ -95,14 +95,14 @@ object Foods {
         //  rice, one cup (~1.3 scoops, ~210 g): red/white mix 5 g protein, 52 g carbs, 1.5 g fat, 3 g fibre;
         //    white 5 g, 57 g, 0.6 g, 0.8 g
         //  ~3 scoops braised chicken & wood ear mushroom, much of it mushroom and sauce: ~90 g thigh meat
-        //    (24 g protein, 8 g fat) + sauce (9 g carbs, 2 g fat) + mushrooms (1 g, 1.5 g fibre)
-        //  1 scoop tomato egg, about 1 egg: 6 g, 6 g carbs, 7 g fat
-        //  1 scoop braised tofu slices with wood ear and cucumber: 6 g, 2 g carbs, 3.5 g fat, 1 g fibre
-        //  1 scoop stir-fried napa cabbage: 1 g, 3 g carbs, 3 g fat, 1.2 g fibre
+        //    (24 g protein, 8 g fat) + sauce (9 g carbs, 2 g fat) + wood ear (~30 g soaked, ~2 g fibre)
+        //  1 scoop tomato egg, about 1 egg: 6 g, 6 g carbs, 7 g fat, 0.5 g fibre
+        //  1 scoop braised tofu slices with wood ear and cucumber: 6 g, 2 g carbs, 3.5 g fat, 1.3 g fibre
+        //  1 scoop stir-fried napa cabbage: 1 g, 3 g carbs, 3 g fat, 1.2 g fibre (napa is mostly water: green, little fibre)
         Food("mixed_rice", "Mixed rice: rice, braised chicken & mushroom, tofu, tomato egg, greens",
-            Macros(710.0, 43.0, 77.0, 24.0, 4.8), "photo + stall portions"),
+            Macros(710.0, 43.0, 77.0, 24.0, 5.8), "photo + stall portions"),
         Food("mixed_rice_red", "Mixed rice with red rice: braised chicken & mushroom, tofu, tomato egg, greens",
-            Macros(700.0, 43.0, 72.0, 25.0, 7.0), "photo + stall portions"),
+            Macros(700.0, 43.0, 72.0, 25.0, 8.0), "photo + stall portions"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 50 g", Macros(207.0, 8.3, 16.2, 10.1, 8.5), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
