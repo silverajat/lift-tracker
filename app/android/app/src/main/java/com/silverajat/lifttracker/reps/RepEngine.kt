@@ -58,6 +58,7 @@ data class CountResult(
     val x: DoubleArray,               // the counted signal, drift removed
     val repWindows: List<IntArray>,   // [start, end) per rep (no margins)
     val turns: Boolean,               // the forearm turns a lot (ROM in degrees)
+    val allWindows: List<IntArray> = repWindows,   // before trimEnd dropped the racking at the end
 )
 
 object RepEngine {
@@ -65,7 +66,11 @@ object RepEngine {
     private val FLOOR = mapOf("turn" to 6.0, "tilt" to 2.0, "lift" to 0.04, "push" to 0.04)
 
     /** The four signals for one set, worked out once (fusion is the slow part). */
-    class Signals(val n: Int, val hz: Int, val bias: DoubleArray, private val m: Map<String, DoubleArray>) {
+    class Signals(
+        val n: Int, val hz: Int, val bias: DoubleArray, private val m: Map<String, DoubleArray>,
+        /** Gravity direction per sample in the pod's frame (unit vectors, from the fusion). */
+        val gravity: Array<DoubleArray> = emptyArray(),
+    ) {
         operator fun get(name: String): DoubleArray = m.getValue(name)
 
         private val prepMemo = HashMap<Long, DoubleArray>()
@@ -153,7 +158,7 @@ object RepEngine {
         val lift = leakyInt(vert, hz)
         val hAxis = mainAxis(horiz)
         val push = leakyInt(DoubleArray(n) { i -> dot(horiz[i], hAxis) }, hz)
-        return Signals(n, hz, bias, mapOf("turn" to turn, "tilt" to tilt, "lift" to lift, "push" to push))
+        return Signals(n, hz, bias, mapOf("turn" to turn, "tilt" to tilt, "lift" to lift, "push" to push), gb)
     }
 
     /** Mean gyro over the stillest second, if that second really is still. */
@@ -243,12 +248,13 @@ object RepEngine {
         val amp = sig.amplitude(c.name, w)
         val rs = cleanRuns(runs(x, p.h * amp), p.gap * t)
         val reps = if (rs.isEmpty()) 0 else ceil((rs.size - 1) / 2.0).toInt()
-        val windows = trimEnd(x, (0 until reps).map { k ->
+        val all = (0 until reps).map { k ->
             val a = rs[2 * k][1]
             val b = if (2 * k + 2 < rs.size) rs[2 * k + 2][1] else x.size
             intArrayOf(a, b)
-        })
-        return CountResult(windows.size, c.name, t, x, windows, sig.turns())
+        }
+        val windows = trimEnd(x, all)
+        return CountResult(windows.size, c.name, t, x, windows, sig.turns(), all)
     }
 
     /**

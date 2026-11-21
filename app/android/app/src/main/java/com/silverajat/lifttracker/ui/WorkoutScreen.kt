@@ -631,6 +631,22 @@ private fun BottomPanel(
                         }
                         if (paused) Text("Paused: not counting. Resume when you're back in the set.",
                             style = MaterialTheme.typography.bodyMedium, color = C.Warm)
+                        val ending by vm.autoEnding.collectAsStateWithLifecycle()
+                        val autoEnd by vm.autoEnd.collectAsStateWithLifecycle()
+                        if (ending != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Set done", style = MaterialTheme.typography.titleMedium, color = C.Done)
+                                Spacer(Modifier.width(8.dp))
+                                Button(
+                                    onClick = { vm.keepGoing() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = C.Raised, contentColor = C.Text),
+                                ) { Text("Keep going", fontWeight = FontWeight.Bold) }
+                            }
+                        } else if (ex != null && Routines.podCounts(ex.id) && !Routines.isOneArm(ex)) {
+                            TextButton(onClick = { vm.setAutoEnd(!autoEnd) }) {
+                                Text(if (autoEnd) "Auto-end ✓" else "Auto-end off", color = if (autoEnd) C.Accent else C.Muted)
+                            }
+                        }
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box(

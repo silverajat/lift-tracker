@@ -145,6 +145,19 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
 - The live stream and the rep counter are unchanged from the prototype, so everything learned so far carries over.
   First flash and updates: `firmware/pod/BRINGUP.md`.
 
+## Auto-end
+
+A set stops itself when the motion changes, not after a pause (a long breather at lockout is still the set):
+
+- **Racking:** a last "rep" far bigger than the set's own reps (or bigger and quicker), once it's 0.6 s past.
+- **Hands off / arms down / reaching for the phone:** the wrist ends up at an angle it never reached during the
+  set's reps (30° beyond that range) and stays there 0.6 s. Lifts that swing the wrist a lot need a bigger change.
+
+It needs 3 reps first, and the set is cut where the change began, so it never costs a rep. "Keep going" gives
+2 s to cancel; it won't stop again until another rep. Every saved set is replayed through it: a lift where it
+would ever have stopped a set before its last rep keeps auto-end off. Off for one-arm lifts and lifts the pod
+doesn't count. Reference: `python/repcount/set_end.py`.
+
 ## Your week
 
 Monday to Sunday (or to today), each number next to the week before. Opens from Today; on Monday morning a notification sums up the week that ended.

@@ -22,6 +22,7 @@ import com.silverajat.lifttracker.reps.RepEngine
 import com.silverajat.lifttracker.reps.RepModel
 import com.silverajat.lifttracker.reps.RomRef
 import com.silverajat.lifttracker.reps.SetAnalysis
+import com.silverajat.lifttracker.reps.SetEnd
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -145,6 +146,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var restJob: Job? = null
     private var countJob: Job? = null
     private var collecting = false
+
+    // ---- auto-end: the set stops itself when the motion changes (racking, hands off the bar) ----
+    private val _autoEnd = MutableStateFlow(prefs.getBoolean("auto_end", true))
+    val autoEnd: StateFlow<Boolean> = _autoEnd
+    fun setAutoEnd(on: Boolean) { _autoEnd.value = on; prefs.edit().putBoolean("auto_end", on).apply() }
+    private val _autoEnding = MutableStateFlow<Long?>(null)
+    /** When the set will stop by itself (a couple of seconds to tap Keep going), or null. */
+    val autoEnding: StateFlow<Long?> = _autoEnding
+    private var autoEndJob: Job? = null
+    private var autoEndAfterReps = 0      // Keep going: not again until a new rep
+    private var endCheckAt = 0
+    /** Lifts where replaying your saved sets would have stopped one early: auto-end stays off for them. */
+    @Volatile private var autoEndOff: Set<Int> = emptySet()
+    private val endReplayFile = File(app.filesDir, "autoend_replay.json")
     /** The finished set's 25 Hz data, kept from Stop until Save. */
     private var setData: List<FloatArray> = emptyList()
 
@@ -169,10 +184,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val snap = counter.snapshot()
                         val n = withContext(Dispatchers.Default) { RepCounter.count(snap, PodProtocol.STREAM_HZ, counter.params, counter.oneArm, counter.firstSide) }
                         if (collecting) _liveReps.value = segmentReps + perSide(hold.update(n, snap.size))
+                        if (collecting && snap.size >= endCheckAt + 10 && autoEndFor()) {
+                            endCheckAt = snap.size
+                            val end = withContext(Dispatchers.Default) { SetEnd.detect(snap, PodProtocol.STREAM_HZ, counter.params) }
+                            if (end != null && collecting && _autoEnding.value == null) beginAutoEnd(end)
+                        }
                     }
                 }
             }
         }
+        viewModelScope.launch(Dispatchers.Default) { runCatching { autoEndOff = checkAutoEnd(_model.value) } }
         viewModelScope.launch {
             // Whenever the pod (re)connects, make sure it isn't auto-recording.
             pod.conn.collect {
@@ -443,6 +464,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         segments.clear()
         segmentReps = 0
         hold.reset()
+        autoEndJob?.cancel(); _autoEnding.value = null; autoEndAfterReps = 0; endCheckAt = 0
         pausedTotalMs = 0
         pausedAt = null
         _paused.value = false
@@ -462,6 +484,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
             _active.value = _active.value?.copy(podStarted = ok)
         }
+    }
+
+    private fun autoEndFor(): Boolean {
+        val a = _active.value ?: return false
+        return _autoEnd.value && !_paused.value && _autoEnding.value == null && _liveReps.value >= 3 &&
+            _liveReps.value > autoEndAfterReps && !counter.oneArm && !halve &&
+            Routines.podCounts(a.exerciseId) && a.exerciseId !in autoEndOff
+    }
+
+    private fun beginAutoEnd(end: SetEnd.End) {
+        _autoEnding.value = System.currentTimeMillis() + AUTO_END_GRACE_MS
+        tick(60)
+        autoEndJob?.cancel()
+        autoEndJob = viewModelScope.launch {
+            delay(AUTO_END_GRACE_MS)
+            if (_autoEnding.value != null && _phase.value == Phase.LIFTING) stopSet(cutAt = end.cut)
+            _autoEnding.value = null
+        }
+    }
+
+    /** The set isn't over: carry on, and don't stop it again until another rep. */
+    fun keepGoing() {
+        autoEndJob?.cancel()
+        _autoEnding.value = null
+        autoEndAfterReps = _liveReps.value
     }
 
     /** Pause the set: stop counting until resume (the set timer stops too). */
@@ -497,13 +544,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         collecting = true
     }
 
-    fun stopSet() {
+    /** [cutAt]: the set stopped itself, so its data ends there (where the racking began). */
+    fun stopSet(cutAt: Int? = null) {
         val set = _active.value ?: return
         if (_phase.value != Phase.LIFTING) return
         collecting = false
         countJob?.cancel()
+        autoEndJob?.takeIf { cutAt == null }?.cancel()
+        _autoEnding.value = null
         // the hand going to the phone to press stop isn't a rep: cut that off the end
-        val last = if (!_paused.value) counter.snapshot().let { RepCounter.cutReach(it, PodProtocol.STREAM_HZ) } else null
+        val last = if (!_paused.value) counter.snapshot().let {
+            if (cutAt != null && cutAt in PodProtocol.STREAM_HZ..it.size) it.subList(0, cutAt)
+            else RepCounter.cutReach(it, PodProtocol.STREAM_HZ)
+        } else null
         val lastHold = com.silverajat.lifttracker.reps.PeakHold().also { if (last != null) { it.update(hold.peak, hold.peakLen) } }
         pausedAt?.let { pausedTotalMs += System.currentTimeMillis() - it }
         pausedAt = null
@@ -675,8 +728,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             _model.value = m
             runCatching { modelFile.writeText(m.toJson()) }
+            autoEndOff = withContext(Dispatchers.Default) { checkAutoEnd(m) }
             _training.value = false
         }
+    }
+
+    /**
+     * Replay every saved set through auto-end as it streamed in. Any lift where it would have stopped a set
+     * before its last rep keeps auto-end off. Each set is replayed once (results kept in autoend_replay.json).
+     */
+    private fun checkAutoEnd(m: RepModel.Model): Set<Int> {
+        val hz = PodProtocol.STREAM_HZ
+        val seen = runCatching { org.json.JSONObject(endReplayFile.readText()) }.getOrElse { org.json.JSONObject() }
+        val off = HashSet<Int>()
+        for (s in store.all()) for (l in s.sets) {
+            if (l.liveReps == null || Routines.isOneArm(l.exerciseId) || !Routines.podCounts(l.exerciseId)) continue
+            val key = "${s.id}_${l.exerciseId}_${l.setNo}"
+            val early = if (seen.has(key)) seen.getBoolean(key) else {
+                val d = raw.load(s.id, l.exerciseId, l.setNo)
+                val e = if (d == null || d.size < 4 * hz) false else {
+                    val p = m.params(l.exerciseId, l.warmup && !l.calibration)
+                    val end = SetEnd.replay(d, hz, p, step = 10)
+                    end != null && (RepEngine.count(d.subList(0, end.cut), hz, p)?.reps ?: 0) < (RepEngine.count(d, hz, p)?.reps ?: 0)
+                }
+                seen.put(key, e)
+                e
+            }
+            if (early) off += l.exerciseId
+        }
+        runCatching { endReplayFile.writeText(seen.toString()) }
+        return off
     }
 
     fun finishWorkout() {
@@ -810,6 +891,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val COUNTDOWN_MS = 10_000L   // same as after rest: time to get into position
         const val AUTO_COUNTDOWN_MS = 10_000L
+        const val AUTO_END_GRACE_MS = 2_000L
         /** Bump when the counter's method changes (older ROM numbers then aren't compared). */
         const val RepEngineVersion = 1
     }
