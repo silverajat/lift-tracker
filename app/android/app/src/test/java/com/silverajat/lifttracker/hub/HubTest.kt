@@ -121,6 +121,22 @@ class HubTest {
         assertTrue("${thu.bed}", thu.bed!! in java.time.LocalTime.of(23, 0)..java.time.LocalTime.of(23, 30))
     }
 
+    /** Owing sleep doesn't put lights out hours before you'd ever fall asleep: 45 min before your usual at most. */
+    @Test fun bedtimeStaysNearYourUsual() {
+        val sat = LocalDate.of(2026, 11, 21)
+        // asleep 23:30 every night, 6 h 40 m: an hour owed after three nights
+        val h = (0 until 28).map { i -> day(sat.minusDays(27L - i), 45.0, 52, 400) }
+        val r = Analysis.run(h, emptyList(), emptyMap(), emptyList(), sat, zone)
+        val t = Analysis.tonight(r, sat, zone)
+        assertTrue("${t.needMin}", t.needMin >= 500)
+        assertEquals(java.time.LocalTime.of(23, 30), t.usualBed)
+        assertEquals(java.time.LocalTime.of(22, 45), t.bed)
+        assertTrue("${t.shortMin}", t.shortMin in 60..100)
+        // owing nothing: the plain sum, no cap needed
+        val ok = Analysis.run((0 until 28).map { i -> day(sat.minusDays(27L - i), 45.0, 52, 450) }, emptyList(), emptyMap(), emptyList(), sat, zone)
+        assertEquals(0, Analysis.tonight(ok, sat, zone).shortMin)
+    }
+
     /** Lots of REM can't make up for very little deep: they're scored separately. */
     @Test fun deepAndRemScoredSeparately() {
         val (balanced, _) = Analysis.sleepScore(100, 100, 94, 16, 22)

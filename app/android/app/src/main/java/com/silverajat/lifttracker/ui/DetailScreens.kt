@@ -513,6 +513,9 @@ fun SleepDetail(a: Analysis.Result?, days: List<HealthDay>, onBack: () -> Unit) 
                         Kv("Sleep needed", hmin(need), listOfNotNull("7h 30m base", tn.strainMin.takeIf { it > 0 }?.let { "+${it}m strain" },
                             tn.debtMin.takeIf { it > 0 }?.let { "+${it}m debt" }, tn.sickMin.takeIf { it > 0 }?.let { "+${it}m body" }).joinToString(" "))
                         Kv("In bed", hmin(tn.inBedMin + Analysis.FALL_ASLEEP_MIN))
+                        if (tn.shortMin > 0 && tn.usualBed != null) {
+                            Kv("Won't fit", "${tn.shortMin}m", "your usual is ${tn.usualBed.format(hhmm)}, earlier than ${Analysis.MAX_EARLIER_MIN}m before rarely works")
+                        }
                         Kv("Wake-up", wake.format(hhmm), "your usual, ${tn.wakeFrom}")
                     }
                 }

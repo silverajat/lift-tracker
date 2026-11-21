@@ -224,7 +224,19 @@ object Analysis {
     data class Tonight(
         val needMin: Int, val bed: LocalTime?, val wake: LocalTime?,
         val inBedMin: Int = needMin, val wakeFrom: String = "", val strainMin: Int = 0, val debtMin: Int = 0, val sickMin: Int = 0,
+        /** Your usual time of falling asleep (median, last 2 weeks). */
+        val usualBed: LocalTime? = null,
+        /** Sleep you can't fit tonight, because lights out would be too far before your usual time. */
+        val shortMin: Int = 0,
     )
+
+    /**
+     * Lights out at most this much before your usual time. Earlier than that you mostly lie awake: the hour or two
+     * before your usual sleep time is when the body clock pushes hardest for wakefulness (the "wake maintenance
+     * zone", Lavie 1986; Strogatz et al. 1987), and the clock only shifts about an hour a day at best.
+     * What doesn't fit stays as debt and comes off the next nights.
+     */
+    const val MAX_EARLIER_MIN = 45
 
     /** Minutes to fall asleep, added before the time in bed. */
     const val FALL_ASLEEP_MIN = 15
@@ -256,10 +268,25 @@ object Analysis {
             recent.size >= 3 -> med(recent) to "lately"
             else -> return Tonight(need, null, null, need, "", nd.strainMin, nd.payBackMin, sick)
         }
-        val eff = r.days.takeLast(7).mapNotNull { it.sleep?.efficiency }.takeIf { it.size >= 3 }?.average()?.div(100.0) ?: 0.9
-        val inBed = (need / eff.coerceIn(0.75, 1.0)).roundToInt()
-        return Tonight(need, wake.minusMinutes((inBed + FALL_ASLEEP_MIN).toLong()), wake, inBed, from, nd.strainMin, nd.payBackMin, sick)
+        val eff = r.days.takeLast(7).mapNotNull { it.sleep?.efficiency }.takeIf { it.size >= 3 }?.average()?.div(100.0)
+            ?.coerceIn(0.75, 1.0) ?: 0.9
+        val inBed = (need / eff).roundToInt()
+        val ideal = wake.minusMinutes((inBed + FALL_ASLEEP_MIN).toLong())
+        // your usual time of falling asleep, as minutes from midnight (negative = the evening before)
+        val usual = r.days.filter { it.date > date.minusDays(14) && it.date <= date }.mapNotNull { d -> d.sleep?.let { bedMinutes(it.start, zone) } }
+            .takeIf { it.size >= 5 }?.sorted()?.let { s -> (s[(s.size - 1) / 2] + s[s.size / 2]) / 2 }
+        val wakeM = wake.hour * 60 + wake.minute
+        val idealM = wakeM - inBed - FALL_ASLEEP_MIN
+        if (usual == null || idealM >= usual - MAX_EARLIER_MIN) {
+            return Tonight(need, ideal, wake, inBed, from, nd.strainMin, nd.payBackMin, sick, usual?.let { clockOf(it) })
+        }
+        val bedM = usual - MAX_EARLIER_MIN
+        val fits = ((wakeM - bedM - FALL_ASLEEP_MIN) * eff).roundToInt()
+        return Tonight(need, clockOf(bedM), wake, wakeM - bedM - FALL_ASLEEP_MIN, from, nd.strainMin, nd.payBackMin, sick,
+            clockOf(usual), (need - fits).coerceAtLeast(0))
     }
+
+    private fun clockOf(m: Int): LocalTime = LocalTime.of(Math.floorMod(m, 24 * 60) / 60, Math.floorMod(m, 60))
 
     fun sleep(days: List<HealthDay>, i: Int, strainPrev: Double?, zone: ZoneId): SleepResult? {
         val s = days[i].sleep ?: return null
