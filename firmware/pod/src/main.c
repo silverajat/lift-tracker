@@ -238,6 +238,7 @@ void pod_fill_status(struct pod_status *st)
 		.fw = FW_VERSION,
 		.hw = POD_HW,
 		.busy = busy,
+		.taps = imu_taps(),
 	};
 }
 
@@ -383,6 +384,7 @@ int main(void)
 	int64_t last_app = k_uptime_get();
 	int64_t fast_until = k_uptime_get() + ADV_FAST_S * 1000;
 	bool was_connected = false;
+	uint8_t seen_taps = imu_taps();
 
 	for (uint32_t t = 0;; t++) {
 		struct app_cmd c;
@@ -403,6 +405,16 @@ int main(void)
 			}
 		}
 		was_connected = connected;
+		/* tapped twice: tell the app now (it ends the set) and buzz once so you know it took */
+		uint8_t taps = imu_taps();
+
+		if (taps != seen_taps) {
+			seen_taps = taps;
+			ble_status_changed();
+			gpio_pin_set_dt(&motor, 1);
+			k_msleep(70);
+			gpio_pin_set_dt(&motor, 0);
+		}
 		if (imu_take_wake() || charging()) {
 			if (now - last_motion > ADV_FAST_S * 1000) {
 				fast_until = now + ADV_FAST_S * 1000;

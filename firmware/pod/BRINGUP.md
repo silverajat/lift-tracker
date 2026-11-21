@@ -34,6 +34,7 @@ Logs while it's wired: `pyocd rtt -t nrf52840`. A good boot shows `N recordings,
 | IMU | start a set | live reps count; no "IMU not started" |
 | Flash | finish a workout | the pod bar shows "Saving sets 1/N", then "Export N recordings" |
 | Motor | rest timer ends | one buzz (two when a set starts) |
+| Double tap | knock the pod twice, quickly, mid-set | a short buzz and the set ends |
 
 Then desolder the SWD wires and cover the pads with kapton.
 

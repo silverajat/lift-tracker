@@ -27,6 +27,9 @@ class PodV2Test {
         // the prototype: protocol 1, bit 7 isn't gym, reserved bytes are ignored
         val p = PodStatus.parse(status(1, 0x80 or 0x10, 16))!!
         assertFalse(p.v2); assertFalse(p.gym); assertFalse(p.busy)
+        assertNull(p.taps); assertNull(v2.taps)
+        val tapped = PodStatus.parse(status(2, 0x80, 16) + byteArrayOf(5))!!
+        assertEquals(5, tapped.taps)
     }
 
     @Test

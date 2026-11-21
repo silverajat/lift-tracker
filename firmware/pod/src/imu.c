@@ -12,6 +12,7 @@
 #include <zephyr/sys/util.h>
 
 #include "lsm6dsv16x_reg.h"
+#include "ble.h"
 
 LOG_MODULE_REGISTER(imu, LOG_LEVEL_INF);
 
@@ -23,6 +24,8 @@ static const struct spi_dt_spec bus = SPI_DT_SPEC_GET(IMU_NODE,
 static const struct gpio_dt_spec int1 = GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), imu_int_gpios);
 static struct gpio_callback int1_cb;
 static atomic_t woke;
+static atomic_t taps;                /* double taps since boot (wraps at 256 in the status) */
+static atomic_t gym_on;
 
 /* ---- SPI glue for ST's library ------------------------------------------------ */
 static int32_t plat_write(void *h, uint8_t reg, const uint8_t *buf, uint16_t len)
@@ -58,9 +61,28 @@ static stmdev_ctx_t ctx = {
 	.mdelay = plat_delay,
 };
 
+/* INT1 is latched: read what fired (that clears it) off the interrupt, in the work queue. */
+static void int1_work_fn(struct k_work *w)
+{
+	lsm6dsv16x_all_sources_t src;
+
+	ARG_UNUSED(w);
+	if (lsm6dsv16x_all_sources_get(&ctx, &src) != 0) {
+		return;
+	}
+	if (src.double_tap && atomic_get(&gym_on)) {
+		atomic_inc(&taps);
+		ble_status_changed();        /* the app hears about it now, not on the next tick */
+	}
+	if (src.wake_up) {
+		atomic_set(&woke, 1);
+	}
+}
+static K_WORK_DEFINE(int1_work, int1_work_fn);
+
 static void int1_fired(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
-	atomic_set(&woke, 1);
+	k_work_submit(&int1_work);
 }
 
 int imu_who_am_i(void)
@@ -98,17 +120,35 @@ static int wake_mode(void)
 	return err ? -EIO : 0;
 }
 
-/* Full rate for the gym: same ranges as the prototype. INT1 is left quiet. */
+/* Full rate for the gym: same ranges as the prototype. INT1 = double tap (tap the pod twice to end
+ * a set). Tap detection wants a fast accelerometer, so it runs at 480 Hz (sampled at 100 Hz all the same).
+ * Threshold TAP_THS x 250 mg (8 g / 32) after the chip's high-pass: a sharp knock on the case, not a rep.
+ * Windows at 480 Hz: shock up to 3 x 8 / ODR = 50 ms, quiet 3 x 4 / ODR = 25 ms after each tap,
+ * second tap within TAP_GAP x 32 / ODR = ~470 ms. To be tuned on the real board. */
+#define TAP_THS  8          /* 2 g */
+#define TAP_GAP  7
 static int gym_mode(void)
 {
 	int err = 0;
 	lsm6dsv16x_pin_int_route_t route = { 0 };
+	lsm6dsv16x_tap_detection_t det = { .tap_x_en = 1, .tap_y_en = 1, .tap_z_en = 1 };
+	lsm6dsv16x_tap_thresholds_t ths = { .x = TAP_THS, .y = TAP_THS, .z = TAP_THS };
+	lsm6dsv16x_tap_time_windows_t win = { .shock = 3, .quiet = 3, .tap_gap = TAP_GAP };
+	lsm6dsv16x_interrupt_mode_t irq = { .enable = 1, .lir = 1 };
 
 	err |= lsm6dsv16x_pin_int1_route_set(&ctx, &route);
 	err |= lsm6dsv16x_xl_mode_set(&ctx, LSM6DSV16X_XL_HIGH_PERFORMANCE_MD);
 	err |= lsm6dsv16x_gy_mode_set(&ctx, LSM6DSV16X_GY_HIGH_PERFORMANCE_MD);
-	err |= lsm6dsv16x_xl_data_rate_set(&ctx, LSM6DSV16X_ODR_AT_240Hz);
+	err |= lsm6dsv16x_xl_data_rate_set(&ctx, LSM6DSV16X_ODR_AT_480Hz);
 	err |= lsm6dsv16x_gy_data_rate_set(&ctx, LSM6DSV16X_ODR_AT_240Hz);
+	err |= lsm6dsv16x_tap_detection_set(&ctx, det);
+	err |= lsm6dsv16x_tap_thresholds_set(&ctx, ths);
+	err |= lsm6dsv16x_tap_axis_priority_set(&ctx, LSM6DSV16X_ZYX);
+	err |= lsm6dsv16x_tap_time_windows_set(&ctx, win);
+	err |= lsm6dsv16x_tap_mode_set(&ctx, LSM6DSV16X_BOTH_SINGLE_DOUBLE);
+	err |= lsm6dsv16x_interrupt_enable_set(&ctx, irq);
+	route.double_tap = 1;
+	err |= lsm6dsv16x_pin_int1_route_set(&ctx, &route);
 	return err ? -EIO : 0;
 }
 
@@ -142,19 +182,23 @@ int imu_init(void)
 
 int imu_active(bool on)
 {
+	lsm6dsv16x_tap_detection_t off = { 0 };
+
+	atomic_set(&gym_on, on);
+	if (!on) {
+		lsm6dsv16x_tap_detection_set(&ctx, off);
+	}
 	return on ? gym_mode() : wake_mode();
 }
 
 bool imu_take_wake(void)
 {
-	if (!atomic_cas(&woke, 1, 0)) {
-		return false;
-	}
-	/* Reading the sources clears the latched wake-up so the next one can fire. */
-	lsm6dsv16x_all_sources_t src;
+	return atomic_cas(&woke, 1, 0);
+}
 
-	lsm6dsv16x_all_sources_get(&ctx, &src);
-	return true;
+uint8_t imu_taps(void)
+{
+	return (uint8_t)atomic_get(&taps);
 }
 
 static int16_t clamp16(float v)

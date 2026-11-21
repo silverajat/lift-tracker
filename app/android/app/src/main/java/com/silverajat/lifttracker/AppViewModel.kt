@@ -195,6 +195,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch(Dispatchers.Default) { runCatching { autoEndOff = checkAutoEnd(_model.value) } }
         viewModelScope.launch {
+            // pod v2: tapping it twice ends the set (a reconnect only sets the starting count)
+            var last: Int? = null
+            var wasReady = false
+            pod.status.collect { st ->
+                val ready = pod.conn.value == PodConn.READY
+                if (!ready || !wasReady) last = null
+                wasReady = ready
+                val t = st?.taps ?: return@collect
+                val prev = last
+                last = t
+                if (prev != null && t != prev && _phase.value == Phase.LIFTING) stopSet()
+            }
+        }
+        viewModelScope.launch {
             // Whenever the pod (re)connects, make sure it isn't auto-recording.
             pod.conn.collect {
                 if (it != PodConn.READY) return@collect

@@ -2,7 +2,8 @@
  * imu.h - ST LSM6DSV16X on SPI, through ST's register library (hal_st).
  *
  * Two modes:
- *   imu_active(true)   accel +/-8 g and gyro +/-1000 dps, both 240 Hz high-performance.
+ *   imu_active(true)   accel +/-8 g (480 Hz) and gyro +/-1000 dps (240 Hz), high-performance, and
+ *                      double-tap detection on INT1 (tap the pod twice: end the set).
  *                      Sampled at 100 Hz by the firmware: same rate, ranges and units as the
  *                      XIAO prototype's LSM6DS3TR-C (0.244 mg and 35 mdps per bit on both),
  *                      so recordings and the app's rep counter carry straight over.
@@ -20,6 +21,7 @@ int imu_init(void);                  /* reset, check the chip, start in low-powe
 int imu_active(bool on);
 int imu_read(struct sample *s);      /* milli-g and 0.1 deg/s, like the prototype */
 bool imu_take_wake(void);            /* true once after each wake-up interrupt */
+uint8_t imu_taps(void);              /* double taps seen in gym mode, counting up (wraps) */
 int imu_who_am_i(void);              /* 0x70 for the LSM6DSV16X, negative if no answer */
 
 #endif /* IMU_H_ */

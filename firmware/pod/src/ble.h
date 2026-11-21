@@ -67,6 +67,7 @@ struct __packed pod_status {
 	uint8_t fw;            /* firmware version */
 	uint8_t hw;            /* v2: POD_HW (was a 0 reserved byte on the prototype) */
 	uint8_t busy;          /* v2: 1 while erasing or sending a recording */
+	uint8_t taps;          /* v2: double taps in gym mode, counting up (wraps at 256): end the set */
 };                             /* 16 bytes */
 
 struct __packed stream_pkt {

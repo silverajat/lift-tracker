@@ -153,6 +153,8 @@ data class PodStatus(
     val busy: Boolean = false,
     /** v2: gym mode (full-rate sensor). */
     val gym: Boolean = false,
+    /** v2: double taps on the pod, counting up (wraps at 256); a new one ends the set. Null on older firmware. */
+    val taps: Int? = null,
 ) {
     /** Talks protocol 2: gym mode, buzz, recording download. */
     val v2: Boolean get() = proto >= 2
@@ -199,6 +201,7 @@ data class PodStatus(
             val fw = bb.get().toInt() and 0xff
             val hw = if (bb.hasRemaining()) bb.get().toInt() and 0xff else 0
             val busy = if (bb.hasRemaining()) bb.get().toInt() and 0xff else 0
+            val taps = if (bb.hasRemaining()) bb.get().toInt() and 0xff else null
             return PodStatus(
                 proto = proto,
                 recording = f and 0x01 != 0,
@@ -217,6 +220,7 @@ data class PodStatus(
                 hardware = hw,
                 busy = proto >= 2 && busy != 0,
                 gym = proto >= 2 && f and 0x80 != 0,
+                taps = taps.takeIf { proto >= 2 },
             )
         }
     }

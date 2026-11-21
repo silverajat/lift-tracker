@@ -140,6 +140,8 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
 - Asleep unless a workout is open: the app switches it into gym mode when a set's countdown starts, and back to
   sleep when you finish the workout (or by itself 5 min after the app goes away, or 45 min after the last set).
 - It buzzes once when rest is over and twice when a set starts.
+- Tap it twice (two quick knocks on the case) to end the set: the sensor's own tap detector, on only in gym mode.
+  A short buzz says it took.
 - After a workout the app copies the pod's full-rate recordings (100 Hz) to the phone and then clears the pod.
   "Export N recordings" on the pod bar saves them as a zip in the same layout as the laptop dumps.
 - The live stream and the rep counter are unchanged from the prototype, so everything learned so far carries over.
