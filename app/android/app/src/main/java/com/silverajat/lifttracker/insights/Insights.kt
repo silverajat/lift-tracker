@@ -230,7 +230,7 @@ object Insights {
         val lines = ArrayList<String>()
         st.steps?.takeIf { it > 300 }?.let { lines += "${"%,d".format(it)} steps (${stepsThing(it, w.start.toString(), recent)})." }
         st.avgHr?.let { lines += "Avg heart rate $it" + (st.maxHr?.let { m -> ", peaking at $m" } ?: "") + "." }
-        val mains = setOf("salad_egg", "salad_carrot", "chicken_rice", "mixed_rice")
+        val mains = setOf("salad_egg", "salad_carrot", "chicken_rice", "chicken_rice_plain", "mixed_rice", "mixed_rice_red")
         val meal = meals.filter { it.foodId in mains || it.slot == Slot.LUNCH || it.slot == Slot.DINNER }
             .lastOrNull { val dt = (w.start.toEpochMilli() - it.timeMs) / 60_000; dt in 0..75 }
         var title = "$emoji $mins-min $name"

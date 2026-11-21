@@ -317,7 +317,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteWeight(d: LocalDate) { meals.deleteWeight(d); _weights.value = allWeights(); refreshAnalysis() }
 
-    private val mains = setOf("salad_egg", "salad_carrot", "chicken_rice", "mixed_rice")
+    private val mains = setOf("salad_egg", "salad_carrot", "chicken_rice", "chicken_rice_plain", "mixed_rice", "mixed_rice_red")
 
     private fun refreshWalks() {
         val list = _entries.value.filter { it.foodId in mains }
