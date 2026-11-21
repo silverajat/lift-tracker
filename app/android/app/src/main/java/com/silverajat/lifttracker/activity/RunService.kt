@@ -33,6 +33,8 @@ class RunService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var tts: TextToSpeech? = null
     private val listener = LocationListener { RunTracker.onLocation(it) }
+    /** Keeps the CPU awake with the screen off, so GPS fixes keep coming on phones that throttle background apps. */
+    private var wake: android.os.PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -51,15 +53,23 @@ class RunService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val gps = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (!gps) { stopSelf(); return START_NOT_STICKY }
+        // restarted after the phone killed the app: carry on with the run it was tracking
+        if (!RunTracker.state.value.active) RunTracker.restore(this, fromService = true)
         startForeground(ID, note(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+        if (!RunTracker.state.value.active) { stopSelf(); return START_NOT_STICKY }
+        if (wake == null) wake = getSystemService(android.os.PowerManager::class.java)
+            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "lifttracker:run").apply { acquire(6 * 60 * 60 * 1000L) }
         runCatching {
             getSystemService(LocationManager::class.java).requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, listener, Looper.getMainLooper())
         }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.children?.forEach { it.cancel() }
         scope.launch {
+            var n = 0
             while (isActive) {
                 delay(5000)
                 if (!RunTracker.state.value.active) { stopSelf(); break }
                 getSystemService(NotificationManager::class.java).notify(ID, note())
+                if (++n % 3 == 0) RunTracker.snapshot(this@RunService)
             }
         }
         return START_STICKY
@@ -67,6 +77,8 @@ class RunService : Service() {
 
     override fun onDestroy() {
         runCatching { getSystemService(LocationManager::class.java).removeUpdates(listener) }
+        runCatching { wake?.takeIf { it.isHeld }?.release() }
+        wake = null
         RunTracker.onSplit = null
         tts?.shutdown()
         scope.cancel()

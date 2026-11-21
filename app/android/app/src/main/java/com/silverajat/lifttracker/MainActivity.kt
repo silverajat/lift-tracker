@@ -103,9 +103,20 @@ class MainActivity : ComponentActivity() {
 
     private fun startGps(sport: com.silverajat.lifttracker.activity.Sport) {
         gpsSport = sport
+        askNoBatteryLimit()
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED)
             com.silverajat.lifttracker.activity.RunTracker.start(this, sport)
         else askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
+    /** Once: ask Android not to put the app to sleep (or runs stop counting with the screen off on many phones). */
+    private fun askNoBatteryLimit() {
+        val pm = getSystemService(android.os.PowerManager::class.java) ?: return
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        runCatching {
+            startActivity(Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                android.net.Uri.parse("package:$packageName")))
+        }
     }
 
     private fun connectPod() {

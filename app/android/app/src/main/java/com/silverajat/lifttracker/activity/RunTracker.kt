@@ -54,13 +54,36 @@ object RunTracker {
         _state.value = State(sport = sport, active = true, startMs = System.currentTimeMillis())
         listenHr(ctx)
         // a run needs GPS with the screen off (a foreground service); a timed game only needs its start time
-        if (sport == Sport.RUN || sport == Sport.WALK) ctx.startForegroundService(Intent(ctx, RunService::class.java)) else persist(ctx)
+        persist(ctx)
+        if (sport == Sport.RUN || sport == Sport.WALK) ctx.startForegroundService(Intent(ctx, RunService::class.java))
     }
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences("live", Context.MODE_PRIVATE)
 
+    private fun liveFile(ctx: Context) = java.io.File(ctx.filesDir, "live_run.json")
+
+    /**
+     * A GPS run in progress, saved to a file (RunService does it every 15 s, and on pause/resume), so if the phone
+     * kills the app mid-run, the run carries on from where it was when the app or the service comes back.
+     */
+    fun snapshot(ctx: Context) {
+        val s = _state.value
+        val f = liveFile(ctx)
+        if (!s.active || !s.usesGps) { f.delete(); return }
+        runCatching {
+            val a = Activity(id = "live", sport = s.sport, startMs = s.startMs, durationS = 0, distanceKm = null, note = "",
+                route = s.points, splitsS = s.splitsS, elapsedS = 0, hr = s.hr)
+            val o = ActivityStore.toJson(a).put("distanceM", s.distanceM).put("pausedTotal", s.pausedTotalMs)
+                .put("pausedAt", s.pausedAt ?: 0L).put("splitStart", splitStartMoving)
+            val tmp = java.io.File(ctx.filesDir, "live_run.tmp")
+            tmp.writeText(o.toString())
+            tmp.renameTo(f)
+        }
+    }
+
     /** Timed sessions survive the app being closed: their state is saved. */
     private fun persist(ctx: Context) {
+        snapshot(ctx)
         val s = _state.value
         prefs(ctx).edit().apply {
             if (!s.active || s.usesGps) clear()
@@ -68,9 +91,26 @@ object RunTracker {
         }.apply()
     }
 
-    /** Call when the app opens: brings back a football/badminton session that was going. */
-    fun restore(ctx: Context) {
+    /** Call when the app opens (or RunService restarts): brings back a run or a football/badminton session that was going. */
+    fun restore(ctx: Context, fromService: Boolean = false) {
         if (_state.value.active) return
+        val f = liveFile(ctx)
+        if (f.exists()) {
+            runCatching {
+                val o = org.json.JSONObject(f.readText())
+                val a = ActivityStore.fromJson(o)
+                val pausedAt = o.optLong("pausedAt", 0).takeIf { it > 0 }
+                // carry on from the last saved point: a gap while the app was dead counts as a straight line
+                last = a.route.lastOrNull()?.let { r -> Location("saved").apply { latitude = r.lat; longitude = r.lng; time = r.t } }
+                splitStartMoving = o.optLong("splitStart", 0)
+                _state.value = State(sport = a.sport, active = true, startMs = a.startMs, pausedTotalMs = o.optLong("pausedTotal", 0),
+                    paused = pausedAt != null, pausedAt = pausedAt, distanceM = o.optDouble("distanceM", 0.0),
+                    points = a.route, splitsS = a.splitsS, hr = a.hr)
+                listenHr(ctx)
+                if (!fromService) ctx.startForegroundService(Intent(ctx, RunService::class.java))
+            }
+            return
+        }
         val p = prefs(ctx)
         val sport = p.getString("sport", null)?.let { runCatching { Sport.valueOf(it) }.getOrNull() } ?: return
         val pausedAt = p.getLong("pausedAt", 0).takeIf { it > 0 }
