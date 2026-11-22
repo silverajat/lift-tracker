@@ -58,17 +58,62 @@ object HrMonitor {
         (c.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
             c.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED)
 
+    /**
+     * A watch that's already sharing heart rate with the phone (the Fitbit Air via Google Health) is connected,
+     * so it stops advertising and a scan never finds it. So first try the devices the phone already knows:
+     * the one that worked last time, those connected right now, then paired ones. Each is opened and kept only if
+     * it has the Heart Rate service. Only then scan for something new.
+     */
+    private val probe = ArrayDeque<BluetoothDevice>()
+    private var probing = false
+
     fun start(c: Context) {
         ctx = c.applicationContext
         wanted = true
         if (gatt != null) return
         if (!allowed(c)) { _state.value = State(Status.NO_PERMISSION); return }
-        scan()
+        _state.value = State(Status.SEARCHING)
+        probe.clear()
+        probe.addAll(known())
+        probeNext()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun known(): List<BluetoothDevice> {
+        val c = ctx ?: return emptyList()
+        val bm = c.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager ?: return emptyList()
+        val adapter = bm.adapter ?: return emptyList()
+        val last = prefs()?.getString("hr_addr", null)?.let { a -> runCatching { adapter.getRemoteDevice(a) }.getOrNull() }
+        val connected = runCatching { bm.getConnectedDevices(BluetoothProfile.GATT) }.getOrDefault(emptyList())
+        val paired = runCatching { adapter.bondedDevices.toList() }.getOrDefault(emptyList())
+            .filter { it.type == BluetoothDevice.DEVICE_TYPE_LE || it.type == BluetoothDevice.DEVICE_TYPE_DUAL }
+        return (listOfNotNull(last) + connected + paired).distinctBy { it.address }.take(8)
+    }
+
+    private fun prefs() = ctx?.getSharedPreferences("hr", Context.MODE_PRIVATE)
+
+    private fun probeNext() {
+        if (!wanted || gatt != null) return
+        val d = probe.removeFirstOrNull()
+        if (d == null) { probing = false; scan(); return }
+        probing = true
+        connect(d)
+        // nothing back in 8 s: next one
+        val g = gatt
+        main.postDelayed({ if (probing && gatt === g && _state.value.status != Status.CONNECTED) { drop(); probeNext() } }, 8_000)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun drop() {
+        runCatching { gatt?.disconnect(); gatt?.close() }
+        gatt = null
     }
 
     @SuppressLint("MissingPermission")
     fun stop() {
         wanted = false
+        probing = false
+        probe.clear()
         runCatching { scanner()?.stopScan(scanCb) }
         runCatching { gatt?.disconnect(); gatt?.close() }
         gatt = null
@@ -86,8 +131,8 @@ object HrMonitor {
         _state.value = State(Status.SEARCHING)
         val filter = ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE)).build()
         runCatching { s.startScan(listOf(filter), ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(), scanCb) }
-        // keep looking: re-arm the scan every 20 s until something shows up
-        main.postDelayed({ if (wanted && gatt == null) { runCatching { s.stopScan(scanCb) }; scan() } }, 20_000)
+        // keep looking every 20 s: the known watches again (it may be back in range), then a fresh scan
+        main.postDelayed({ if (wanted && gatt == null && !probing) { runCatching { s.stopScan(scanCb) }; ctx?.let { start(it) } } }, 20_000)
     }
 
     private val scanCb = object : ScanCallback() {
@@ -112,15 +157,24 @@ object HrMonitor {
             if (newState == BluetoothProfile.STATE_CONNECTED) g.discoverServices()
             else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 runCatching { g.close() }
-                gatt = null
+                if (gatt === g) gatt = null
+                if (probing) { main.post { probeNext() }; return }
                 _state.value = State(if (wanted) Status.SEARCHING else Status.OFF)
-                if (wanted) main.postDelayed({ if (wanted && gatt == null) scan() }, 2_000)
+                // dropped mid-run: straight back to the same watch, then the usual search
+                if (wanted) main.postDelayed({ if (wanted && gatt == null) start(ctx ?: return@postDelayed) }, 2_000)
             }
         }
 
         @SuppressLint("MissingPermission")
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
-            val ch = g.getService(SERVICE)?.getCharacteristic(MEASUREMENT) ?: return
+            val ch = g.getService(SERVICE)?.getCharacteristic(MEASUREMENT)
+            if (ch == null) {
+                // not a heart-rate device: try the next one
+                if (probing) main.post { if (gatt === g) drop(); probeNext() }
+                return
+            }
+            probing = false
+            prefs()?.edit()?.putString("hr_addr", g.device.address)?.apply()
             g.setCharacteristicNotification(ch, true)
             val d = ch.getDescriptor(CCCD) ?: return
             if (Build.VERSION.SDK_INT >= 33) g.writeDescriptor(d, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
