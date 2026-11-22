@@ -95,6 +95,15 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
     var weightOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
 
     editing?.let { e -> EntryDialog(e, onDismiss = { editing = null }, hub = hub) }
+    // a meal from a photo
+    var photoSlot by remember { mutableStateOf<Slot?>(null) }
+    var choosing by remember { mutableStateOf(false) }
+    var photo by remember { mutableStateOf<ByteArray?>(null) }
+    val picker = rememberMealPhoto { photo = it }
+    if (choosing) PhotoSourceDialog(onDismiss = { choosing = false; photoSlot = null },
+        onCamera = { choosing = false; picker.camera() }, onGallery = { choosing = false; picker.gallery() })
+    val ps = photoSlot; val pj = photo
+    if (ps != null && pj != null) PhotoMealDialog(hub, ps, pj, onDone = { photo = null; photoSlot = null })
     customSlot?.let { s -> CustomDialog(s, hub, onDismiss = { customSlot = null }, onSave = { n, m -> hub.logCustom(s, n, m); customSlot = null }) }
     if (weightDialog) WeightDialog(onDismiss = { weightDialog = false }, onSave = { hub.setWeight(it, if (weightOpen) LocalDate.now() else date); weightDialog = false })
     if (weightOpen) {
@@ -194,11 +203,16 @@ fun MealsScreen(hub: HubViewModel, startOnLog: Boolean = false) {
                                     Tag("+ " + short(f), color = if (f.id == suggested) C.Accent else C.Text,
                                         modifier = Modifier.clickable { hub.log(slot, f) })
                                 }
+                                Tag("+ 📷 photo", color = C.Muted, modifier = Modifier.clickable { photoSlot = slot; choosing = true })
                                 Tag("+ other", color = C.Muted, modifier = Modifier.clickable { customSlot = slot })
                             }
                         } else {
-                            Text("+ add something else", color = C.Muted, style = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier.clickable { customSlot = slot })
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text("+ add something else", color = C.Muted, style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.clickable { customSlot = slot })
+                                Text("+ 📷 photo", color = C.Muted, style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.clickable { photoSlot = slot; choosing = true })
+                            }
                         }
                         if (isMain && logged.isNotEmpty()) Text("Walk ${Targets.walkAfterMealMin} min after", style = MaterialTheme.typography.labelMedium, color = C.Muted)
                     }

@@ -26,6 +26,8 @@ import com.silverajat.lifttracker.meals.WeightEntry
 import com.silverajat.lifttracker.reps.RepModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -264,6 +266,53 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         meals.update(e.copy(name = f.name, macros = f.macros * e.portion, amounts = f.amounts))
         if (usual) meals.setUsual(base.id, f.amounts)
         reloadMeals()
+    }
+
+    private val photoFixes = com.silverajat.lifttracker.meals.PhotoMeal.Corrections(app.filesDir)
+    private val photoLog = com.silverajat.lifttracker.meals.PhotoMeal.Log(app.filesDir)
+    private val photoRefs: List<Pair<ByteArray, String>> by lazy {
+        com.silverajat.lifttracker.meals.PhotoMeal.BUNDLED.mapNotNull { (f, t) ->
+            runCatching { app.assets.open("meal_refs/$f").use { it.readBytes() } to t }.getOrNull()
+        }
+    }
+
+    /**
+     * A meal from a photo: 3 runs at once, the middle one kept (see PhotoMeal). [answers] are your replies to its
+     * questions, for a second go. Calls back with the estimate, or an error message.
+     */
+    fun estimatePhoto(jpeg: ByteArray, answers: List<String>, onDone: (com.silverajat.lifttracker.meals.PhotoMeal.Estimate?, String?) -> Unit) {
+        val key = _apiKey.value
+        if (key.isBlank()) { onDone(null, "Add your OpenAI key in the chat settings first."); return }
+        viewModelScope.launch {
+            val instr = com.silverajat.lifttracker.meals.PhotoMeal.instructions(photoFixes.all())
+            val examples = withContext(Dispatchers.IO) { photoRefs + photoLog.newest(4).map { it.jpeg to it.text } }
+            val ask = if (answers.isEmpty()) "Now the meal to estimate. What's on this plate?" else "What's on this plate? Answers to your questions: " + answers.joinToString("; ") +
+                ". Don't ask anything else."
+            var error: String? = null
+            val runs = withContext(Dispatchers.IO) {
+                (1..3).map {
+                    async {
+                        runCatching { com.silverajat.lifttracker.meals.PhotoMeal.parse(Gpt.sendImage(key, _model.value, instr, ask, jpeg, examples = examples)) }
+                            .onFailure { e -> error = e.message }.getOrNull()
+                    }
+                }.awaitAll().filterNotNull()
+            }
+            val est = com.silverajat.lifttracker.meals.PhotoMeal.middle(runs)?.let { if (answers.isNotEmpty()) it.copy(questions = emptyList()) else it }
+            onDone(est, if (est == null) (error ?: "Couldn't read the answer. Try again.") else null)
+        }
+    }
+
+    /** Save a photo meal at your [grams] per part (null: not there); portions you changed are remembered for the next photos. */
+    fun logPhoto(slot: Slot, est: com.silverajat.lifttracker.meals.PhotoMeal.Estimate, grams: List<Double?>, jpeg: ByteArray? = null) {
+        val now = System.currentTimeMillis()
+        val fixes = est.items.mapIndexedNotNull { i, it ->
+            val g = grams.getOrNull(i) ?: 0.0
+            if (it.grams > 0 && kotlin.math.abs(g / it.grams - 1) >= 0.1) com.silverajat.lifttracker.meals.PhotoMeal.Correction(it.name, it.grams, g, now) else null
+        }
+        photoFixes.add(fixes)
+        val items = est.items.mapIndexedNotNull { i, it -> grams.getOrNull(i)?.let { g -> it.at(g) } }
+        if (jpeg != null) viewModelScope.launch(Dispatchers.IO) { photoLog.save(jpeg, est.name, items) }
+        logCustom(slot, "📷 " + est.name, items.fold(Macros.ZERO) { a, x -> a + x.macros })
     }
 
     /**

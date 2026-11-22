@@ -81,6 +81,34 @@ object Gpt {
         } finally { c.disconnect() }
     }
 
+    /** One question about a photo (a JPEG). Blocking: run it off the main thread. */
+    fun sendImage(key: String, model: String, instructions: String, text: String, jpeg: ByteArray, maxTokens: Int = 3000,
+                  examples: List<Pair<ByteArray, String>> = emptyList()): String {
+        fun url(b: ByteArray) = "data:image/jpeg;base64," + android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP)
+        val content = JSONArray()
+        // worked examples first, small (low detail), then the photo to estimate
+        examples.forEach { (b, t) ->
+            content.put(JSONObject().put("type", "input_text").put("text", t))
+            content.put(JSONObject().put("type", "input_image").put("image_url", url(b)).put("detail", "low"))
+        }
+        content.put(JSONObject().put("type", "input_text").put("text", text))
+        content.put(JSONObject().put("type", "input_image").put("image_url", url(jpeg)).put("detail", "high"))
+        val body = JSONObject().apply {
+            put("model", model)
+            put("instructions", instructions)
+            put("max_output_tokens", maxTokens)
+            put("store", false)
+            put("input", JSONArray().put(JSONObject().put("role", "user").put("content", content)))
+        }
+        val c = open("responses", key)
+        try {
+            c.requestMethod = "POST"
+            c.doOutput = true
+            c.outputStream.use { it.write(body.toString().toByteArray()) }
+            return text(JSONObject(read(c)))
+        } finally { c.disconnect() }
+    }
+
     /** The reply's text from a Responses API result. */
     fun text(o: JSONObject): String {
         val out = o.optJSONArray("output") ?: return ""
