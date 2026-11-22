@@ -258,7 +258,8 @@ object BodyCheck {
             // "still" only if it's still off the same way it was when run down: HRV that dropped and is now well
             // above normal (with resting HR normal) has bounced back, it isn't still off
             val ev = listOf(Signal.BREATHING, Signal.TEMPERATURE, Signal.RESTING_HR, Signal.HRV, Signal.OXYGEN).mapNotNull { s ->
-                val was = peak[s]?.takeIf { it.off } ?: return@mapNotNull null
+                // HRV only counts the way illness moves it: down. HRV up while sick (or since) isn't being run down.
+                val was = peak[s]?.takeIf { it.off && !(s == Signal.HRV && it.change > 0) } ?: return@mapNotNull null
                 val now = n[s]
                 if (now == null || !now.off || (now.change > 0) != (was.change > 0)) "${s.label} back to normal (was ${was.changeText()})"
                 else "${s.label} still ${now.changeText()}"

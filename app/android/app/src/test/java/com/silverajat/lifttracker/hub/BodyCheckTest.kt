@@ -88,6 +88,15 @@ class BodyCheckTest {
         assertTrue(r.reasons.toString(), r.reasons.none { it.title.startsWith("Settling") || it.title.startsWith("Stress") })
     }
 
+    /** HRV was high while sick and still is, everything else is back: recovered, not still settling. */
+    @Test fun hrvHighThroughoutIsntStillSick() {
+        val sick = { i: Int -> night(i, rr = 16.6, rhr = 59, hrv = 85.0) }
+        val days = normal.take(27) + sick(27) + sick(28) + sick(29) + night(30) + night(31, hrv = 85.0)
+        val r = BodyCheck.run(days, emptyMap(), today)!!
+        assertTrue(r.reasons.toString(), r.reasons.none { it.title.startsWith("Settling") })
+        assertTrue(r.state == State.ADAPTING || r.state == State.NORMAL)
+    }
+
     /** HRV well up on its own, nothing else: not stress or an injury. */
     @Test fun highHrvAloneIsGood() {
         val r = BodyCheck.run(normal + night(30) + night(31, hrv = 80.0), emptyMap(), today)!!
