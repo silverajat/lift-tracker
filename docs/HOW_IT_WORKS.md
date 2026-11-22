@@ -147,6 +147,15 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
 - The live stream and the rep counter are unchanged from the prototype, so everything learned so far carries over.
   First flash and updates: `firmware/pod/BRINGUP.md`.
 
+## Meals from a photo
+
+"+ 📷 photo" on any meal: GPT (your key and model) lists each part of the plate with its grams, protein, carbs, fat and fibre.
+Calories are worked out from those (4/4/9 + 2 per g fibre), so they add up. Before your photo it's shown worked examples:
+photos of your regular meals with their agreed breakdowns (mixed rice, chicken rice, the salad bowl), plus the last 4 meals you
+logged from a photo with the grams you confirmed. It's told your past portion corrections too. It runs 3 times at once and keeps
+the middle answer (the spread is shown if it's big), and may ask up to 2 things a photo can't show. If the plate is one of your
+regulars, your usual is shown next to it, with "Log my usual". Change any grams before adding: the change is remembered.
+
 ## Auto-end
 
 A set stops itself when the motion changes, not after a pause (a long breather at lockout is still the set):
