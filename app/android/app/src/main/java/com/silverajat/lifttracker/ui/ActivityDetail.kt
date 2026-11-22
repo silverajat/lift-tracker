@@ -94,7 +94,7 @@ fun ActivityDetail(
                             DStat("${item.minutes}", "minutes")
                             DStat((a?.avg ?: item.avgHr)?.toString() ?: "–", "avg bpm")
                             DStat((a?.max ?: item.maxHr)?.toString() ?: "–", "max bpm")
-                            DStat(item.strain?.let { "%.1f".format(it) } ?: "–", "strain", StrainBlue)
+                            DStat(item.strain?.let { "%.1f".format(it) } ?: "–", if (item.strainEstimated) "strain (est.)" else "strain", StrainBlue)
                         }
                         val extra = listOfNotNull(
                             a?.kcal?.let { "$it" to "calories" },

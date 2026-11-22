@@ -356,7 +356,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
                 }?.let { manualHr[a.id] = it }
             }
             _items.value = withContext(Dispatchers.Default) {
-                com.silverajat.lifttracker.activity.ActivityLog.merge(_days.value, list, manualHr, sessions.all(), overrides.all())
+                com.silverajat.lifttracker.activity.ActivityLog.merge(_days.value, list, manualHr, sessions.all(), overrides.all(), _hrMax.value)
             }
             learnHrMax(_items.value)
         }

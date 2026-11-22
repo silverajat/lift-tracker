@@ -264,6 +264,8 @@ class HealthRepo(private val context: Context) {
         val s = runCatching { readAll(HeartRateRecord::class, from, to).flatMap { r -> r.samples.map { HrSample(it.time, it.beatsPerMinute.toInt()) } } }
             .getOrDefault(emptyList()).filter { it.time >= from && it.time <= to }
         if (s.size < 3) return null
+        // not synced yet (or the watch was off): don't settle on a few minutes of it, ask again next time
+        if (com.silverajat.lifttracker.activity.RunEffort.coverage(s.map { it.time.toEpochMilli() }, from.toEpochMilli(), to.toEpochMilli()) < 0.8) return null
         return Workout(from, to, "", null, avgHr = s.map { it.bpm }.average().toInt(), maxHr = s.maxOf { it.bpm },
             trimp = Scores.load(s, restingHr, hrMax)?.trimp)
     }

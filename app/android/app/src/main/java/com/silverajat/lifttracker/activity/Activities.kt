@@ -149,7 +149,45 @@ data class ActivityItem(
     val source: String,            // "Fitbit", "Logged", "GPS run", "Pod"
     val manualId: String? = null,
     val sessionId: Long? = null,
+    /** No heart rate for most of it (yet): strain estimated from pace (RunEffort). */
+    val strainEstimated: Boolean = false,
 )
+
+/**
+ * Strain for a run before (or without) its heart rate: from pace. Running costs VO2 = 0.2 x speed + 3.5 ml/kg/min
+ * (ACSM, flat; walking 0.1 x speed + 3.5), and the share of your heart-rate reserve tracks the share of your VO2
+ * reserve (Swain & Leutholtz 1997). VO2 max from the Fitbit, else 15.3 x max HR / resting HR (Uth et al. 2004).
+ * Each km split counts on its own (Banister TRIMP is steeper at higher effort).
+ */
+object RunEffort {
+    fun hrr(sport: Sport, metersPerMin: Double, vo2max: Double): Double {
+        val vo2 = (if (sport == Sport.WALK) 0.1 else 0.2) * metersPerMin + 3.5
+        return ((vo2 - 3.5) / (vo2max - 3.5)).coerceIn(0.0, 0.95)
+    }
+
+    private fun trimp(min: Double, f: Double) = if (f < 0.3) 0.0 else min * f * 0.64 * kotlin.math.exp(1.92 * f)
+
+    fun trimp(a: Activity, vo2max: Double?, restingHr: Int?, hrMax: Int): Int? {
+        val km = a.distanceKm ?: return null
+        if (a.durationS < 120 || km < 0.2) return null
+        val max = vo2max ?: (15.3 * hrMax / (restingHr ?: 60))
+        var t = 0.0
+        var doneS = 0; var doneKm = 0.0
+        for (s in a.splitsS) if (s > 0) { t += trimp(s / 60.0, hrr(a.sport, 1000.0 / (s / 60.0), max)); doneS += s; doneKm += 1.0 }
+        val restS = a.durationS - doneS; val restKm = km - doneKm
+        if (restS > 30 && restKm > 0.05) t += trimp(restS / 60.0, hrr(a.sport, restKm * 1000 / (restS / 60.0), max))
+        return t.roundToInt()
+    }
+
+    /** Share of [from]..[to] that heart-rate readings cover (gaps over 5 min don't count). */
+    fun coverage(times: List<Long>, from: Long, to: Long): Double {
+        if (to <= from || times.size < 2) return 0.0
+        val t = times.sorted()
+        var covered = 0L
+        for (i in 0 until t.size - 1) { val g = t[i + 1] - t[i]; if (g in 1..300_000) covered += g }
+        return covered.toDouble() / (to - from)
+    }
+}
 
 object ActivityLog {
     /**
@@ -158,7 +196,9 @@ object ActivityLog {
      * item: your name and distance, the Fitbit's heart rate.
      */
     fun merge(days: List<HealthDay>, manual: List<Activity>, manualHr: Map<String, Workout>, sessions: List<Session>,
-              overrides: Map<Long, Sport?> = emptyMap()): List<ActivityItem> {
+              overrides: Map<Long, Sport?> = emptyMap(), hrMax: Int = com.silverajat.lifttracker.health.Scores.DEFAULT_HR_MAX): List<ActivityItem> {
+        val rest = days.lastOrNull { it.restingHr != null }?.restingHr
+        val vo2max = days.lastOrNull { it.vo2max != null }?.vo2max
         // hidden ones are dropped; the rest keep your corrected type
         val fitbit = days.flatMap { it.workouts }.filter { w -> !(overrides.containsKey(w.start.toEpochMilli()) && overrides[w.start.toEpochMilli()] == null) }
         val used = HashSet<Workout>()
@@ -166,10 +206,19 @@ object ActivityLog {
         for (a in manual) {
             val s = Instant.ofEpochMilli(a.startMs); val e = Instant.ofEpochMilli(a.endMs)
             val fw = fitbit.firstOrNull { it.start < e && it.end > s }?.also { used += it }
+            // heart rate: the live Bluetooth readings if they cover the run, else the Fitbit's (once synced and
+            // covering it), else, for a GPS run, strain estimated from pace until the heart rate arrives
+            val live = a.hr.takeIf { RunEffort.coverage(it.map { p -> p.t }, a.startMs, a.endMs) >= 0.8 }
+            val liveLoad = live?.let { pts ->
+                com.silverajat.lifttracker.health.Scores.load(pts.map { com.silverajat.lifttracker.health.HrSample(Instant.ofEpochMilli(it.t), it.bpm) }, rest, hrMax)
+            }
             val hr = manualHr[a.id] ?: fw
+            val est = if (liveLoad == null && hr?.trimp == null && a.route.isNotEmpty()) RunEffort.trimp(a, vo2max, rest, hrMax) else null
             out += ActivityItem("m-${a.id}", a.sport, a.sport.label + (if (a.note.isNotBlank()) ": ${a.note}" else ""), s, e,
-                a.durationS / 60, a.distanceKm ?: fw?.distanceKm, hr?.avgHr, hr?.maxHr, hr?.trimp?.let { Analysis.strainOf(it) },
-                if (a.route.isNotEmpty()) "GPS run" else "Logged", manualId = a.id)
+                a.durationS / 60, a.distanceKm ?: fw?.distanceKm,
+                live?.map { it.bpm }?.average()?.roundToInt() ?: hr?.avgHr, live?.maxOf { it.bpm } ?: hr?.maxHr,
+                (liveLoad?.trimp ?: hr?.trimp ?: est)?.let { Analysis.strainOf(it) },
+                if (a.route.isNotEmpty()) "GPS run" else "Logged", manualId = a.id, strainEstimated = est != null)
         }
         for (s in sessions.filter { it.sets.isNotEmpty() && it.endMs != null }) {
             val st = Instant.ofEpochMilli(s.startMs); val en = Instant.ofEpochMilli(s.endMs!!)
