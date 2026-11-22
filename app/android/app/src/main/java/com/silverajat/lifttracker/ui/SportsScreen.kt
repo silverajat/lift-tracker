@@ -468,12 +468,12 @@ fun RunDetail(r: Activity, item: ActivityItem?, onBack: () -> Unit, onDelete: ()
                             BigStat(r.paceSPerKm?.let { ActivityLog.pace(it).removeSuffix(" /km") } ?: "–", "per km")
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                            BigStat(item?.avgHr?.toString() ?: "–", "avg heart rate")
-                            BigStat(item?.maxHr?.toString() ?: "–", "max")
-                            BigStat(item?.strain?.let { "%.1f".format(it) } ?: "–", "strain", StrainBlue)
+                            BigStat((item?.avgHr ?: hr?.avg)?.toString() ?: "–", "avg heart rate")
+                            BigStat((item?.maxHr ?: hr?.max)?.toString() ?: "–", "max")
+                            BigStat(item?.strain?.let { "%.1f".format(it) } ?: "–", if (item?.strainEstimated == true) "strain (est.)" else "strain", StrainBlue)
                             climb(r.route)?.let { BigStat("${it}m", "climb") }
                         }
-                        if (item?.avgHr == null) Text("Heart rate and strain fill in once the Fitbit syncs.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                        if (item?.avgHr == null && hr == null) Text("Heart rate and strain fill in once the Fitbit syncs.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
                     }
                 }
             }

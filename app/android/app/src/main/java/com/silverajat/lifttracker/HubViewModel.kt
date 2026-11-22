@@ -405,8 +405,21 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
                     synced.filter { it.time > Instant.ofEpochMilli(own.last().t) } else synced
                 val st = health.activityStats(item.start, item.end)
                 val rest = _days.value.lastOrNull { it.restingHr != null }?.restingHr
+                // the heart rate has synced since the list was made: use it for the run's numbers everywhere now
+                item.manualId?.takeIf { it !in manualHr }?.let { id ->
+                    val inside = samples.filter { it.time >= item.start && it.time <= item.end }
+                    val cov = com.silverajat.lifttracker.activity.RunEffort.coverage(inside.map { it.time.toEpochMilli() }, item.start.toEpochMilli(), item.end.toEpochMilli())
+                    if (cov >= 0.8 && inside.size >= 10) {
+                        manualHr[id] = com.silverajat.lifttracker.health.Workout(item.start, item.end, "", null,
+                            avgHr = inside.map { it.bpm }.average().toInt(), maxHr = inside.maxOf { it.bpm },
+                            trimp = com.silverajat.lifttracker.health.Scores.load(inside, rest, _hrMax.value)?.trimp)
+                        val merged = com.silverajat.lifttracker.activity.ActivityLog.merge(_days.value, _activities.value, manualHr, sessions.all(), overrides.all(), _hrMax.value)
+                        _items.value = merged
+                    }
+                }
+                val fresh = _items.value.firstOrNull { it.key == item.key } ?: item
                 com.silverajat.lifttracker.activity.SportAnalysis.analyze(item.sport, item.start, item.end, samples, rest, _hrMax.value,
-                    st.steps, st.kcal, item.strain, _items.value.filter { it.key != item.key })
+                    st.steps, st.kcal, fresh.strain, _items.value.filter { it.key != item.key })
             }.getOrNull()
         }
     }
