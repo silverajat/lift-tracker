@@ -77,7 +77,8 @@ object BodyCheck {
         val hrvDown get() = get(Signal.HRV)?.let { it.off && it.change < 0 } == true
         val o2Down get() = off(Signal.OXYGEN)
         val tempUp get() = off(Signal.TEMPERATURE)
-        val heartOff get() = rhrUp || hrvOff
+        /** Heart signs in the strained direction: resting HR up or HRV down (HRV up alone is usually good recovery). */
+        val heartOff get() = rhrUp || hrvDown
         val anyOff get() = rrUp || tempUp || rhrUp || hrvOff || o2Down
         fun pts(s: Signal) = get(s)?.points ?: 0
     }
@@ -241,7 +242,7 @@ object BodyCheck {
         }
 
         // 6. nothing above explains it
-        val heartPts = n.pts(Signal.RESTING_HR) + n.pts(Signal.HRV)
+        val heartPts = n.pts(Signal.RESTING_HR) + (if (n.hrvDown) n.pts(Signal.HRV) else 0)
         if (heartPts >= 2 && !sick && reasons.none { it.likely }) {
             val longRun = nightsOff >= 3
             reasons += Reason(if (longRun) "Something else, for $nightsOff nights" else "Stress, alcohol or an injury",
@@ -254,10 +255,13 @@ object BodyCheck {
         val recentSick = all.filter { it.date < n.date && it.date >= n.date.minusDays(10) }.filter { illness(it, prevOf(all, it)) >= 3 }
         if (!sick && recentSick.isNotEmpty()) {
             val peak = recentSick.maxBy { illness(it, prevOf(all, it)) }
+            // "still" only if it's still off the same way it was when run down: HRV that dropped and is now well
+            // above normal (with resting HR normal) has bounced back, it isn't still off
             val ev = listOf(Signal.BREATHING, Signal.TEMPERATURE, Signal.RESTING_HR, Signal.HRV, Signal.OXYGEN).mapNotNull { s ->
                 val was = peak[s]?.takeIf { it.off } ?: return@mapNotNull null
                 val now = n[s]
-                if (now == null || !now.off) "${s.label} back to normal (was ${was.changeText()})" else "${s.label} still ${now.changeText()}"
+                if (now == null || !now.off || (now.change > 0) != (was.change > 0)) "${s.label} back to normal (was ${was.changeText()})"
+                else "${s.label} still ${now.changeText()}"
             }
             val allBack = ev.none { it.contains(" still ") }
             reasons.add(0, Reason(if (allBack) "Back to normal after being run down" else "Settling down after being run down", true, ev,
@@ -267,9 +271,13 @@ object BodyCheck {
         // 8. all good
         val hrv = n[Signal.HRV]
         val rhr = n[Signal.RESTING_HR]
-        if (reasons.isEmpty() && hrv != null && hrv.change > 0 && hrv.z >= 1.0 && (rhr == null || rhr.change <= 0) && !n.rrUp && !n.tempUp) {
-            reasons += Reason("Recovering well", true, listOfNotNull("HRV ${hrv.valueText()}, %+d%% vs normal".format(hrv.change.roundToInt()),
-                rhr?.let { "Resting HR ${it.valueText()}, normal ${it.normalText()}" }), "A good day to push.")
+        // HRV well up with resting HR not up: the body's recovering well (also when it's just come back from being run down)
+        val onlyBack = reasons.all { it.title.startsWith("Back to normal") }
+        if (onlyBack && hrv != null && hrv.change > 0 && hrv.z >= 1.0 && (rhr == null || rhr.change <= 1) && !n.rrUp && !n.tempUp) {
+            reasons.add(0, Reason("Recovering well", true, listOfNotNull("HRV ${hrv.valueText()}, %+d%% vs normal".format(hrv.change.roundToInt()),
+                rhr?.let { "Resting HR ${it.valueText()}, normal ${it.normalText()}" }) +
+                    (if (hrv.change >= 60) listOf("One night this high can be a reading blip: see if it holds") else emptyList()),
+                if (reasons.isEmpty()) "A good day to push." else "Fine to train normally; build back up over a few sessions."))
         }
 
         val top = reasons.sortedByDescending { it.likely }.firstOrNull()

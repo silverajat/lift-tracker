@@ -615,6 +615,10 @@ fun bodyColor(st: com.silverajat.lifttracker.health.BodyCheck.State) = when (st)
     else -> Recover
 }
 
+/** Off-normal colour; HRV above normal is the good direction, so it's blue, not a warning. */
+private fun signalColor(r: com.silverajat.lifttracker.health.BodyCheck.Reading) =
+    if (r.signal == com.silverajat.lifttracker.health.BodyCheck.Signal.HRV && r.change > 0) StrainBlue else levelColor(r.level)
+
 private fun levelColor(l: com.silverajat.lifttracker.health.BodyCheck.Level) = when (l) {
     com.silverajat.lifttracker.health.BodyCheck.Level.STRONG -> RedZ
     com.silverajat.lifttracker.health.BodyCheck.Level.MILD -> Yellow
@@ -655,7 +659,7 @@ fun BodyDetail(a: Analysis.Result?, onBack: () -> Unit) {
                 Column {
                     n.readings.forEachIndexed { i, r ->
                         if (i > 0) HorizontalDivider(color = C.Line, modifier = Modifier.padding(vertical = 10.dp))
-                        Kv(r.signal.label, r.valueText(), "normal ${r.normalText()} · ${r.changeText()}", if (r.off) levelColor(r.level) else C.Text)
+                        Kv(r.signal.label, r.valueText(), "normal ${r.normalText()} · ${r.changeText()}", if (r.off) signalColor(r) else C.Text)
                     }
                 }
             }
@@ -680,7 +684,7 @@ private fun SignalGrid(nights: List<com.silverajat.lifttracker.health.BodyCheck.
                     val w = (size.width - gap * (dates.size - 1)) / dates.size
                     dates.forEachIndexed { i, d ->
                         val r = byDate[d]?.get(s)
-                        val col = if (r == null) C.Raised.copy(alpha = 0.4f) else if (r.off) levelColor(r.level) else Recover.copy(alpha = 0.35f)
+                        val col = if (r == null) C.Raised.copy(alpha = 0.4f) else if (r.off) signalColor(r) else Recover.copy(alpha = 0.35f)
                         drawRoundRect(col, Offset(i * (w + gap), 0f), Size(w, size.height), CornerRadius(3.dp.toPx()))
                     }
                 }

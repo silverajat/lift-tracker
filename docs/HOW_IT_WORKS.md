@@ -53,8 +53,8 @@ Then the pattern is read together with what you did, and each possible reason ge
 - **Short on sleep:** the same heart signs after under 75% of your need, or 2+ hours short over 3 nights.
 - **Late meal:** the same, one night only, after last food past 9:30 PM.
 - **Stress, alcohol or an injury:** heart signs clearly off with nothing above to explain them. After 3+ nights it's flagged more strongly: injuries and inflammation raise resting HR too.
-- **Settling down:** after a sick-looking night in the last 10 days, which signs are back to normal and which aren't yet.
-- **Recovering well:** HRV up, resting HR normal or lower, breathing normal.
+- **Settling down:** after a sick-looking night in the last 10 days, which signs are back to normal and which aren't yet. A sign only counts as "still off" if it's off the same way it was when you were run down: HRV that dropped and is now above normal has bounced back.
+- **Recovering well:** HRV up, resting HR normal (at most +1) or lower, breathing and temperature normal, also straight after being run down. HRV up on its own never counts as strain, stress or a late meal; only HRV down does. A single night 60%+ above normal gets a note that it may be a reading blip.
 
 None of this is a diagnosis: it says the body is under some load and what fits best.
 

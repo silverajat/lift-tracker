@@ -77,4 +77,20 @@ class BodyCheckTest {
         assertTrue(ev.toString(), ev.any { it.startsWith("Resting HR still") })
         assertEquals(start.plusDays(27), r.since)
     }
+
+    /** After a sick spell everything's back, and HRV is well above normal: that's bouncing back, not "still off". */
+    @Test fun highHrvAfterBeingRunDownIsRecovery() {
+        val sick = { i: Int -> night(i, rr = 16.6, rhr = 59, hrv = 32.0) }
+        val days = normal.take(27) + sick(27) + sick(28) + sick(29) + night(30) + night(31, hrv = 85.0)
+        val r = BodyCheck.run(days, emptyMap(), today)!!
+        assertEquals(r.reasons.toString(), State.ADAPTING, r.state)
+        assertEquals("Recovering well", r.reasons.first().title)
+        assertTrue(r.reasons.toString(), r.reasons.none { it.title.startsWith("Settling") || it.title.startsWith("Stress") })
+    }
+
+    /** HRV well up on its own, nothing else: not stress or an injury. */
+    @Test fun highHrvAloneIsGood() {
+        val r = BodyCheck.run(normal + night(30) + night(31, hrv = 80.0), emptyMap(), today)!!
+        assertEquals(State.ADAPTING, r.state)
+    }
 }
