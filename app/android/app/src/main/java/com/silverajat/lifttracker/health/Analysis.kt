@@ -165,7 +165,7 @@ object Analysis {
         return Base(m, sd, x.size)
     }
 
-    private fun median(x: List<Double>): Double {
+    fun median(x: List<Double>): Double {
         val s = x.sorted()
         return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2
     }

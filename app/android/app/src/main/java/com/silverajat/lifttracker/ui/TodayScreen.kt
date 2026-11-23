@@ -511,6 +511,16 @@ fun FitbitDataDialog(hub: HubViewModel, onDismiss: () -> Unit) {
     // new kinds of data (skin temperature, VO2 max) need allowing once
     val ask = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()) { round++; hub.refreshHealth(full = true) }
+    // Google Health API: its approval screen, when Google asks for one
+    val ghState by hub.googleHealth.collectAsStateWithLifecycle()
+    val ghConsent by hub.ghConsent.collectAsStateWithLifecycle()
+    val approve = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()) { r -> hub.googleHealthApproved(r.data) }
+    var askedApproval by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    LaunchedEffect(ghConsent, askedApproval) {
+        val pi = ghConsent
+        if (pi != null && askedApproval) { askedApproval = false; approve.launch(androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build()) }
+    }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = C.Surface,
@@ -541,6 +551,8 @@ fun FitbitDataDialog(hub: HubViewModel, onDismiss: () -> Unit) {
                         }
                     }
                 }
+                GoogleHealthSection(ghState, ghConsent != null, onConnect = { askedApproval = true; hub.connectGoogleHealth() },
+                    onApprove = { askedApproval = true }, onDisconnect = { hub.disconnectGoogleHealth() })
                 Text("If something says nothing: open the Google Health app, go to your profile, then Settings, then Health Connect, " +
                     "and turn sharing on for everything. Then open Google Health once so the watch syncs, and tap Check again.",
                     style = MaterialTheme.typography.bodySmall, color = C.Muted)
@@ -558,6 +570,40 @@ fun FitbitDataDialog(hub: HubViewModel, onDismiss: () -> Unit) {
     )
 }
 
+
+/** The Google Health API extras: connect, what came in, and whether our HRV is steadier than Fitbit's. */
+@Composable
+private fun GoogleHealthSection(g: HubViewModel.GhState, needsApproval: Boolean, onConnect: () -> Unit, onApprove: () -> Unit, onDisconnect: () -> Unit) {
+    val zone = ZoneId.systemDefault()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 6.dp)) {
+        Text("Google Health (extra data)", style = MaterialTheme.typography.titleSmall)
+        when {
+            !g.connected -> {
+                Text("Blood oxygen, HRV through the night, VO2 max and second-by-second heart rate.", style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                androidx.compose.material3.TextButton(onClick = onConnect) { Text("Connect Google Health", color = C.Accent) }
+            }
+            else -> {
+                if (needsApproval) androidx.compose.material3.TextButton(onClick = onApprove) { Text("Approve again (weekly in testing)", color = C.Accent) }
+                Text(if (g.syncing) "Syncing…" else "Synced " + (if (g.syncedMs > 0) java.time.Instant.ofEpochMilli(g.syncedMs).atZone(zone).let { t ->
+                    (if (t.toLocalDate() == LocalDate.now()) "" else t.format(shortDay) + " ") + t.format(hm) } else "never") +
+                    " · ${g.nights} nights · blood oxygen ${g.spo2Nights}" + (g.vo2?.let { " · VO2 max %.0f".format(it) } ?: ""),
+                    style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                g.steadiness?.let { st ->
+                    Text(when {
+                        st.fitbitSwingPct == null || st.oursSwingPct == null -> "HRV: comparing ours with Fitbit's (${st.nights} of 7 nights)"
+                        else -> "HRV night to night: Fitbit ±%.0f%%, ours ±%.0f%% → using %s".format(st.fitbitSwingPct, st.oursSwingPct,
+                            if (st.useOurs) "ours" else "Fitbit's") + if (st.nights < 7) " (${st.nights} of 7 nights)" else ""
+                    }, style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                }
+                g.errors.take(3).forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = Yellow) }
+                Row {
+                    androidx.compose.material3.TextButton(onClick = onConnect) { Text("Sync now", color = C.Accent) }
+                    androidx.compose.material3.TextButton(onClick = onDisconnect) { Text("Disconnect", color = C.Muted) }
+                }
+            }
+        }
+    }
+}
 
 /** Today's main 3 from the Day tab: tick them here, tap the card to open the full plan. */
 @Composable

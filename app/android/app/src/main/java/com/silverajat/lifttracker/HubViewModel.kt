@@ -119,7 +119,113 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     private val _healthState = MutableStateFlow(
         if (!health.available()) HealthState.UNAVAILABLE else if (cached != null) HealthState.OK else HealthState.LOADING)
     val healthState: StateFlow<HealthState> = _healthState
-    private val _days = MutableStateFlow(cached?.days.orEmpty())
+    // ---- Google Health API: extra Fitbit data on top of Health Connect (see GoogleHealth) ----
+    private val ghStore = com.silverajat.lifttracker.health.GoogleHealth.Store(app.filesDir)
+    private var gh = ghStore.load()
+    private var rawDays: List<HealthDay> = cached?.days.orEmpty()
+
+    data class GhState(
+        val connected: Boolean, val needsApproval: Boolean, val syncing: Boolean, val syncedMs: Long, val nights: Int,
+        val spo2Nights: Int, val vo2: Double?, val steadiness: com.silverajat.lifttracker.health.GoogleHealth.Steadiness?, val errors: List<String>,
+    )
+    private val _ghConsent = MutableStateFlow<android.app.PendingIntent?>(null)
+    /** Google wants you to approve (first time, or again after a week in testing mode): the screen launches this. */
+    val ghConsent: StateFlow<android.app.PendingIntent?> = _ghConsent
+    private val _gh = MutableStateFlow(ghState())
+    val googleHealth: StateFlow<GhState> = _gh
+
+    private fun steadiness() = com.silverajat.lifttracker.health.GoogleHealth.steadiness(gh.nights,
+        rawDays.mapNotNull { d -> d.hrvMs?.let { d.date to it } }.toMap())
+
+    private fun ghState(syncing: Boolean = false) = GhState(gh.connected, _ghConsent.value != null && gh.connected, syncing, gh.syncedMs,
+        gh.nights.size, gh.nights.values.count { it.spo2 != null }, gh.nights.values.filter { it.vo2max != null }.maxByOrNull { it.date }?.vo2max,
+        if (gh.nights.isEmpty()) null else steadiness(), gh.errors)
+
+    /** Health Connect's days with the Google Health extras: blood oxygen, VO2 max, and our HRV once it's proven steadier. */
+    private fun ghOverlay(days: List<HealthDay>): List<HealthDay> {
+        if (gh.nights.isEmpty()) return days
+        val ours = steadiness().useOurs
+        return days.map { d ->
+            val n = gh.nights[d.date] ?: return@map d
+            d.copy(spo2 = n.spo2 ?: d.spo2, vo2max = n.vo2max ?: d.vo2max, hrvMs = if (ours) n.hrvOurs ?: d.hrvMs else d.hrvMs)
+        }
+    }
+
+    private suspend fun ghToken(): Pair<String?, android.app.PendingIntent?> = kotlinx.coroutines.suspendCancellableCoroutine { k ->
+        val req = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+            .setRequestedScopes(com.silverajat.lifttracker.health.GoogleHealth.SCOPES.map { com.google.android.gms.common.api.Scope(it) })
+            .build()
+        com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(getApplication<Application>()).authorize(req)
+            .addOnSuccessListener { res ->
+                k.resumeWith(Result.success(if (res.hasResolution()) null to res.pendingIntent else res.accessToken to null))
+            }
+            .addOnFailureListener { e ->
+                gh = gh.copy(errors = listOf("Sign-in: ${e.message?.take(200)}"))
+                k.resumeWith(Result.success(null to null))
+            }
+    }
+
+    /** "Connect Google Health" (or the weekly reconnect): asks Google; the screen shows its approval if it needs one. */
+    fun connectGoogleHealth() {
+        viewModelScope.launch {
+            val (token, consent) = ghToken()
+            _ghConsent.value = consent
+            if (token != null) syncGoogleHealth(token) else _gh.value = ghState()
+        }
+    }
+
+    /** Back from Google's approval screen. */
+    fun googleHealthApproved(data: android.content.Intent?) {
+        _ghConsent.value = null
+        val res = runCatching {
+            com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(getApplication<Application>()).getAuthorizationResultFromIntent(data)
+        }.getOrNull()
+        val token = res?.accessToken
+        if (token == null) { gh = gh.copy(errors = listOf("Not approved")); _gh.value = ghState(); return }
+        viewModelScope.launch { syncGoogleHealth(token) }
+    }
+
+    fun disconnectGoogleHealth() {
+        gh = gh.copy(connected = false, nights = emptyMap(), errors = emptyList())
+        ghStore.save(gh)
+        _ghConsent.value = null
+        _days.value = ghOverlay(rawDays)
+        _gh.value = ghState()
+        refreshAnalysis()
+    }
+
+    private var ghJob: Job? = null
+    private suspend fun syncGoogleHealth(token: String) {
+        _gh.value = ghState(syncing = true)
+        val today = LocalDate.now(zone)
+        // first time: 40 days (enough for the 30-night baselines); after that the last 4 nights again
+        val from = if (gh.nights.size < 20) today.minusDays(40) else today.minusDays(4)
+        val sleeps = rawDays.mapNotNull { d -> d.sleep?.let { d.date to (it.start to it.end) } }.toMap()
+        val errors = ArrayList<String>()
+        val fresh = withContext(Dispatchers.IO) {
+            runCatching { com.silverajat.lifttracker.health.GoogleHealth.nights(token, from, today, sleeps, zone, errors) }
+                .onFailure { errors += it.message.orEmpty().take(200) }.getOrDefault(emptyMap())
+        }
+        gh = gh.copy(connected = true, nights = gh.nights + fresh, syncedMs = System.currentTimeMillis(), errors = errors)
+        withContext(Dispatchers.IO) { ghStore.save(gh) }
+        _days.value = ghOverlay(rawDays)
+        _gh.value = ghState()
+        refreshAnalysis()
+        // activities whose heart rate Health Connect doesn't cover yet
+        refreshActivities()
+    }
+
+    /** On each Health Connect sync: quietly refresh the extras too (no screen; if Google wants approval, it shows in the data check). */
+    private fun syncGoogleHealthQuietly() {
+        if (!gh.connected || ghJob?.isActive == true) return
+        ghJob = viewModelScope.launch {
+            val (token, consent) = ghToken()
+            _ghConsent.value = consent
+            if (token != null) syncGoogleHealth(token) else _gh.value = ghState()
+        }
+    }
+
+    private val _days = MutableStateFlow(ghOverlay(cached?.days.orEmpty()))
     val days: StateFlow<List<HealthDay>> = _days
     private val _analysis = MutableStateFlow<Analysis.Result?>(null)
     val analysis: StateFlow<Analysis.Result?> = _analysis
@@ -157,7 +263,8 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             val fresh = withContext(Dispatchers.IO) { runCatching { health.days(if (all) FIRST_DAYS else 3, _hrMax.value) }.getOrDefault(emptyList()) }
             if (fresh.isEmpty() && _days.value.isNotEmpty()) { _healthState.value = HealthState.OK; return@launch }
             val d = if (all || saved == null) fresh else cache.merge(saved.days, fresh)
-            _days.value = d
+            rawDays = d
+            _days.value = ghOverlay(d)
             withContext(Dispatchers.IO) { cache.save(d, all) }
             // weigh-ins from a smart scale (via Google Health), one per day
             scaleWeights = withContext(Dispatchers.IO) { health.weights(70) }
@@ -168,6 +275,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             _healthState.value = HealthState.OK
             refreshWalks()
             refreshActivities()
+            syncGoogleHealthQuietly()
             checkInsights()
         }
     }
@@ -402,6 +510,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
                 val rest = _days.value.lastOrNull { it.restingHr != null }?.restingHr
                 withContext(Dispatchers.IO) {
                     health.windowStats(Instant.ofEpochMilli(a.startMs), Instant.ofEpochMilli(a.endMs), rest, _hrMax.value)
+                        ?: ghWindow(Instant.ofEpochMilli(a.startMs), Instant.ofEpochMilli(a.endMs), rest)
                 }?.let { manualHr[a.id] = it }
             }
             _items.value = withContext(Dispatchers.Default) {
@@ -409,6 +518,19 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
             }
             learnHrMax(_items.value)
         }
+    }
+
+    /** An activity's heart rate from Google Health (second by second), if connected and it covers the activity. */
+    private var ghTokenCache: Pair<String, Long>? = null
+    private suspend fun ghWindow(from: Instant, to: Instant, rest: Int?): com.silverajat.lifttracker.health.Workout? {
+        if (!gh.connected) return null
+        val token = ghTokenCache?.takeIf { System.currentTimeMillis() - it.second < 30 * 60_000 }?.first
+            ?: withContext(Dispatchers.Main) { ghToken() }.first?.also { ghTokenCache = it to System.currentTimeMillis() } ?: return null
+        val s = runCatching { com.silverajat.lifttracker.health.GoogleHealth.heartRate(token, from, to) }.getOrDefault(emptyList())
+            .filter { it.time >= from && it.time <= to }
+        if (s.size < 10 || com.silverajat.lifttracker.activity.RunEffort.coverage(s.map { it.time.toEpochMilli() }, from.toEpochMilli(), to.toEpochMilli()) < 0.8) return null
+        return com.silverajat.lifttracker.health.Workout(from, to, "", null, avgHr = s.map { it.bpm }.average().toInt(), maxHr = s.maxOf { it.bpm },
+            trimp = com.silverajat.lifttracker.health.Scores.load(s, rest, _hrMax.value)?.trimp)
     }
 
     fun addActivity(sport: com.silverajat.lifttracker.activity.Sport, startMs: Long, minutes: Int, km: Double?, note: String) {

@@ -147,6 +147,19 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
 - The live stream and the rep counter are unchanged from the prototype, so everything learned so far carries over.
   First flash and updates: `firmware/pod/BRINGUP.md`.
 
+## Google Health extras
+
+Optional, on top of Health Connect: "Connect Google Health" in the Fitbit data check (Today, tap the Fitbit status). It signs in
+to the Google Health API (the old Fitbit Web API) read-only, through a personal Google Cloud project in testing mode, so Google
+asks you to approve again about once a week. It adds:
+
+- **Blood oxygen**, nightly average and low (Fitbit doesn't share it with Health Connect): Body's oxygen sign.
+- **VO2 max**, for run strain from pace.
+- **HRV through the night**: the app's own nightly HRV is the median of the night's readings after dropping any more than 3
+  robust spreads away, so a few noisy windows can't double it. It only replaces Fitbit's number once it's proven steadier: over
+  at least 7 nights, its typical night-to-night swing has to be 10%+ smaller than Fitbit's. The data check shows both swings.
+- **Second-by-second heart rate** for activities Health Connect doesn't cover.
+
 ## Meals from a photo
 
 "+ 📷 photo" on any meal: GPT (your key and model) lists each part of the plate with its grams, protein, carbs, fat and fibre.
