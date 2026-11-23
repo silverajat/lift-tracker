@@ -31,8 +31,40 @@ object Foods {
     private fun per(m: Macros, amount: Double) = m * (1.0 / amount)
     private fun one(key: String, label: String, unit: String, amount: Double, m: Macros) = listOf(Part(key, label, unit, amount, per(m, amount)))
 
+    /** Macros with calories worked out from them (4/4/9 + 2 per g fibre), so the parts add up. */
+    private fun at(p: Double, c: Double, f: Double, fib: Double = 0.0) = Macros(4 * p + 4 * c + 9 * f + 2 * fib, p, c, f, fib)
+
+    /** Units counted in whole servings (steppers in the app), not weighed. */
+    val COUNTED = setOf("scoop", "cup", "portion", "egg")
+
+    // mixed rice, scoop by scoop (see the breakdown below): 0 to leave a dish out, 2 for an extra scoop
+    private fun mixedRice(red: Boolean) = listOf(
+        if (red) Part("rice", "Red rice", "cup", 1.0, at(5.0, 52.0, 1.5, 3.0)) else Part("rice", "White rice", "cup", 1.0, at(5.0, 57.0, 0.6, 0.8)),
+        Part("chicken", "Braised chicken & mushroom", "scoop", 3.0, at(25.0 / 3, 3.0, 10.0 / 3, 2.0 / 3)),
+        Part("egg", "Tomato egg", "scoop", 1.0, at(6.0, 6.0, 7.0, 0.5)),
+        Part("tofu", "Braised tofu", "scoop", 1.0, at(6.0, 2.0, 3.5, 1.3)),
+        Part("greens", "Greens", "scoop", 1.0, at(1.0, 3.0, 3.0, 1.2)),
+    )
+
+    // salad bowl: chickpeas swap for kidney beans when they run out, egg for carrot
+    private fun salad(egg: Boolean) = listOf(
+        Part("rice", "Brown/red rice", "portion", 1.0, at(6.0, 49.0, 2.0, 4.0)),
+        Part("chicken", "Citrus-lime chicken", "portion", 1.0, at(22.0, 4.0, 6.0)),
+        Part("chickpeas", "Chickpeas", "scoop", 1.0, at(3.5, 11.0, 1.0, 3.0)),
+        Part("kidney", "Kidney beans", "scoop", 0.0, at(3.5, 9.0, 0.2, 2.5)),
+        Part("edamame", "Edamame", "scoop", 1.0, at(4.5, 3.5, 2.5, 2.0)),
+        Part("egg", "Egg", "egg", if (egg) 1.0 else 0.0, at(6.0, 0.5, 5.0)),
+        Part("carrot", "Carrot", "scoop", if (egg) 0.0 else 1.0, at(0.5, 5.0, 0.1, 1.4)),
+        Part("broccoli", "Broccoli", "scoop", 1.0, at(1.5, 3.0, 0.2, 1.0)),
+        Part("dressing", "Sesame dressing", "portion", 1.0, at(0.5, 2.0, 7.0)),
+    )
+
     /** Things you weigh or measure, and their ingredients. */
     private val weighed: Map<String, List<Part>> = mapOf(
+        "mixed_rice" to mixedRice(false),
+        "mixed_rice_red" to mixedRice(true),
+        "salad_egg" to salad(true),
+        "salad_carrot" to salad(false),
         // your labels: whey 130 kcal / 32 g; milks from the plan's shake totals
         "shake" to listOf(
             Part("whey", "Whey (ON Gold Standard)", "g", 32.0, Macros(4.0625, 0.75, 0.09375, 0.0625)),
@@ -61,6 +93,19 @@ object Foods {
         fun n(v: Double) = if (v == Math.floor(v)) "%.0f".format(v) else "%.1f".format(v)
         val name = if (f.id == "shake")
             "Whey ${n(a.getValue("whey"))} g + creatine ${n(a.getValue("creatine"))} g, ${n(a.getValue("hl"))} ml HL milk + ${n(a.getValue("soy"))} ml NutriSoy"
+            else if (parts.size > 1) {
+                // a dish of parts: its name, plus what's different from how it usually comes
+                val diff = parts.mapNotNull { p ->
+                    val v = a.getValue(p.key)
+                    when {
+                        v == p.default -> null
+                        v == 0.0 -> "no ${p.label.lowercase()}"
+                        p.default == 0.0 -> "+${if (v == 1.0) "" else n(v) + " "}${p.label.lowercase()}"
+                        else -> "${n(v)} ${p.label.lowercase()}"
+                    }
+                }
+                f.name.substringBefore(":") + (if (diff.isEmpty()) ": " + f.name.substringAfter(":").trim() else " (${diff.joinToString(", ")})")
+            }
             else f.name.substringBeforeLast(",") + ", ${n(a.values.first())} ${parts.first().unit}"
         return f.copy(name = name, macros = m, parts = parts, amounts = a)
     }
@@ -78,7 +123,7 @@ object Foods {
         // chickpeas ~40 g (66 kcal, 4 g), edamame ~40 g (49 kcal, 4 g), egg (72 kcal, 6 g), broccoli, ~15 ml sesame dressing (70 kcal)
         Food("salad_egg", "Salad bowl: citrus-lime chicken, brown rice, broccoli, chickpeas, edamame, egg, sesame dressing",
             Macros(700.0, 44.0, 73.0, 26.0, 10.0), "built from its parts"),
-        Food("salad_carrot", "Salad bowl, carrot instead of egg", Macros(640.0, 38.0, 76.0, 21.0, 11.0), "built from its parts"),
+        Food("salad_carrot", "Salad bowl: citrus-lime chicken, brown rice, broccoli, chickpeas, edamame, carrot, sesame dressing", Macros(640.0, 38.0, 76.0, 21.0, 11.0), "built from its parts"),
         // HPB steamed chicken rice plate (346 g, 488 kcal, ~21 g protein, 3.6 g fat per 100 g: ~12.5 g fat), ~half of it
         // from the rice (cooked in chicken fat and stock). Skinless: the skin on ~70 g of chicken is ~3 g fat, ~30 kcal.
         // + kailan in oyster sauce (~60 kcal, ~4 g fat: hawkers drizzle oil or garlic oil over it) + half a braised egg

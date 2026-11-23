@@ -309,7 +309,8 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
     val parts = e.foodId?.let { Foods.base(it) }?.let { Foods.withAmounts(it, e.amounts.ifEmpty { null }) }
     val amountText = remember { mutableStateMapOf<String, String>().apply {
         parts?.amounts?.forEach { (k, v) -> put(k, if (v == Math.floor(v)) "%.0f".format(v) else v.toString()) } } }
-    var usual by remember { mutableStateOf(true) }
+    // a dish of scoops (mixed rice, salad): what's missing today is usually a one-off, so not your new usual
+    var usual by remember { mutableStateOf(parts?.parts?.none { it.unit in Foods.COUNTED } ?: true) }
     val amounts = parts?.parts?.associate { p -> p.key to (amountText[p.key]?.toDoubleOrNull() ?: p.default) }
     if (picking) TimeDialog(hour, minute, onDismiss = { picking = false }) { h, m -> hour = h; minute = m; picking = false }
     AlertDialog(
@@ -327,10 +328,27 @@ private fun EntryDialog(e: MealEntry, onDismiss: () -> Unit, hub: HubViewModel) 
                 if (parts != null && parts.parts.isNotEmpty()) {
                     parts.parts.forEach { p ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(p.label, modifier = Modifier.weight(1f))
-                            NumField(p.unit, amountText[p.key] ?: "", { amountText[p.key] = it.filter { c -> c.isDigit() || c == '.' } },
-                                Modifier.width(96.dp))
+                            val v = amountText[p.key]?.toDoubleOrNull() ?: 0.0
+                            Text(p.label, modifier = Modifier.weight(1f), color = if (p.unit in Foods.COUNTED && v == 0.0) C.Muted else C.Text)
+                            if (p.unit in Foods.COUNTED) {
+                                // − n + : 0 leaves it out, more for an extra scoop
+                                fun set(x: Double) { amountText[p.key] = if (x == Math.floor(x)) "%.0f".format(x) else x.toString() }
+                                Text("−", style = MaterialTheme.typography.titleLarge, color = if (v > 0) C.Text else C.Muted,
+                                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(enabled = v > 0) { set((v - 1).coerceAtLeast(0.0)) }
+                                        .padding(horizontal = 12.dp, vertical = 2.dp))
+                                Text(if (v == Math.floor(v)) "%.0f".format(v) else "%.1f".format(v), style = MaterialTheme.typography.titleMedium.merge(Tnum),
+                                    modifier = Modifier.width(28.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                Text("+", style = MaterialTheme.typography.titleLarge, color = C.Text,
+                                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { set(v + 1) }.padding(horizontal = 12.dp, vertical = 2.dp))
+                            } else {
+                                NumField(p.unit, amountText[p.key] ?: "", { amountText[p.key] = it.filter { c -> c.isDigit() || c == '.' } },
+                                    Modifier.width(96.dp))
+                            }
                         }
+                    }
+                    amounts?.let { a ->
+                        val m = parts.parts.fold(com.silverajat.lifttracker.meals.Macros.ZERO) { acc, p -> acc + p.per * (a[p.key] ?: 0.0) }
+                        Text("${m.kcal.toInt()} kcal · ${m.protein.toInt()} g protein", style = MaterialTheme.typography.labelLarge, color = C.Muted)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { usual = !usual }) {
                         androidx.compose.material3.Checkbox(usual, { usual = it },
