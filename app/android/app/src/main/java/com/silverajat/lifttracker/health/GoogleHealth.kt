@@ -52,42 +52,54 @@ object GoogleHealth {
             c.connectTimeout = 15_000; c.readTimeout = 30_000
             val code = c.responseCode
             val body = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) throw ApiError(code, body.take(300))
+            if (code !in 200..299) throw ApiError(code, "$code " +
+                (runCatching { JSONObject(body).getJSONObject("error").getString("message") }.getOrNull() ?: body).take(300))
             return JSONObject(body)
         } finally { c.disconnect() }
     }
 
-    /** Every data point of [type] (path id, e.g. "heart-rate-variability") matching [filter], newest first. */
-    fun list(token: String, type: String, filter: String, pageSize: Int = 10_000, maxPages: Int = 8): List<JSONObject> {
+    /**
+     * Every data point of [type] (path id, e.g. "heart-rate-variability"), newest first, matching [filter] if given.
+     * Without a filter it pages back until [stop] says a point is older than wanted.
+     */
+    fun list(token: String, type: String, filter: String?, pageSize: Int = 10_000, maxPages: Int = 8,
+             stop: (JSONObject) -> Boolean = { false }): List<JSONObject> {
         val out = ArrayList<JSONObject>()
         var page: String? = null
         repeat(maxPages) {
-            val url = BASE + type + "/dataPoints?pageSize=$pageSize&filter=" + URLEncoder.encode(filter, "UTF-8") +
+            val url = BASE + type + "/dataPoints?pageSize=$pageSize" + (filter?.let { "&filter=" + URLEncoder.encode(it, "UTF-8") } ?: "") +
                 (page?.let { "&pageToken=" + URLEncoder.encode(it, "UTF-8") } ?: "")
             val o = get(token, url)
-            o.optJSONArray("dataPoints")?.let { a -> for (i in 0 until a.length()) out += a.getJSONObject(i) }
+            var past = false
+            o.optJSONArray("dataPoints")?.let { a -> for (i in 0 until a.length()) { val p = a.getJSONObject(i); if (stop(p)) past = true else out += p } }
+            if (past) return out
             page = o.optString("nextPageToken").takeIf { it.isNotBlank() } ?: return out
         }
         return out
     }
 
     /**
-     * The filter's field prefix is the data type's JSON name ("heartRateVariability"); if the API wants the path id
-     * ("heart-rate-variability") instead, it says so with a 400 and we ask again that way.
+     * With the documented filter (prefix = the type's JSON name, e.g. "dailyHeartRateVariability.date"); if the API
+     * turns that down (400), no filter: page back from the newest until older than wanted (it lists newest first).
      */
-    private fun listEither(token: String, path: String, json: String, filter: (String) -> String, pageSize: Int = 10_000): List<JSONObject> =
+    private fun listEither(token: String, path: String, json: String, filter: (String) -> String, pageSize: Int = 10_000,
+                           older: (JSONObject) -> Boolean): List<JSONObject> =
         try { list(token, path, filter(json), pageSize) } catch (e: ApiError) {
-            if (e.code == 400) list(token, path, filter(path), pageSize) else throw e
+            if (e.code == 400) list(token, path, null, pageSize, maxPages = 20, stop = older) else throw e
         }
 
     private fun rfc(t: Instant) = t.toString()
     private fun day(d: LocalDate) = d.toString()
 
     private fun samples(token: String, path: String, json: String, from: Instant, to: Instant) =
-        listEither(token, path, json, { p -> "$p.sample_time.physical_time >= \"${rfc(from)}\" AND $p.sample_time.physical_time < \"${rfc(to)}\"" })
+        listEither(token, path, json, { p -> "$p.sample_time.physical_time >= \"${rfc(from)}\" AND $p.sample_time.physical_time < \"${rfc(to)}\"" },
+            older = { p -> time(p.optJSONObject(json))?.let { it < from } == true })
+            .filter { p -> time(p.optJSONObject(json))?.let { it >= from && it < to } == true }
 
     private fun daily(token: String, path: String, json: String, from: LocalDate, to: LocalDate) =
-        listEither(token, path, json, { p -> "$p.date >= \"${day(from)}\" AND $p.date < \"${day(to.plusDays(1))}\"" }, 1000)
+        listEither(token, path, json, { p -> "$p.date >= \"${day(from)}\" AND $p.date < \"${day(to.plusDays(1))}\"" }, 1000,
+            older = { p -> date(p.optJSONObject(json))?.let { it < from } == true })
+            .filter { p -> date(p.optJSONObject(json))?.let { !it.isBefore(from) && !it.isAfter(to) } == true }
 
     private fun time(o: JSONObject?) = o?.optJSONObject("sampleTime")?.optString("physicalTime")?.let { runCatching { Instant.parse(it) }.getOrNull() }
     private fun date(o: JSONObject?) = o?.optJSONObject("date")?.let { d -> runCatching { LocalDate.of(d.getInt("year"), d.getInt("month"), d.getInt("day")) }.getOrNull() }
