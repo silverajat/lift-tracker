@@ -52,11 +52,12 @@ private fun kindColor(k: Kind): Color = when (k) {
     Kind.WEEKLY -> C.Violet
     Kind.NIGHT -> SleepPurple
     Kind.PLAN -> C.Accent
+    Kind.BATTERY -> C.Warm
 }
 
 private fun kindLabel(k: Kind) = when (k) {
     Kind.WORKOUT -> "Workout"; Kind.MORNING -> "Morning"; Kind.ACTIVITY -> "Activity"; Kind.FOOD -> "Net"
-    Kind.NIGHT -> "Wrap-up"; Kind.WEATHER -> "Weather"; Kind.WEEKLY -> "Week"; Kind.PLAN -> "Day"
+    Kind.NIGHT -> "Wrap-up"; Kind.WEATHER -> "Weather"; Kind.WEEKLY -> "Week"; Kind.PLAN -> "Day"; Kind.BATTERY -> "Battery"
 }
 
 /** Every summary the app has sent (Fitbit-style), plus Brainstorm (GPT). */
