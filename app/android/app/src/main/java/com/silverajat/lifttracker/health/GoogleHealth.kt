@@ -157,6 +157,15 @@ object GoogleHealth {
         return out
     }
 
+    /** A token without any screen (already approved), or null if Google wants you to approve again. For background checks. */
+    suspend fun silentToken(ctx: android.content.Context): String? = kotlinx.coroutines.suspendCancellableCoroutine { k ->
+        val req = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+            .setRequestedScopes(SCOPES.map { com.google.android.gms.common.api.Scope(it) }).build()
+        com.google.android.gms.auth.api.identity.Identity.getAuthorizationClient(ctx).authorize(req)
+            .addOnSuccessListener { r -> k.resumeWith(Result.success(if (r.hasResolution()) null else r.accessToken)) }
+            .addOnFailureListener { k.resumeWith(Result.success(null)) }
+    }
+
     /** A paired Fitbit and its battery, as the Fitbit app last saw it. */
     data class Device(val name: String, val battery: Int?, val status: String?, val lastSync: Instant?)
 

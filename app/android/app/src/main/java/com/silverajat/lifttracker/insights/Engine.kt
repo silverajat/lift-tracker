@@ -169,6 +169,32 @@ object InsightEngine {
         runCatching { NotificationManagerCompat.from(ctx).notify(i.key.hashCode(), n) }
     }
 
+    /**
+     * The Fitbit's battery: one nudge when it drops to 20% (not again until it's been charged past 60%), and in the
+     * evening (8 to 10 PM) if it's at 40% or less, so it doesn't die overnight and miss sleep, HRV and breathing.
+     */
+    private suspend fun checkBattery(ctx: Context, prefs: android.content.SharedPreferences, now: LocalDateTime, today: java.time.LocalDate,
+                                     nowMs: Long, sent: Set<String>) {
+        if (!com.silverajat.lifttracker.health.GoogleHealth.Store(ctx.filesDir).load().connected) return
+        if (nowMs - prefs.getLong("fitbit_batt_at", 0) < 55 * 60_000) return
+        prefs.edit().putLong("fitbit_batt_at", nowMs).apply()
+        val token = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            com.silverajat.lifttracker.health.GoogleHealth.silentToken(ctx) } ?: return
+        val dev = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { com.silverajat.lifttracker.health.GoogleHealth.devices(token) }.getOrNull()
+        }?.maxByOrNull { it.lastSync ?: java.time.Instant.EPOCH } ?: return
+        val b = dev.battery ?: return
+        if (b >= 60) prefs.edit().remove("fitbit_low_sent").apply()
+        if (b <= 20 && !prefs.getBoolean("fitbit_low_sent", false)) {
+            prefs.edit().putBoolean("fitbit_low_sent", true).apply()
+            post(ctx, Insight("battery-low-$today-$b", Kind.BATTERY, "🔋 ${dev.name} at $b%",
+                "Charge it soon, so it doesn't miss tonight's sleep, HRV and breathing.", nowMs), tab = "TODAY")
+        } else if (b <= 40 && now.hour in 20..21 && "battery-night-$today" !in sent) {
+            post(ctx, Insight("battery-night-$today", Kind.BATTERY, "🔋 Charge your Fitbit before bed",
+                "$b% might not last the night, and sleep, HRV and breathing need it on all night.", nowMs), tab = "TODAY")
+        }
+    }
+
     /** Check everything that might be due now. [force] sends the morning summary even if it went out already. */
     suspend fun run(ctx: Context, force: Boolean = false) {
         val zone = ZoneId.systemDefault()
@@ -216,6 +242,9 @@ object InsightEngine {
             return (mine + scale.filter { it.date !in have }).sortedBy { it.date }
         }
         suspend fun analysis() = Analysis.run(days(), sessions, meals.days(today.minusDays(60), today), weights(), today, zone, goalKg)
+
+        // Fitbit battery (Google Health, at most hourly): low, or not enough for the night
+        runCatching { checkBattery(ctx, prefs, now, today, nowMs, sent) }
 
         // morning summary: after you wake (sleep synced) or by 10 AM at the latest
         val mKey = "morning-$today"
