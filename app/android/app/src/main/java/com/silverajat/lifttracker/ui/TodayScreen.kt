@@ -83,6 +83,8 @@ data class TodayUi(
     val syncedAt: Long?,
     val podReady: Boolean,
     val podSub: String,
+    /** The Fitbit's battery from Google Health, if connected. */
+    val fitbitBattery: Int? = null,
     val food: List<MealEntry>,
     val goalKg: Double,
     val take: Coach.Take?,
@@ -161,10 +163,11 @@ fun TodayScreen(hub: HubViewModel, gym: AppViewModel, onConnectHealth: () -> Uni
     var dataDialog by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     if (dataDialog) FitbitDataDialog(hub) { dataDialog = false }
     val ready = conn == PodConn.READY
+    val ghToday by hub.googleHealth.collectAsStateWithLifecycle()
     TodayContent(
         TodayUi(
             health = state, analysis = a, todayHealth = days.lastOrNull { it.date == LocalDate.now() }, syncedAt = synced,
-            podReady = ready,
+            podReady = ready, fitbitBattery = ghToday.device?.battery,
             podSub = if (ready) (status?.let { (if (it.batteryKnown) "${it.batteryPct}%" else "battery ?") + if (it.charging) ", charging" else "" } ?: "connected") else "for the gym",
             food = food, goalKg = goal, take = take, taking = taking, takeError = takeError, hasKey = key.isNotEmpty(),
             items = items,
@@ -202,7 +205,8 @@ fun TodayContent(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     PixelGlyph(Glyphs.heart, Color(0xFFE5323D), modifier = Modifier.padding(end = 2.dp))
                     DeviceChip("Fitbit Air", u.health == HealthState.OK, when (u.health) {
-                        HealthState.OK -> u.syncedAt?.let { "synced " + Instant.ofEpochMilli(it).atZone(zone).format(hm) } ?: "synced"
+                        HealthState.OK -> (u.fitbitBattery?.let { "$it% · " } ?: "") +
+                            (u.syncedAt?.let { "synced " + Instant.ofEpochMilli(it).atZone(zone).format(hm) } ?: "synced")
                         HealthState.LOADING -> "syncing"
                         HealthState.NEEDS_PERMISSION -> "tap to connect"
                         HealthState.UNAVAILABLE -> "needs Health Connect"
@@ -586,7 +590,8 @@ private fun GoogleHealthSection(g: HubViewModel.GhState, needsApproval: Boolean,
                 if (needsApproval) androidx.compose.material3.TextButton(onClick = onApprove) { Text("Approve again (weekly in testing)", color = C.Accent) }
                 Text(if (g.syncing) "Syncing…" else "Synced " + (if (g.syncedMs > 0) java.time.Instant.ofEpochMilli(g.syncedMs).atZone(zone).let { t ->
                     (if (t.toLocalDate() == LocalDate.now()) "" else t.format(shortDay) + " ") + t.format(hm) } else "never") +
-                    " · ${g.nights} nights · blood oxygen ${g.spo2Nights}" + (g.vo2?.let { " · VO2 max %.0f".format(it) } ?: ""),
+                    " · ${g.nights} nights · blood oxygen ${g.spo2Nights}" + (g.vo2?.let { " · VO2 max %.0f".format(it) } ?: "") +
+                    (g.device?.let { d -> " · ${d.name} " + (d.battery?.let { "$it%" } ?: d.status?.lowercase() ?: "battery ?") } ?: ""),
                     style = MaterialTheme.typography.bodySmall, color = C.Muted)
                 g.steadiness?.let { st ->
                     Text(when {

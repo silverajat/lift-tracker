@@ -156,6 +156,20 @@ object GoogleHealth {
         return out
     }
 
+    /** A paired Fitbit and its battery, as the Fitbit app last saw it. */
+    data class Device(val name: String, val battery: Int?, val status: String?, val lastSync: Instant?)
+
+    /** Your paired trackers (not scales), each with its battery. */
+    fun devices(token: String): List<Device> {
+        val o = get(token, BASE.substringBefore("dataTypes/") + "pairedDevices")
+        val a = o.keys().asSequence().mapNotNull { o.optJSONArray(it) }.firstOrNull() ?: return emptyList()
+        return (0 until a.length()).map { a.getJSONObject(it) }.filter { it.optString("deviceType", "TRACKER") != "SCALE" }.map { d ->
+            Device(d.optString("deviceVersion", "Fitbit").ifBlank { "Fitbit" },
+                d.opt("batteryLevel")?.toString()?.toIntOrNull(), d.optString("batteryStatus").ifBlank { null },
+                d.optString("lastSyncTime").takeIf { it.isNotBlank() }?.let { runCatching { Instant.parse(it) }.getOrNull() })
+        }
+    }
+
     /** Second-by-second heart rate between [from] and [to] (for an activity). */
     fun heartRate(token: String, from: Instant, to: Instant): List<HrSample> =
         samples(token, "heart-rate", "heartRate", from, to).mapNotNull { p ->

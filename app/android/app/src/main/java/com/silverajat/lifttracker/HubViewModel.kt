@@ -127,7 +127,9 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
     data class GhState(
         val connected: Boolean, val needsApproval: Boolean, val syncing: Boolean, val syncedMs: Long, val nights: Int,
         val spo2Nights: Int, val vo2: Double?, val steadiness: com.silverajat.lifttracker.health.GoogleHealth.Steadiness?, val errors: List<String>,
+        val device: com.silverajat.lifttracker.health.GoogleHealth.Device? = null,
     )
+    @Volatile private var ghDevice: com.silverajat.lifttracker.health.GoogleHealth.Device? = null
     private val _ghConsent = MutableStateFlow<android.app.PendingIntent?>(null)
     /** Google wants you to approve (first time, or again after a week in testing mode): the screen launches this. */
     val ghConsent: StateFlow<android.app.PendingIntent?> = _ghConsent
@@ -139,7 +141,7 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun ghState(syncing: Boolean = false) = GhState(gh.connected, _ghConsent.value != null && gh.connected, syncing, gh.syncedMs,
         gh.nights.size, gh.nights.values.count { it.spo2 != null }, gh.nights.values.filter { it.vo2max != null }.maxByOrNull { it.date }?.vo2max,
-        if (gh.nights.isEmpty()) null else steadiness(), gh.errors)
+        if (gh.nights.isEmpty()) null else steadiness(), gh.errors, ghDevice)
 
     /** Health Connect's days with the Google Health extras: blood oxygen, VO2 max, and our HRV once it's proven steadier. */
     private fun ghOverlay(days: List<HealthDay>): List<HealthDay> {
@@ -202,6 +204,11 @@ class HubViewModel(app: Application) : AndroidViewModel(app) {
         val from = if (gh.nights.size < 20) today.minusDays(40) else today.minusDays(4)
         val sleeps = rawDays.mapNotNull { d -> d.sleep?.let { d.date to (it.start to it.end) } }.toMap()
         val errors = ArrayList<String>()
+        // the watch's battery (the Fitbit app's last reading)
+        withContext(Dispatchers.IO) {
+            runCatching { com.silverajat.lifttracker.health.GoogleHealth.devices(token).maxByOrNull { it.lastSync ?: Instant.EPOCH } }
+                .onSuccess { ghDevice = it }.onFailure { errors += "Battery: ${it.message?.take(160)}" }
+        }
         val fresh = withContext(Dispatchers.IO) {
             runCatching { com.silverajat.lifttracker.health.GoogleHealth.nights(token, from, today, sleeps, zone, errors) }
                 .onFailure { errors += it.message.orEmpty().take(200) }.getOrDefault(emptyMap())
