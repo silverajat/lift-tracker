@@ -83,8 +83,6 @@ data class TodayUi(
     val syncedAt: Long?,
     val podReady: Boolean,
     val podSub: String,
-    /** The Fitbit's battery from Google Health, if connected. */
-    val fitbitBattery: Int? = null,
     val food: List<MealEntry>,
     val goalKg: Double,
     val take: Coach.Take?,
@@ -96,6 +94,8 @@ data class TodayUi(
     val items: List<com.silverajat.lifttracker.activity.ActivityItem> = emptyList(),
     val plan: com.silverajat.lifttracker.journal.DayPage? = null,
     val week: com.silverajat.lifttracker.insights.Weekly.Report? = null,
+    /** The Fitbit's battery from Google Health, if connected. */
+    val fitbitBattery: Int? = null,
 )
 
 /** A page another part of the app wants opened on Today (from a notification). */
