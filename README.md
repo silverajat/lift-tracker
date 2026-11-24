@@ -31,3 +31,5 @@ data/       recordings (raw data is git-ignored)
 **RTL:** R1 UART + cocotb → R2 full pipeline → R3 formal proofs → R4 FPGA demo.
 
 The full plan lives in my Lift Tracker Wearable doc.
+
+Plan for the polished public version (hero demo clip and the rest): `docs/REPO_POLISH.md`.
