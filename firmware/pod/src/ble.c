@@ -179,6 +179,8 @@ static void adv_apply(struct k_work *w)
 
 	if (err && err != -EALREADY) {
 		LOG_ERR("advertising failed (%d)", err);
+	} else {
+		LOG_INF("advertising (%s)", adv_want == ADV_FAST ? "fast" : "slow");
 	}
 }
 K_WORK_DEFINE(adv_work, adv_apply);
