@@ -130,7 +130,7 @@ Worn only at the gym: no sleep tracking or alarm (the Fitbit does those). After 
 
 ## Open points
 
-1. Confirm the charger contacts on the real charger. The 18 mm spacing came from photos (±0.5–1 mm); the 4 × 3 mm pads allow for that.
+1. Charger contacts confirmed on the real charger (rev A): the pins land on the pads and it charges. But the charger's magnet is **not centred** between its pins, so with the pins on the pads the magnet sits off the steel disc and the pod has to be placed carefully. Rev B: move the steel target to where the magnet actually is (measure the offset on the charger).
 2. The E73's height is taken from its 3D model (3.0 mm). If the real module is lower, the case can drop by the difference.
 3. Rev B: the SWD pads (1.0 mm round, 1.5 mm pitch, 0.5 mm gap) are sized for a pogo clip, not for hand-soldering wires;
    on rev A soldering three jumper wires to them took ~2 h. Make them 1.6 × 2.0 mm at 2.54 mm pitch (a 0.1" header or a

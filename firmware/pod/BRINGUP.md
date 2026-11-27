@@ -69,3 +69,11 @@ After the switch, the first update has to go over SWD again.
   25 Hz, milli-g and 0.1 °/s. The LSM6DSV16X is set to the same ranges (±8 g, ±1000 dps).
 - The rep counter works out the motion axis per set (PCA and gravity). So the sensor sitting at a different
   angle on the new board doesn't matter, and the corrections you've made so far keep training it.
+
+## Lessons from the first build (Nov 27)
+
+- Solder the battery last and keep its wires short and flat; fit the motor on two layers of Kapton over the E73's metal can.
+- Never let a loose steel washer near a powered board: one bridged pins on the first board, which then booted and dragged the
+  battery down (its protection cut out, pads read ~0.7 V). The second board was fine.
+- Test after every step (motor, washer, debug wires off, in the case) and only glue once it still connects the next morning.
+- The firmware now has a 60 s watchdog: a sealed pod has no reset button, so a hang restarts it instead of bricking it.
