@@ -405,6 +405,7 @@ int main(void)
 			}
 		}
 		was_connected = connected;
+		imu_poll();
 		/* tapped twice: tell the app now (it ends the set) and buzz once so you know it took */
 		uint8_t taps = imu_taps();
 

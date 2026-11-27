@@ -72,7 +72,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val raw = RawStore(app)
     /** Full-rate recordings downloaded from pod v2 (dump_logs format). */
     val podRecs = com.silverajat.lifttracker.data.PodRecStore(app.filesDir)
-    private val _podSaved = MutableStateFlow(runCatching { podRecs.count() }.getOrDefault(0))
+    /** Recordings saved since the last export (the button only shows when there are new ones). */
+    private val _podSaved = MutableStateFlow(runCatching {
+        podRecs.count() - app.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("pod_exported", 0)
+    }.getOrDefault(0).coerceAtLeast(0))
     val podSaved: StateFlow<Int> = _podSaved
     private val _podSync = MutableStateFlow<String?>(null)
     /** "Saving sets 3/12" while recordings come off the pod. */
@@ -829,7 +832,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val full = pod.readRecording(id)
                     if (full == null) { all = false; break }
                     withContext(Dispatchers.IO) { podRecs.save(full.first, full.second) }
-                    _podSaved.value = podRecs.count()
+                    _podSaved.value = (podRecs.count() - prefs.getInt("pod_exported", 0)).coerceAtLeast(0)
                 }
                 if (all && _session.value == null) pod.send(PodProtocol.erase())
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -853,6 +856,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             val uri = app.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)!!
             app.contentResolver.openOutputStream(uri)!!.use { podRecs.zip(it) }
+            prefs.edit().putInt("pod_exported", podRecs.count()).apply()
+            _podSaved.value = 0
             name
         }.getOrNull()
     }

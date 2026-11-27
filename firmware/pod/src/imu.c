@@ -191,6 +191,16 @@ int imu_active(bool on)
 	return on ? gym_mode() : wake_mode();
 }
 
+/* INT1 is latched and the GPIO interrupt is edge-triggered: if an edge is ever missed (an event
+ * latched while the pin was being set up or the routing changed), the pin stays high and no new
+ * edge comes, so wake-on-motion and taps would stop for good. Checked once a second as a fallback. */
+void imu_poll(void)
+{
+	if (gpio_pin_get_dt(&int1) > 0) {
+		k_work_submit(&int1_work);
+	}
+}
+
 bool imu_take_wake(void)
 {
 	return atomic_cas(&woke, 1, 0);

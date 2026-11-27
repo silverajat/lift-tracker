@@ -20,7 +20,9 @@
 int imu_init(void);                  /* reset, check the chip, start in low-power wake mode */
 int imu_active(bool on);
 int imu_read(struct sample *s);      /* milli-g and 0.1 deg/s, like the prototype */
-bool imu_take_wake(void);            /* true once after each wake-up interrupt */
+bool imu_take_wake(void);
+/* Re-reads INT1 if it's stuck high (a missed edge). Call once a tick. */
+void imu_poll(void);            /* true once after each wake-up interrupt */
 uint8_t imu_taps(void);              /* double taps seen in gym mode, counting up (wraps) */
 int imu_who_am_i(void);              /* 0x70 for the LSM6DSV16X, negative if no answer */
 
