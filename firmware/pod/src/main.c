@@ -415,6 +415,7 @@ int main(void)
 	int64_t last_app = k_uptime_get();
 	int64_t fast_until = k_uptime_get() + ADV_FAST_S * 1000;
 	bool was_connected = false;
+	int64_t lazy_at = 0;   /* when to ask for the slow link after the app connects */
 	uint8_t seen_taps = imu_taps();
 
 	wdt_start();
@@ -436,9 +437,18 @@ int main(void)
 			last_app = now;
 			if (!was_connected) {
 				blink(40);
+				lazy_at = now + 5000;
 			}
 		}
 		was_connected = connected;
+		/* the phone connects on its fastest link (7.5-15 ms), which costs ~1 mA all the time it
+		 * stays connected; once it's set up, drop to the slow one unless we're in the gym */
+		if (lazy_at && now >= lazy_at) {
+			lazy_at = 0;
+			if (connected && !gym) {
+				ble_fast_link(false);
+			}
+		}
 		imu_poll();
 		/* tapped twice: tell the app now (it ends the set) and buzz once so you know it took */
 		uint8_t taps = imu_taps();
