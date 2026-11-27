@@ -1,5 +1,6 @@
 package com.silverajat.lifttracker.ui
 
+import kotlinx.coroutines.launch
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -70,7 +71,7 @@ private fun TopIcon(icon: ImageVector, label: String, on: Boolean, onClick: () -
 
 /** Everything you can switch on and off. */
 @Composable
-fun SettingsScreen(hub: HubViewModel) {
+fun SettingsScreen(hub: HubViewModel, vm: com.silverajat.lifttracker.AppViewModel? = null) {
     val ctx = LocalContext.current
     val prefs = remember { ctx.getSharedPreferences("hub", Context.MODE_PRIVATE) }
     val notifyOn by hub.notifyOn.collectAsStateWithLifecycle()
@@ -103,6 +104,22 @@ fun SettingsScreen(hub: HubViewModel) {
         item {
             Group("Focus timer") {
                 PrefToggle(prefs, GardenViewModel.PAUSE_AWAY, "Pause while I'm in other apps", "Locking the phone doesn't pause it")
+            }
+        }
+        if (vm != null) item {
+            val fresh by vm.podSaved.collectAsStateWithLifecycle()
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            Group("Pod") {
+                Column(Modifier.fillMaxWidth().clickable {
+                    scope.launch {
+                        val name = vm.exportPodRecordings()
+                        android.widget.Toast.makeText(ctx, name?.let { "Saved to Downloads: $it" } ?: "Nothing to save yet", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }.padding(vertical = 4.dp)) {
+                    Text("Export pod recordings", style = MaterialTheme.typography.titleMedium)
+                    Text(if (fresh > 0) "$fresh new since the last export" else "All saved sets as a zip in Downloads",
+                        style = MaterialTheme.typography.bodySmall, color = C.Muted)
+                }
             }
         }
         item {

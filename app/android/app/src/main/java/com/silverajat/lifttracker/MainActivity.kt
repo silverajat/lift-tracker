@@ -191,7 +191,7 @@ class MainActivity : ComponentActivity() {
                           (if (fullScreen) null else com.silverajat.lifttracker.ui.TopActions(unread, panel) { panel = if (panel == it) null else it })) {
                         when {
                             !fullScreen && panel == "notifications" -> InsightsScreen(hub)
-                            !fullScreen && panel == "settings" -> com.silverajat.lifttracker.ui.SettingsScreen(hub)
+                            !fullScreen && panel == "settings" -> com.silverajat.lifttracker.ui.SettingsScreen(hub, vm)
                             !fullScreen && panel == "chat" -> com.silverajat.lifttracker.ui.ChatScreen(hub, onBack = { panel = null })
                             else -> when (shown) {
                                 Tab.TODAY -> TodayScreen(hub, vm, onConnectHealth = ::connectHealth, onConnectPod = ::connectPod,

@@ -131,15 +131,7 @@ fun HomeScreen(vm: AppViewModel, onConnect: () -> Unit, onExport: (Session) -> U
         }
         item {
             val sync by vm.podSync.collectAsStateWithLifecycle()
-            val saved by vm.podSaved.collectAsStateWithLifecycle()
-            val ctx = androidx.compose.ui.platform.LocalContext.current
-            val scope = androidx.compose.runtime.rememberCoroutineScope()
-            PodBar(conn, status, onConnect, sync, saved, onExport = {
-                scope.launch {
-                    val name = vm.exportPodRecordings()
-                    android.widget.Toast.makeText(ctx, name?.let { "Saved to Downloads: $it" } ?: "Couldn't save", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            })
+            PodBar(conn, status, onConnect, sync)
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
