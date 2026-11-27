@@ -115,7 +115,8 @@ void ble_stream_sample(const struct sample *s);
 void ble_status_changed(void);
 void ble_advertise(enum adv_mode m);
 void ble_fast_link(bool fast);      /* short connection interval (gym, downloads) or a lazy one */
-int ble_send_recording(uint16_t rec_id, uint32_t from);   /* blocks until sent; runs in the cmd thread */
+int ble_send_recording(uint16_t rec_id, uint32_t from);
+void pod_wdt_feed(void);   /* main.c: keep the watchdog happy during long work */   /* blocks until sent; runs in the cmd thread */
 
 /* Implemented in main.c */
 void pod_fill_status(struct pod_status *st);

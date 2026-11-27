@@ -31,8 +31,39 @@
 #include "ble.h"
 #include "imu.h"
 #include "storage.h"
+#include <zephyr/drivers/watchdog.h>
 
 LOG_MODULE_REGISTER(pod, LOG_LEVEL_INF);
+
+/* Watchdog: if the firmware ever hangs (it's sealed, there's no reset button), the chip restarts
+ * itself after WDT_TIMEOUT_MS. Keeps running while the CPU sleeps; paused while a debugger halts it. */
+#define WDT_TIMEOUT_MS 60000
+static const struct device *const wdt = DEVICE_DT_GET(DT_NODELABEL(wdt0));
+static int wdt_ch = -1;
+
+static void wdt_start(void)
+{
+	struct wdt_timeout_cfg cfg = {
+		.window = { .min = 0, .max = WDT_TIMEOUT_MS },
+		.flags = WDT_FLAG_RESET_SOC,
+	};
+
+	if (!device_is_ready(wdt)) {
+		return;
+	}
+	wdt_ch = wdt_install_timeout(wdt, &cfg);
+	if (wdt_ch < 0 || wdt_setup(wdt, WDT_OPT_PAUSE_HALTED_BY_DBG) != 0) {
+		LOG_ERR("watchdog not started");
+		wdt_ch = -1;
+	}
+}
+
+void pod_wdt_feed(void)
+{
+	if (wdt_ch >= 0) {
+		wdt_feed(wdt, wdt_ch);
+	}
+}
 
 #define SAMPLE_HZ       100     /* same as the prototype: the training data carries over */
 #define FW_VERSION      3       /* 3 = pod v2 */
@@ -386,8 +417,11 @@ int main(void)
 	bool was_connected = false;
 	uint8_t seen_taps = imu_taps();
 
+	wdt_start();
 	for (uint32_t t = 0;; t++) {
 		struct app_cmd c;
+
+		pod_wdt_feed();
 
 		/* one tick a second, sooner when the app sends something */
 		if (ble_get_cmd(&c, K_SECONDS(1))) {

@@ -365,6 +365,7 @@ int ble_send_recording(uint16_t rec_id, uint32_t from)
 	uint32_t i = from;
 
 	while (i < r.n_samples) {
+		pod_wdt_feed();
 		uint8_t n = (uint8_t)MIN(per, r.n_samples - i);
 
 		*pk = (struct data_pkt){ .rec_id = rec_id, .kind = DATA_SAMPLES, .n = n, .index = i };
