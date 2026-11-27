@@ -132,6 +132,9 @@ Worn only at the gym: no sleep tracking or alarm (the Fitbit does those). After 
 
 1. Confirm the charger contacts on the real charger. The 18 mm spacing came from photos (±0.5–1 mm); the 4 × 3 mm pads allow for that.
 2. The E73's height is taken from its 3D model (3.0 mm). If the real module is lower, the case can drop by the difference.
+3. Rev B: the SWD pads (1.0 mm round, 1.5 mm pitch, 0.5 mm gap) are sized for a pogo clip, not for hand-soldering wires;
+   on rev A soldering three jumper wires to them took ~2 h. Make them 1.6 × 2.0 mm at 2.54 mm pitch (a 0.1" header or a
+   jumper per pad solders easily), or add a matching pogo-pin jig so nothing has to be soldered.
 
 ## History
 
