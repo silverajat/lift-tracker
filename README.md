@@ -7,8 +7,8 @@ and it counts reps live as you lift, grades each rep's range of motion against y
 own when you rack the weight (or when you tap it twice), and buzzes when rest is over. Every corrected set
 teaches the counter, per exercise.
 
-It spans the whole stack: a 4-layer PCB generated from Python, a printed case, Zephyr firmware with Bluetooth
-updates, a rep-counting signal chain checked against a Python reference model, and the app.
+I built every part of it: the 4-layer PCB (generated from Python), the printed case, the Zephyr firmware with
+Bluetooth updates, the rep counter (checked against a Python reference model) and the app.
 
 **Built with:** KiCad (driven from Python) · Zephyr / nRF Connect SDK (C), MCUboot · Kotlin + Jetpack Compose ·
 Python (NumPy) · OpenSCAD · GitHub Actions
@@ -36,8 +36,8 @@ Fitbit Air charger, and the debug pads under Kapton. Right: worn on the wrist.*
   your full range from the warm-up. Reps under 90% are flagged as partials, with tempo and speed drop alongside.
 - **Learns from corrections.** Every set you correct is a labelled example. After 3 of them an exercise gets its own
   counter settings; warm-ups learn separately because they're lighter and quicker.
-- **Knows what it can't count.** Lifts where the wrist barely moves (leg extension, leg curl, reverse crunches)
-  aren't counted rather than counted wrong.
+- **Skips what it can't count.** Lifts where the wrist barely moves (leg extension, leg curl, reverse crunches)
+  are left uncounted, since a wrist pod would get them wrong.
 - **Keeps the raw data.** The pod records every set at 100 Hz into its own 2 MB flash and the app copies it off
   after the workout. That's what the counter gets retrained on.
 - **Has no port and no button.** It charges on the Google Fitbit Air charger, updates its firmware over Bluetooth,
