@@ -409,7 +409,11 @@ int main(void)
 		boot_write_img_confirmed();
 	}
 	blink(200);
-	buzz(1);
+	/* no hello-buzz on a nearly flat cell: the motor's kick can dip it enough to restart the pod, which buzzes
+	 * again, and so on (a buzz every minute or so as the cell recovers between tries) */
+	if (batt_cache_mv == 0 || batt_cache_mv > 3500) {
+		buzz(1);
+	}
 
 	int64_t last_motion = k_uptime_get();
 	int64_t last_app = k_uptime_get();
