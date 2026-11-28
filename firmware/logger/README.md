@@ -30,7 +30,7 @@ Records the XIAO nRF52840 Sense's IMU to its 2 MB flash during sets, then hands 
 
 ## First time (once the board arrives)
 
-1. **Flash it.** Easiest: double-click `FLASH_XIAO.bat` in the repo root. It flashes, then runs the desk test and dumps the data. By hand: plug the XIAO in, double-tap its tiny reset button. A new USB drive appears. Drag `prebuilt/lift_logger_d1.uf2` onto it. The board reboots and the LED turns blue.
+1. **Flash it.** Easiest: double-click `tools/xiao/FLASH_XIAO.bat`. It flashes, then runs the desk test and dumps the data. By hand: plug the XIAO in, double-tap its tiny reset button. A new USB drive appears. Drag `prebuilt/lift_logger_d1.uf2` onto it. The board reboots and the LED turns blue.
 2. **Open its serial port** in VS Code: nRF Connect panel → Connected Devices, or the *nRF Terminal*. Press Enter and you get a `uart:~$` prompt.
 3. **Erase the flash once:** type `rec erase` (takes up to ~30 s). New chips can ship with old data on the flash, and the firmware refuses to record until it's erased.
 4. **Desk test:** `rec start`, leave the board still on the desk for 10 s, pick it up and do 5 slow curl motions, `rec stop`. Then `rec list`.

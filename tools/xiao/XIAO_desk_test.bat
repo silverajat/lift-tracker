@@ -1,5 +1,5 @@
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 if not exist logs mkdir logs
 echo Lift tracker: XIAO desk test
 where py >nul 2>&1 && (set PY=py -3) || (set PY=python)

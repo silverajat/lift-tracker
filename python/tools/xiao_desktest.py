@@ -1,6 +1,6 @@
 """D1 step 1 on the real XIAO: erase, guided desk test, list, dump.
 
-Run by double-clicking XIAO_desk_test.bat in the lift-tracker folder.
+Run by double-clicking tools/xiao/XIAO_desk_test.bat.
 Everything printed is also saved to logs/desk_test_<time>.txt so Claude can
 read it afterwards.
 """

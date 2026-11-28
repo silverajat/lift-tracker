@@ -132,6 +132,7 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
 
 - **What it counts:** reps from the pod's motion. It picks the signal that repeats most cleanly, then counts swings with hysteresis.
 - **Learning:** from every corrected set. Each exercise gets its own settings after 3. Warm-ups learn separately, because they're lighter and quicker.
+- **New pod:** pod v2 sits differently on the wrist (new case, new sensor), so its sets count 3× in the learning. Settings learned on the prototype carried over better than starting again: on the first pod v2 day they missed 36 reps across 21 sets, against 103 for settings fitted on pod v2 sets alone (`PodV2CountTest`).
 - **Stop-button reach:** reaching for the phone is cut off at the end of the set: a short burst of movement under about 1.6 s, after the set has gone still for 0.3 s or more.
 - **Hands off the bar:** racking, letting go and reaching for the phone with no still moment in between can look like 1–3 extra reps. They're nothing like the set's reps, so the last "rep" is dropped while it's 2.5× the size of a typical rep in the set, or 1.3× the size in 0.85× the time. Needs 4+ reps and never goes below 3.
 
@@ -147,7 +148,8 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
   A short buzz says it took.
 - After a workout the app copies the pod's full-rate recordings (100 Hz) to the phone and then clears the pod.
   Settings, "Export pod recordings", saves them as a zip in the same layout as the laptop dumps.
-- The live stream and the rep counter are unchanged from the prototype, so everything learned so far carries over.
+- The live stream and the rep counter are the same as on the prototype, so everything learned on it carries over (pod v2 sets just count more, see Rep counter).
+- A 60 s watchdog restarts it if the firmware ever hangs: it's sealed, with no reset button.
   First flash and updates: `firmware/pod/BRINGUP.md`.
 
 ## Google Health extras

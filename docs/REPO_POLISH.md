@@ -1,6 +1,7 @@
 # Polished public repo: plan
 
-Do this once pod v2 bring-up is done (firmware/pod/BRINGUP.md all green).
+Pod v2 bring-up is done and the README is rewritten (28 Nov). Still to do: the demo clip below, and photos of the
+finished pod (the README has `<!-- PHOTO -->` markers where they go).
 
 ## The hero demo (top of the README)
 
