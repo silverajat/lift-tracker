@@ -10,7 +10,7 @@ To change a size: edit the number in `lift_pod.scad`, render (F6), export STL.
 
 ## pod-v2/ — the final, Fitbit-sized pod
 
-43.6 × 20.6 × 7.75 mm, built and in use. A custom 4-layer board (Ebyte E73 nRF52840 module, LSM6DSV16X IMU, 2 MB flash, 40 mAh LiPo, coin motor) that charges on the Google Fitbit Air charger. The board is the pod's underside: two gold contacts 18 mm apart plus a steel disc for the charger's magnet, with a bridge so it charges either way round. Everything else goes over Bluetooth.
+43.6 × 20.6 × 7.75 mm, built and in use. A custom 4-layer board (Ebyte E73 nRF52840 module, LSM6DSV16X IMU, 2 MB flash, ~40 mAh LiPo, coin motor) that charges on the Google Fitbit Air charger. The board is the pod's underside: two gold contacts 18 mm apart plus a steel disc for the charger's magnet, with a bridge so it charges either way round. Everything else goes over Bluetooth.
 
 - `SPEC.md`: decisions, circuit, pin map, parts, assembly.
 - `pcb/`: the whole board as Python data (`design.py`, `placement.py`) → KiCad schematic, placement, staged Freerouting, DRC (`make_release.sh`).

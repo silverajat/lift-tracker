@@ -38,7 +38,7 @@ Top view of the board (x 0–41, y 0–18 mm):
 | Size | **43.6 × 20.6 × 7.75 mm** body, 55.6 mm with band lugs (cells up to ~20.5 mm long; `lift_pod_v2_shell_long.stl` takes 22 mm cells) | Motor on the module, cell beside it: thinner than stacking the cell on the 3 mm module |
 | Data | **Bluetooth only** | Recordings download over BLE, firmware updates over BLE (MCUboot + mcumgr) |
 | Charging | **Google Fitbit Air charger** (5 V, 2 spring pins 18 mm apart, centre magnet) | Contacts on the underside 18 mm apart; a 5 mm steel disc on top of the board between them, for the charger's magnet. Full Schottky bridge, so the pod charges either way round |
-| Battery | **301120 LiPo, 40 mAh, with protection board** | Datasheet max 3.0 × 11.0 × 20.5 mm. Has its own DW01 + 8205 protection, so none on our board |
+| Battery | **301020 LiPo with protection board** (XINJ, sold as 80 mAh; about 30–40 mAh real for its size). Designed around a 301120 40 mAh cell | Max 3.0 × 11.0 × 20.5 mm. Has its own DW01-type protection, so none on our board |
 | Button | **None** | Tap gestures from the IMU |
 | Heart rate | **None** | HR comes from the Fitbit into the merged app |
 | Features | Rep tracking, ROM/quality, buzz alerts (rest over, next set) | Worn only for gym sessions; sleep, steps and alarms stay on the Fitbit |

@@ -60,7 +60,7 @@ flowchart LR
         I[LSM6DSV16X IMU<br/>accel + gyro, taps] -- SPI --> N[nRF52840<br/>Ebyte E73]
         N -- SPI --> F[W25Q16<br/>2 MB flash]
         N --> M[Coin motor]
-        C[Fitbit charger pins] --> B[Bridge + MCP73831<br/>charger] --> L[40 mAh LiPo]
+        C[Fitbit charger pins] --> B[Bridge + MCP73831<br/>charger] --> L[LiPo, ~40 mAh]
     end
     N -- "Bluetooth LE<br/>25 Hz live stream" --> A
     N -- "100 Hz recordings<br/>after the workout" --> A
@@ -92,7 +92,8 @@ flowchart LR
 - **Charges on the Fitbit Air charger:** contacts 18 mm apart to match its spring pins, a Schottky bridge so the pod
   charges either way round, an MCP73831 at ~21 mA, and a steel washer on top of the board for the charger's magnet.
 - **Parts:** Ebyte E73 (nRF52840), ST LSM6DSV16X IMU, W25Q16 2 MB flash, XC6206 LDO (~1 µA), AO3400A motor
-  driver, TVS on the exposed contacts, 40 mAh LiPo with its own protection.
+  driver, TVS on the exposed contacts, a 301020 LiPo with its own protection (sold as 80 mAh; a cell that
+  size really holds about 30–40 mAh).
 - **Generated from Python.** [`pcb/design.py`](hardware/pod-v2/pcb/design.py) and
   [`placement.py`](hardware/pod-v2/pcb/placement.py) hold the whole board as data; the scripts beside them write
   the KiCad schematic and layout, route it (staged Freerouting), run ERC and DRC, and export the fab files. ERC
