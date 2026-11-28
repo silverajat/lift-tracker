@@ -420,7 +420,7 @@ static void ble_thread(void)
 	}
 }
 
-K_THREAD_DEFINE(ble_tx, 1536, ble_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(8), 0, 2000);
+K_THREAD_DEFINE(ble_tx, 2048, ble_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(8), 0, 2000);
 
 int ble_init(void)
 {

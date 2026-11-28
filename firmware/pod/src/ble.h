@@ -71,7 +71,14 @@ struct __packed pod_status {
 	uint32_t uptime_s;     /* v2.1: seconds since the pod last started */
 	uint8_t reset_why;     /* v2.1: why it last started, enum pod_reset */
 	uint8_t restarts;      /* v2.1: restarts since it was last powered up (saturates at 127) */
-};                             /* 22 bytes */
+	uint8_t fault_kind;    /* v2.2: what ended the previous run: 0 nothing, 1 crash, 2 hang (watchdog) */
+	uint8_t fault_thread;  /* v2.2: 1 main, 2 sampler, 3 status/stream, 4 work queue, 5 idle, 9 other */
+	uint8_t fault_step;    /* v2.2: where the main loop was */
+	uint8_t fault_reason;  /* v2.2: Zephyr's fatal error reason (crash) */
+	int8_t fault_prio;     /* v2.2: priority of the thread that was running */
+	uint16_t fault_up_s;   /* v2.2: how long that run had lasted */
+	uint32_t fault_pc;     /* v2.2: code address it was at */
+};                             /* 33 bytes */
 
 enum pod_reset { RST_POWER = 0, RST_PIN = 1, RST_WATCHDOG = 2, RST_SOFT = 3, RST_LOCKUP = 4, RST_OTHER = 5 };
 

@@ -34,6 +34,12 @@ class PodV2Test {
         // v2.1: uptime, why it last started and the restart count on the end
         val diag = PodStatus.parse(status(2, 0x80, 16) + byteArrayOf(5) + le(6).apply { putInt(3725); put(2); put(4) }.array())!!
         assertEquals(3725L, diag.uptimeS); assertEquals("watchdog", diag.resetLabel); assertEquals(4, diag.restarts)
+        assertNull(diag.faultLabel)
+        // v2.2: what ended the run before (a crash in an unnamed thread, Zephyr reason 2, after 12 s)
+        val fault = PodStatus.parse(status(2, 0x80, 16) + byteArrayOf(5) + le(6).apply { putInt(40); put(3); put(1) }.array() +
+            le(11).apply { put(1); put(9); put(3); put(2); put(8); putShort(12); putInt(0x0002d1a0) }.array())!!
+        assertEquals("crash t9 s3 r2 at 0x0002d1a0 after 12 s", fault.faultLabel)
+        assertEquals(1, fault.restarts)
     }
 
     @Test

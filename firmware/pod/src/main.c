@@ -33,21 +33,101 @@
 #include "storage.h"
 #include <zephyr/drivers/watchdog.h>
 #include <zephyr/drivers/hwinfo.h>
-#include <hal/nrf_power.h>
+#include <zephyr/fatal.h>
+#include <zephyr/sys/reboot.h>
+#include <zephyr/kernel_structs.h>
+#include <cmsis_core.h>
 
 LOG_MODULE_REGISTER(pod, LOG_LEVEL_INF);
 
-/* Watchdog: if the firmware ever hangs (it's sealed, there's no reset button), the chip restarts
- * itself after WDT_TIMEOUT_MS. Keeps running while the CPU sleeps; paused while a debugger halts it. */
-#define WDT_TIMEOUT_MS 60000
+/* ---- Crash and hang record ---------------------------------------------------------
+ * The pod is sealed, so nothing can be read off it with a debugger. If it ever crashes or hangs,
+ * what happened is kept in the last 1 KB of RAM (left out of both MCUboot's and this image's memory
+ * map in the board file, and RAM keeps its contents through a reset), and reported to the app in
+ * the status. A crash restarts it straight away; a hang restarts it after WDT_TIMEOUT_MS. */
+#define RET_ADDR  0x2003FC00
+#define RET_MAGIC 0x4C504F44u
+struct retained {
+	uint32_t magic;
+	uint8_t restarts, kind, thread, step;
+	int8_t prio;
+	uint8_t reason;
+	uint16_t up_s;
+	uint32_t pc, lr;
+	uint32_t check;
+};
+static volatile struct retained *const ret = (volatile struct retained *)RET_ADDR;
+
+static uint32_t ret_sum(void)
+{
+	return ret->magic ^ (ret->restarts | ret->kind << 8 | ret->thread << 16 | (uint32_t)ret->step << 24) ^
+	       ((uint8_t)ret->prio | ret->reason << 8 | (uint32_t)ret->up_s << 16) ^ ret->pc ^ (ret->lr * 3) ^
+	       0x5A5A1234u;
+}
+
+/* where the main loop is, so a hang says what it was waiting on */
+static volatile uint8_t step;
+#define STEP(n) (step = (n))
+enum { S_TOP = 1, S_CMD, S_LINK, S_IMU, S_TAPS, S_ADV, S_GYMLOST, S_LOCK, S_GYMIDLE, S_BATT, S_BLINK };
+
+static k_tid_t main_tid;
+extern const k_tid_t ble_tx;
+extern const k_tid_t sampler;
+
+/* 1 main, 2 sampler, 3 status/stream, 4 system work queue, 5 idle, 9 anything else (prio tells which) */
+static uint8_t thread_code(k_tid_t t)
+{
+	return t == main_tid ? 1 : t == sampler ? 2 : t == ble_tx ? 3 : t == &k_sys_work_q.thread ? 4 :
+	       t == _kernel.cpus[0].idle_thread ? 5 : 9;
+}
+
+static void record(uint8_t kind, uint8_t reason, uint32_t pc, uint32_t lr)
+{
+	k_tid_t t = k_current_get();
+
+	ret->kind = kind;
+	ret->reason = reason;
+	ret->thread = thread_code(t);
+	ret->prio = (int8_t)t->base.prio;
+	ret->step = step;
+	ret->up_s = (uint16_t)MIN(k_uptime_get() / 1000, 0xffff);
+	ret->pc = pc;
+	ret->lr = lr;
+	ret->magic = RET_MAGIC;
+	ret->check = ret_sum();
+}
+
+enum { FAULT_NONE = 0, FAULT_CRASH = 1, FAULT_HANG = 2 };
+
+/* Any crash (bad memory access, stack overflow, a Bluetooth assert): note where, restart now. */
+void k_sys_fatal_error_handler(unsigned int reason, const struct arch_esf *esf)
+{
+	record(FAULT_CRASH, (uint8_t)reason, esf ? esf->basic.pc : 0, esf ? esf->basic.lr : 0);
+	sys_reboot(SYS_REBOOT_COLD);
+	CODE_UNREACHABLE;
+}
+
+/* Watchdog: the main loop feeds it every second. Starved for WDT_TIMEOUT_MS, this runs just before
+ * the chip restarts: it notes what was running (and where) and which step the main loop was stuck in. */
+#define WDT_TIMEOUT_MS 15000
 static const struct device *const wdt = DEVICE_DT_GET(DT_NODELABEL(wdt0));
 static int wdt_ch = -1;
+
+static void wdt_fired(const struct device *dev, int channel)
+{
+	const uint32_t *frame = (const uint32_t *)__get_PSP();   /* the interrupted thread's saved registers */
+
+	ARG_UNUSED(dev);
+	ARG_UNUSED(channel);
+	record(FAULT_HANG, 0, frame ? frame[6] : 0, frame ? frame[5] : 0);
+}
 
 static void wdt_start(void)
 {
 	struct wdt_timeout_cfg cfg = {
 		.window = { .min = 0, .max = WDT_TIMEOUT_MS },
 		.flags = WDT_FLAG_RESET_SOC,
+		.callback = wdt_fired,
 	};
 
 	if (!device_is_ready(wdt)) {
@@ -237,7 +317,7 @@ static void sampling_thread(void)
 	}
 }
 
-K_THREAD_DEFINE(sampler, 2048, sampling_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(2), 0, 0);
+K_THREAD_DEFINE(sampler, 3072, sampling_thread, NULL, NULL, NULL, K_PRIO_PREEMPT(2), 0, 0);
 
 /* ---- Battery and charging ------------------------------------------------------------ */
 static int batt_mv(void)
@@ -262,17 +342,20 @@ static bool charging(void)
 	return gpio_pin_get_dt(&chg) == 1;   /* active low in the devicetree */
 }
 
-/* Why the pod last started, and how many times it has restarted since it was powered up. GPREGRET2 survives
- * every reset except losing power, so bit 7 marks "has been running" and bits 0-6 count the restarts. */
+/* Why the pod last started, how many times it has restarted since it was powered up, and what ended
+ * the previous run if it crashed or hung (the record above). */
 static uint8_t reset_why, restarts;
+static struct retained last;
 
 static void note_reset(void)
 {
 	uint32_t cause = 0;
-	uint32_t reg = nrf_power_gpregret_get(NRF_POWER, 1);
 
 	hwinfo_get_reset_cause(&cause);
 	hwinfo_clear_reset_cause();
+	/* no reset flag at all: the power came on (or dipped too low), and RAM holds nothing worth reading */
+	bool valid = cause != 0 && ret->magic == RET_MAGIC && ret->check == ret_sum();
+
 	if (cause & RESET_WATCHDOG) {
 		reset_why = RST_WATCHDOG;
 	} else if (cause & RESET_CPU_LOCKUP) {
@@ -281,14 +364,24 @@ static void note_reset(void)
 		reset_why = RST_SOFT;
 	} else if (cause & RESET_PIN) {
 		reset_why = RST_PIN;
-	} else if (!(reg & 0x80)) {
+	} else if (cause == 0) {
 		reset_why = RST_POWER;
 	} else {
 		reset_why = RST_OTHER;
 	}
-	restarts = (reg & 0x80) ? MIN((reg & 0x7f) + 1, 0x7f) : 0;
-	nrf_power_gpregret_set(NRF_POWER, 1, 0x80 | restarts);
-	LOG_INF("started: reason %u (cause 0x%x), restart %u", reset_why, cause, restarts);
+	if (valid) {
+		last = *(struct retained *)ret;
+		restarts = MIN(last.restarts + 1, 0x7f);
+	} else {
+		memset(&last, 0, sizeof(last));
+		restarts = 0;
+	}
+	ret->restarts = restarts;
+	ret->kind = FAULT_NONE;
+	ret->magic = RET_MAGIC;
+	ret->check = ret_sum();
+	LOG_INF("started: reason %u (cause 0x%x), restart %u, last fault %u in %u/%u at 0x%08x", reset_why, cause,
+		restarts, last.kind, last.thread, last.step, last.pc);
 }
 
 void pod_fill_status(struct pod_status *st)
@@ -316,6 +409,13 @@ void pod_fill_status(struct pod_status *st)
 		.uptime_s = (uint32_t)(k_uptime_get() / 1000),
 		.reset_why = reset_why,
 		.restarts = restarts,
+		.fault_kind = last.kind,
+		.fault_thread = last.thread,
+		.fault_step = last.step,
+		.fault_reason = last.reason,
+		.fault_prio = last.prio,
+		.fault_up_s = last.up_s,
+		.fault_pc = last.pc,
 	};
 }
 
@@ -444,6 +544,7 @@ static void handle_cmd(const struct app_cmd *c)
 
 int main(void)
 {
+	main_tid = k_current_get();
 	note_reset();
 	gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
 	gpio_pin_configure_dt(&motor, GPIO_OUTPUT_INACTIVE);
@@ -483,7 +584,6 @@ int main(void)
 	int64_t last_app = k_uptime_get();
 	int64_t fast_until = k_uptime_get() + ADV_FAST_S * 1000;
 	bool was_connected = false;
-	int64_t lazy_at = 0;   /* when to ask for the slow link after the app connects */
 	uint8_t seen_taps = imu_taps();
 
 	wdt_start();
@@ -491,9 +591,11 @@ int main(void)
 		struct app_cmd c;
 
 		pod_wdt_feed();
+		STEP(S_TOP);
 
 		/* one tick a second, sooner when the app sends something */
 		if (ble_get_cmd(&c, K_SECONDS(1))) {
+			STEP(S_CMD);
 			handle_cmd(&c);
 			last_app = k_uptime_get();
 			continue;
@@ -505,20 +607,15 @@ int main(void)
 			last_app = now;
 			if (!was_connected) {
 				blink(40);
-				lazy_at = now + 5000;
 			}
 		}
 		was_connected = connected;
-		/* the phone connects on its fastest link (7.5-15 ms), which costs ~1 mA all the time it
-		 * stays connected; once it's set up, drop to the slow one unless we're in the gym */
-		if (lazy_at && now >= lazy_at) {
-			lazy_at = 0;
-			if (connected && !gym) {
-				ble_fast_link(false);
-			}
-		}
+		/* (No link-speed request on connect: the app only stays connected in the gym, and that request
+		 * is the one change in the build where the restarts began.) */
+		STEP(S_IMU);
 		imu_poll();
 		/* tapped twice: tell the app now (it ends the set) and buzz once so you know it took */
+		STEP(S_TAPS);
 		uint8_t taps = imu_taps();
 
 		if (taps != seen_taps) {
@@ -535,6 +632,7 @@ int main(void)
 			last_motion = now;
 		}
 
+		STEP(S_ADV);
 		/* advertising: fast just after waking, then once a second, then off when idle */
 		if (now < fast_until) {
 			ble_advertise(ADV_FAST);
@@ -544,23 +642,28 @@ int main(void)
 			ble_advertise(ADV_OFF);
 		}
 
+		STEP(S_GYMLOST);
 		/* gym mode with the app gone: back to sleep */
 		if (gym && !connected && now - last_app > GYM_LOST_MIN * 60 * 1000LL) {
 			set_gym(false);
 		}
+		STEP(S_LOCK);
 		k_mutex_lock(&store_lock, K_FOREVER);
 		bool rec = storage_recording();
 		k_mutex_unlock(&store_lock);
 
+		STEP(S_GYMIDLE);
 		/* gym mode but no set for ages (workout never finished in the app): back to sleep */
 		if (gym && !rec && now - last_set > GYM_IDLE_MIN * 60 * 1000LL) {
 			set_gym(false);
 		}
 
 		/* battery: every 10 s in the gym, every minute otherwise */
+		STEP(S_BATT);
 		if (t % (gym ? 10 : 60) == 0) {
 			batt_cache_mv = batt_mv();
 		}
+		STEP(S_BLINK);
 		if (rec && t % 2 == 0) {
 			blink(15);
 		}

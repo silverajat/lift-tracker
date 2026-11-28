@@ -72,6 +72,8 @@ jobs:
           cd ~/b_pod
           python3 ~/ncs/zephyr/scripts/build/mergehex.py -o liftpod-v2-full.hex mcuboot/zephyr/zephyr.hex pod/zephyr/zephyr.signed.hex
           cp dfu_application.zip liftpod-v2-update.zip
+          # kept so a crash address the app shows can be turned into a function name
+          cp pod/zephyr/zephyr.elf liftpod-v2-app.elf
           ls -la liftpod-v2-full.hex liftpod-v2-update.zip
       - uses: actions/upload-artifact@v4
         with:
@@ -86,6 +88,6 @@ jobs:
         working-directory: lift-tracker
         run: |
           gh release delete pod-fw-latest --yes --cleanup-tag || true
-          gh release create pod-fw-latest ~/b_pod/liftpod-v2-full.hex ~/b_pod/liftpod-v2-update.zip \
+          gh release create pod-fw-latest ~/b_pod/liftpod-v2-full.hex ~/b_pod/liftpod-v2-update.zip ~/b_pod/liftpod-v2-app.elf \
             --title "Pod v2 firmware (latest build)" --prerelease \
             --notes "Built from ${GITHUB_SHA::7}. First flash: liftpod-v2-full.hex over SWD. After that: liftpod-v2-update.zip from the nRF Device Manager app. See firmware/pod/BRINGUP.md."

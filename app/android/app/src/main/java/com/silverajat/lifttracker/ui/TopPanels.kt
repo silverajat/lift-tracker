@@ -126,7 +126,8 @@ fun SettingsScreen(hub: HubViewModel, vm: com.silverajat.lifttracker.AppViewMode
                     val ago = if (up < 3600) "${up / 60} min" else "${up / 3600} h ${up % 3600 / 60} min"
                     val time = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
                         .format(java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault()))
-                    Text("At $time: running $ago · last start: ${st.resetLabel} · restarts since power-up: ${st.restarts}",
+                    Text("At $time: running $ago · last start: ${st.resetLabel} · restarts since power-up: ${st.restarts}" +
+                        (st.faultLabel?.let { " · before that: $it" } ?: ""),
                         style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(top = 8.dp))
                 }
             }

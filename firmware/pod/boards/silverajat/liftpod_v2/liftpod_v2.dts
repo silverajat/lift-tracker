@@ -104,3 +104,10 @@
 &usbd {
 	status = "disabled";
 };
+
+/* The last 1 KB of RAM is kept out of both images (MCUboot and the app): it holds the crash/hang record,
+ * which has to survive the restart (src/main.c, RET_ADDR). */
+&sram0 {
+	reg = <0x20000000 DT_SIZE_K(255)>;
+};
+

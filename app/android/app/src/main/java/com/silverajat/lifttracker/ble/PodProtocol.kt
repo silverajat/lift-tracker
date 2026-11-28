@@ -160,7 +160,23 @@ data class PodStatus(
     val uptimeS: Long? = null,
     val resetWhy: Int? = null,
     val restarts: Int? = null,
+    /** What ended the pod's previous run: 1 crash, 2 hang (watchdog), with where it was. Null/0 = nothing. */
+    val faultKind: Int? = null,
+    val faultThread: Int? = null,
+    val faultStep: Int? = null,
+    val faultReason: Int? = null,
+    val faultUpS: Int? = null,
+    val faultPc: Long? = null,
 ) {
+    /** Short code for Settings, e.g. "crash t9 s3 r2 at 0x0002d1a0 after 12 s"; null when there was none. */
+    val faultLabel: String?
+        get() {
+            val k = faultKind ?: return null
+            if (k == 0) return null
+            val what = if (k == 1) "crash" else "hang"
+            return "$what t$faultThread s$faultStep r$faultReason at 0x%08x after ${faultUpS} s".format(faultPc ?: 0L)
+        }
+
     /** "watchdog" etc., for the restart line in Settings. */
     val resetLabel: String?
         get() = when (resetWhy) {
@@ -216,6 +232,14 @@ data class PodStatus(
             val up = if (bb.remaining() >= 6) bb.int.toLong() and 0xffffffffL else null
             val why = if (up != null) bb.get().toInt() and 0xff else null
             val restarts = if (up != null) bb.get().toInt() and 0xff else null
+            val more = bb.remaining() >= 11
+            val fKind = if (more) bb.get().toInt() and 0xff else null
+            val fThread = if (more) bb.get().toInt() and 0xff else null
+            val fStep = if (more) bb.get().toInt() and 0xff else null
+            val fReason = if (more) bb.get().toInt() and 0xff else null
+            if (more) bb.get()                                   // priority: in the raw status, not shown
+            val fUp = if (more) bb.short.toInt() and 0xffff else null
+            val fPc = if (more) bb.int.toLong() and 0xffffffffL else null
             return PodStatus(
                 proto = proto,
                 recording = f and 0x01 != 0,
@@ -237,6 +261,12 @@ data class PodStatus(
                 uptimeS = up,
                 resetWhy = why,
                 restarts = restarts,
+                faultKind = fKind,
+                faultThread = fThread,
+                faultStep = fStep,
+                faultReason = fReason,
+                faultUpS = fUp,
+                faultPc = fPc,
                 taps = taps.takeIf { proto >= 2 },
             )
         }
