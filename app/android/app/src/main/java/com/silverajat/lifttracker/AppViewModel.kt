@@ -197,6 +197,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch(Dispatchers.Default) { runCatching { autoEndOff = checkAutoEnd(_model.value) } }
+        // pod v2 sets now get their own fit: redo the model once with this version
+        if (prefs.getInt("model_v", 0) < 2) { prefs.edit().putInt("model_v", 2).apply(); retrain() }
         viewModelScope.launch {
             // pod v2: tapping it twice ends the set (a reconnect only sets the starting count)
             var last: Int? = null
@@ -738,7 +740,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val d = raw.load(s.id, l.exerciseId, l.setNo) ?: return@mapNotNull null
                         val cut = RepCounter.side(d, hz, Routines.isOneArm(l.exerciseId), Routines.podSideFirst(l.exerciseId))
                         if (cut.size < hz) null
-                        else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps, l.warmup && !l.calibration)
+                        else RepModel.Example(l.exerciseId, RepEngine.signals(cut, hz), l.reps, l.warmup && !l.calibration,
+                            newPod = s.startMs >= POD_V2_SINCE_MS)
                     }
                 }
                 RepModel.train(examples)
@@ -924,6 +927,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
+        /** Workouts from here on were on pod v2 (first flashed 27 Nov 2026, 16:00 Singapore time). */
+        const val POD_V2_SINCE_MS = 1_795_766_400_000L
+
         const val COUNTDOWN_MS = 10_000L   // same as after rest: time to get into position
         const val AUTO_COUNTDOWN_MS = 10_000L
         const val AUTO_END_GRACE_MS = 2_000L

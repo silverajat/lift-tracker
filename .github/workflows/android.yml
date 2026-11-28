@@ -32,7 +32,7 @@ jobs:
           key: robolectric-android-all-15
       - name: Unit tests (rep counter vs the Python reference)
         run: |
-          gradle testDebugUnitTest --no-daemon --stacktrace -i | grep -E "MISMATCH|exact|ROM|FAILED|PASSED|Tests" || true
+          gradle testDebugUnitTest --no-daemon --stacktrace -i | grep -E "MISMATCH|exact|ROM|PODV2|FAILED|PASSED|Tests" || true
           for i in 1 2 3; do gradle testDebugUnitTest --no-daemon && exit 0; echo "retry $i in 60 s"; sleep 60; done
           exit 1
       - name: Screenshots (sample data)
