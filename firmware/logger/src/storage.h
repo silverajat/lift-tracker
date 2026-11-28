@@ -123,5 +123,7 @@ uint32_t storage_bytes_total(void);
 
 /* Erase the whole flash chip. Takes several seconds. */
 int storage_erase_all(void);
+/* Optional hook, called between erase blocks (weak, does nothing unless the app defines it). */
+void storage_yield(void);
 
 #endif /* STORAGE_H_ */

@@ -96,7 +96,19 @@ static volatile bool rec_from_app;
 /* ---- Flash power: deep power-down whenever nothing needs it ------------------------- */
 static void flash_power(bool on)
 {
-	pm_device_action_run(flash, on ? PM_DEVICE_ACTION_RESUME : PM_DEVICE_ACTION_SUSPEND);
+	if (on) {
+		/* Always send the wake-up command, even if the driver thinks the chip is already awake: a chip left
+		 * in deep power-down answers every status read with "busy", and the driver would wait forever. */
+		pm_device_action_run(flash, PM_DEVICE_ACTION_SUSPEND);
+		pm_device_action_run(flash, PM_DEVICE_ACTION_RESUME);
+	} else {
+		pm_device_action_run(flash, PM_DEVICE_ACTION_SUSPEND);
+	}
+}
+
+void storage_yield(void)
+{
+	pod_wdt_feed();
 }
 
 /* ---- Recording (sampler thread only) ---------------------------------------------- */

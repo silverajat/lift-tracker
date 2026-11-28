@@ -11,4 +11,10 @@ struct device { int x; };
 extern const struct device fake_flash_dev;
 static inline bool device_is_ready(const struct device *d) { (void)d; return true; }
 #define MIN(a,b) ((a)<(b)?(a):(b))
+#ifndef ROUND_UP
+#define ROUND_UP(x, a) ((((x) + (a) - 1) / (a)) * (a))
+#endif
+#ifndef __weak
+#define __weak __attribute__((weak))
+#endif
 #include "toolchain.h"

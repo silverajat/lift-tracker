@@ -386,13 +386,44 @@ uint32_t storage_bytes_total(void)
 	return FLASH_SIZE;
 }
 
+/* Called between erase blocks: the pod feeds its watchdog here (a whole-chip erase can take longer than it). */
+__weak void storage_yield(void)
+{
+}
+
+#define ERASE_BLOCK (64 * 1024)
+
 int storage_erase_all(void)
 {
 	if (open) {
 		return -EBUSY;
 	}
-	int err = flash_erase(flash, 0, FLASH_SIZE);
+	/* Only what's been used, a 64 KB block at a time: quicker than a chip erase, and the caller gets a
+	 * chance to do something (feed a watchdog) between blocks instead of waiting up to a minute. */
+	uint32_t used = MIN(ROUND_UP(next_free + PAGE_SIZE, ERASE_BLOCK), (uint32_t)FLASH_SIZE);
+	int err = 0;
 
+	for (uint32_t a = 0; a < FLASH_SIZE && !err; a += ERASE_BLOCK) {
+		if (a >= used) {
+			/* past what the index knows about: keep going only while blocks still hold something
+			 * (a recording cut off by a reset), judged by the start of the block */
+			uint8_t probe[16];
+
+			if (flash_read(flash, a, probe, sizeof(probe)) != 0) {
+				break;
+			}
+			bool blank = true;
+
+			for (size_t i = 0; i < sizeof(probe); i++) {
+				blank &= probe[i] == 0xff;
+			}
+			if (blank) {
+				break;
+			}
+		}
+		err = flash_erase(flash, a, ERASE_BLOCK);
+		storage_yield();
+	}
 	if (!err) {
 		n_recs = 0;
 		next_free = 0;
