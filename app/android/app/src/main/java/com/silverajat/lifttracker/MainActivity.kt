@@ -176,6 +176,7 @@ class MainActivity : ComponentActivity() {
                 val gymShown = fullScreen || (tab == Tab.MOVE && gymOpen && panel == null)
                 LaunchedEffect(gymShown || session != null) {
                     wantPod = gymShown || session != null
+                    vm.wantPod(wantPod)
                     if (wantPod) connectPod()
                 }
                 LaunchedEffect(tab) {

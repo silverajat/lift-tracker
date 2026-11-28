@@ -808,6 +808,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- pod v2 ---------------------------------------------------------------------
 
+    private var releaseJob: Job? = null
+
+    /**
+     * The pod stays connected only while you're in the gym part of the app or a workout is open: a phone holding the
+     * link all day costs the pod far more battery than anything else it does. Leaving lets any sync finish first.
+     */
+    fun wantPod(on: Boolean) {
+        releaseJob?.cancel()
+        if (on) return
+        releaseJob = viewModelScope.launch {
+            delay(3_000)              // a sync that's about to start (after Finish) gets going first
+            syncJob?.join()
+            if (_session.value == null) pod.disconnect()
+        }
+    }
+
     private fun podV2(block: suspend () -> Unit) {
         if (pod.conn.value == PodConn.READY && pod.status.value?.v2 == true) viewModelScope.launch { block() }
     }
