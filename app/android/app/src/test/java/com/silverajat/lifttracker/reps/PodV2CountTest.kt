@@ -7,8 +7,10 @@ import java.io.File
 
 /**
  * Real sets from pod v2 (the first lower day on it, 28 Nov), as the phone receives them (25 Hz), with the reps you
- * confirmed. Shows what the counter gets with its defaults, and with settings learned only from pod v2 sets the way
- * the phone now learns them (each set counted with settings fitted on the OTHER sets, so it can't learn its own answer).
+ * confirmed. Shows what the counter gets with its defaults, and with settings learned from these sets alone (each set
+ * counted with settings fitted on the OTHER sets, so it can't learn its own answer). "live" is what the phone showed, with
+ * the settings it had learned on the old pod; for the lifts the pod doesn't count (Routines.podCounts) it's just the plan.
+ * On this day the old-pod settings did far better than either, so the phone keeps learning from all sets, pod v2 weighted.
  */
 class PodV2CountTest {
     private class SetData(val name: String, val ex: Int, val warm: Boolean, val truth: Int, val live: Int?, val data: List<FloatArray>)

@@ -28,10 +28,12 @@ object RepModel {
     private val SIG = listOf(CounterParams.AUTO) + RepEngine.SIGNALS
     private val DET = listOf(0.75, 1.0, 1.5)
     const val MIN_SETS = 3
-    /** Pod v2 sits differently on the wrist, so its sets are fitted on their own once an exercise has this many. */
-    const val MIN_NEW_POD = 2
-    /** And the all-exercise fit once there are this many pod v2 sets in total. */
-    const val MIN_NEW_POD_GLOBAL = 10
+    /**
+     * Pod v2 sits differently on the wrist (new case, new sensor), so a rep looks slightly different to it. Its sets
+     * count this many times over in the fit, so the settings move to it within a few workouts while the old pod's
+     * sets still stop one odd set from swinging them.
+     */
+    const val NEW_POD_WEIGHT = 3
 
     /** A set to learn from: its data (one-arm sets already cut to the right arm) and true reps. */
     class Example(val exerciseId: Int, val signals: RepEngine.Signals, val reps: Int, val warmup: Boolean = false,
@@ -44,10 +46,7 @@ object RepModel {
         val exactLearned: Int,  // sets the learned counter gets exactly right
         val missDefault: Int,   // reps the default miscounted in total
         val missLearned: Int,
-        val newPod: Boolean = false,  // fitted on pod v2 sets only
-    ) {
-        fun usable() = sets >= MIN_SETS || (newPod && sets >= MIN_NEW_POD)
-    }
+    )
 
     data class Model(
         val global: Fit?,
@@ -56,9 +55,9 @@ object RepModel {
         val warmPerExercise: Map<Int, Fit> = emptyMap(),
     ) {
         fun params(exerciseId: Int, warmup: Boolean = false): CounterParams =
-            (if (warmup) warmPerExercise[exerciseId]?.takeIf { it.usable() }?.params
-                ?: warmGlobal?.takeIf { it.usable() }?.params else null)
-                ?: perExercise[exerciseId]?.takeIf { it.usable() }?.params
+            (if (warmup) warmPerExercise[exerciseId]?.takeIf { it.sets >= MIN_SETS }?.params
+                ?: warmGlobal?.takeIf { it.sets >= MIN_SETS }?.params else null)
+                ?: perExercise[exerciseId]?.takeIf { it.sets >= MIN_SETS }?.params
                 ?: global?.params ?: CounterParams()
 
         fun toJson(): String = JSONObject().apply {
@@ -91,14 +90,12 @@ object RepModel {
                 put("detrend", f.params.detrend); put("sets", f.sets)
                 put("exactDefault", f.exactDefault); put("exactLearned", f.exactLearned)
                 put("missDefault", f.missDefault); put("missLearned", f.missLearned)
-                put("newPod", if (f.newPod) 1 else 0)
             }
 
             private fun fitFrom(o: JSONObject) = Fit(
                 CounterParams(o.getDouble("h"), o.getDouble("gap"), o.getString("signal"), o.getDouble("detrend")),
                 o.getInt("sets"), o.getInt("exactDefault"), o.getInt("exactLearned"),
                 o.getInt("missDefault"), o.getInt("missLearned"),
-                newPod = runCatching { o.getInt("newPod") == 1 }.getOrDefault(false),
             )
         }
     }
@@ -107,8 +104,11 @@ object RepModel {
         for (h in H) for (g in GAP) for (s in SIG) for (d in DET) add(CounterParams(h, g, s, d))
     }
 
+    /** Reps miscounted per set (pod v2 sets weighted, see NEW_POD_WEIGHT). */
     private fun errors(p: CounterParams, sets: List<Example>): IntArray =
-        IntArray(sets.size) { i -> abs((RepEngine.count(sets[i].signals, p)?.reps ?: 0) - sets[i].reps) }
+        IntArray(sets.size) { i ->
+            abs((RepEngine.count(sets[i].signals, p)?.reps ?: 0) - sets[i].reps) * (if (sets[i].newPod) NEW_POD_WEIGHT else 1)
+        }
 
     fun fit(sets: List<Example>): Fit? {
         if (sets.isEmpty()) return null
@@ -134,19 +134,11 @@ object RepModel {
         )
     }
 
-    /**
-     * Fit everything: all sets together, then each exercise on its own; and the warm-ups the same way, on their own.
-     * Pod v2 reads a rep a bit differently (where it sits, its case, its sensor), so wherever there are enough pod v2
-     * sets they're fitted on their own and the old pod's sets are left out; until then everything counts together.
-     */
+    /** Fit everything: all sets together, then each exercise on its own; and the warm-ups the same way, on their own. */
     fun train(examples: List<Example>): Model {
-        fun pick(xs: List<Example>, min: Int): Fit? {
-            val fresh = xs.filter { it.newPod }
-            return if (fresh.size >= min) fit(fresh)?.copy(newPod = true) else fit(xs)
-        }
-        val global = pick(examples, MIN_NEW_POD_GLOBAL)
-        val per = examples.groupBy { it.exerciseId }.mapValues { (_, v) -> pick(v, MIN_NEW_POD)!! }
+        val global = fit(examples)
+        val per = examples.groupBy { it.exerciseId }.mapValues { (_, v) -> fit(v)!! }
         val warm = examples.filter { it.warmup }
-        return Model(global, per, pick(warm, MIN_NEW_POD_GLOBAL), warm.groupBy { it.exerciseId }.mapValues { (_, v) -> pick(v, MIN_NEW_POD)!! })
+        return Model(global, per, fit(warm), warm.groupBy { it.exerciseId }.mapValues { (_, v) -> fit(v)!! })
     }
 }
