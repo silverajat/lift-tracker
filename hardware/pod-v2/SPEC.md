@@ -104,10 +104,10 @@ P0.00/P0.01 are the 32 kHz crystal pins, used here as GPIO, so the firmware must
 | State | Current | Per day |
 |---|---|---|
 | Gym session (IMU 100 Hz + BLE stream), 1.5 h | ~2 mA | ~3 mAh |
-| Off the wrist the rest of the day (IMU wake-on-motion, no advertising) | ~10–15 µA | ~0.3 mAh |
-| **Total with daily gym** | | **~3.5 mAh/day → ~10 days with margin** |
+| The rest of the day (IMU wake-on-motion, advertising once a second) | ~20–30 µA | ~0.6 mAh |
+| **Total with daily gym** | | **~3.6 mAh/day → about a week on the real ~30–40 mAh cell** |
 
-Worn only at the gym: no sleep tracking or alarm (the Fitbit does those). After ~20 min without motion the pod stops advertising and waits for the IMU's wake-on-motion; picking it up wakes it.
+Worn only at the gym: no sleep tracking or alarm (the Fitbit does those). It advertises once a second all the time: the first firmware stopped advertising after ~20 min without motion and sped it up on movement, but stopping and restarting the adverts around a connection locked up the Bluetooth controller (28 Nov), and the saving was ~0.3 mAh a day.
 
 ## Firmware changes for v2
 

@@ -54,7 +54,7 @@ After the switch, the first update has to go over SWD again.
 ## How it behaves
 
 - **Asleep** (almost always): accelerometer at 15 Hz in wake-on-motion, gyro and flash off, advertising once a
-  second. After 20 min with no movement and no app it stops advertising; moving it brings that back.
+  second, always (never stopped or switched between rates: that locked up the Bluetooth controller).
 - **Gym mode**: the app turns it on when you open a set (during the countdown) and off when you finish
   the workout. It also ends 5 min after the app goes away, or 45 min after the last set.
 - **After a workout**: the app copies every recording (100 Hz, accel + gyro) to the phone, then erases the

@@ -165,6 +165,7 @@ data class PodStatus(
     val faultThread: Int? = null,
     val faultStep: Int? = null,
     val faultReason: Int? = null,
+    val faultPrio: Int? = null,
     val faultUpS: Int? = null,
     val faultPc: Long? = null,
 ) {
@@ -174,7 +175,7 @@ data class PodStatus(
             val k = faultKind ?: return null
             if (k == 0) return null
             val what = if (k == 1) "crash" else "hang"
-            return "$what t$faultThread s$faultStep r$faultReason at 0x%08x after ${faultUpS} s".format(faultPc ?: 0L)
+            return "$what t$faultThread p$faultPrio s$faultStep r$faultReason at 0x%08x after ${faultUpS} s".format(faultPc ?: 0L)
         }
 
     /** "watchdog" etc., for the restart line in Settings. */
@@ -237,7 +238,7 @@ data class PodStatus(
             val fThread = if (more) bb.get().toInt() and 0xff else null
             val fStep = if (more) bb.get().toInt() and 0xff else null
             val fReason = if (more) bb.get().toInt() and 0xff else null
-            if (more) bb.get()                                   // priority: in the raw status, not shown
+            val fPrio = if (more) bb.get().toInt() else null      // signed
             val fUp = if (more) bb.short.toInt() and 0xffff else null
             val fPc = if (more) bb.int.toLong() and 0xffffffffL else null
             return PodStatus(
@@ -265,6 +266,7 @@ data class PodStatus(
                 faultThread = fThread,
                 faultStep = fStep,
                 faultReason = fReason,
+                faultPrio = fPrio,
                 faultUpS = fUp,
                 faultPc = fPc,
                 taps = taps.takeIf { proto >= 2 },

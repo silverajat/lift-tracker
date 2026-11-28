@@ -169,9 +169,11 @@ through a window in the case.*
 7. **The charger's magnet isn't centred between its pins.** With the pins on the pads, the magnet sits off the steel
    washer, so the pod has to be placed carefully. A rev B would move the steel to where the magnet actually is.
 8. **A restart loop.** After the battery update the sealed pod froze and came back about once a minute, and could only
-   be reached just after each restart. The update that started it also asked the phone for a slower link a few seconds
-   into every connection; that request is gone, every thread got more stack, a crash now restarts it in under a
-   second, and it keeps a note of where any crash or hang happened for the app to show.
+   be reached just after each restart. A first fix (more stack everywhere, an instant restart on a crash, and a note
+   of where any crash or hang happened, kept through the restart for the app to show) caught the next one: the
+   Bluetooth controller stuck in its advertising on/off command. The pod used to speed up, slow down and stop its
+   adverts with movement, and now that the app connects and lets go many times a day, that switching kept landing
+   on a connection. It now advertises once a second, always.
 
 Full first-flash and test steps, and the lessons above: [`firmware/pod/BRINGUP.md`](firmware/pod/BRINGUP.md).
 

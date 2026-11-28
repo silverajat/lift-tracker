@@ -37,7 +37,6 @@ static struct k_spinlock conn_lock;
 static volatile bool status_on, stream_on, data_on;
 static uint16_t stream_seq;
 static uint32_t stream_div;
-static enum adv_mode adv_want = ADV_FAST;
 
 /* ---- Control ------------------------------------------------------------------ */
 static ssize_t ctrl_write(struct bt_conn *c, const struct bt_gatt_attr *attr,
@@ -164,34 +163,26 @@ static const struct bt_data sd[] = {
 	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
 
-/* Slow: one advert a second (~10-20 uA): the app still finds it, it costs almost nothing. */
-#define ADV_SLOW_PARAM BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONN, BT_GAP_ADV_SLOW_INT_MIN, \
-				       BT_GAP_ADV_SLOW_INT_MAX, NULL)
+/* One advert a second (~10-20 uA), connectable, started once at boot and again only after a disconnect
+ * (the stack doesn't resume it on its own). Never stopped or switched between rates: stopping and
+ * restarting adverts while the phone was connecting or letting go locked up the controller (the hang
+ * the crash record caught on 28 Nov was inside its advertising on/off command). */
+#define ADV_PARAM BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONN, BT_GAP_ADV_SLOW_INT_MIN, BT_GAP_ADV_SLOW_INT_MAX, NULL)
 
 static void adv_apply(struct k_work *w)
 {
-	bt_le_adv_stop();
-	if (conn || adv_want == ADV_OFF) {
+	if (conn) {
 		return;
 	}
-	int err = bt_le_adv_start(adv_want == ADV_FAST ? BT_LE_ADV_CONN_FAST_2 : ADV_SLOW_PARAM,
-				  ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+	int err = bt_le_adv_start(ADV_PARAM, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 
 	if (err && err != -EALREADY) {
 		LOG_ERR("advertising failed (%d)", err);
 	} else {
-		LOG_INF("advertising (%s)", adv_want == ADV_FAST ? "fast" : "slow");
+		LOG_INF("advertising");
 	}
 }
 K_WORK_DEFINE(adv_work, adv_apply);
-
-void ble_advertise(enum adv_mode m)
-{
-	if (adv_want != m) {
-		adv_want = m;
-		k_work_submit(&adv_work);
-	}
-}
 
 /* ---- Connections ------------------------------------------------------------------ */
 static struct bt_conn *conn_get(void)

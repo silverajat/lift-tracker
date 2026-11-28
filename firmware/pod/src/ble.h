@@ -118,14 +118,12 @@ struct app_cmd {
 	struct set_label label;
 };
 
-enum adv_mode { ADV_OFF, ADV_SLOW, ADV_FAST };
 
 int ble_init(void);
 bool ble_connected(void);
 bool ble_get_cmd(struct app_cmd *out, k_timeout_t wait);
 void ble_stream_sample(const struct sample *s);
 void ble_status_changed(void);
-void ble_advertise(enum adv_mode m);
 void ble_fast_link(bool fast);      /* short connection interval (gym, downloads) or a lazy one */
 int ble_send_recording(uint16_t rec_id, uint32_t from);
 void pod_wdt_feed(void);   /* main.c: keep the watchdog happy during long work */   /* blocks until sent; runs in the cmd thread */

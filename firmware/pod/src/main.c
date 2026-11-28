@@ -4,9 +4,9 @@
  *
  * Asleep (most of the time)
  *   Sensor in low-power wake mode (gyro off, accel at 15 Hz), flash in deep power-down,
- *   CPU idle. Bluetooth advertises once a second so the app can always find it; after
- *   ADV_IDLE_MIN minutes with no movement and no app, it stops advertising too, and the
- *   next movement (picking it up, strapping it on) brings the adverts back.
+ *   CPU idle. Bluetooth advertises once a second, always, so the app can always find it.
+ *   (It used to switch between fast, slow and off with movement; stopping and restarting the
+ *   adverts around a connection locked up the Bluetooth controller: the restart loop of 28 Nov.)
  * Gym mode (the app sends OP_GYM 1 when a workout starts, or OP_START)
  *   Sensor at full rate, sampled at 100 Hz, live stream to the app, recordings on flash,
  *   fast Bluetooth link. Ends on OP_GYM 0 (workout finished), or GYM_LOST_MIN minutes after
@@ -151,8 +151,6 @@ void pod_wdt_feed(void)
 #define FW_VERSION      3       /* 3 = pod v2 */
 #define STOP_STILL_S    12      /* app gone mid-set: close it after this much stillness */
 #define MAX_REC_S       300     /* safety cap per recording */
-#define ADV_FAST_S      30      /* fast adverts this long after waking, for a quick connect */
-#define ADV_IDLE_MIN    20      /* no movement and no app this long: stop advertising */
 #define GYM_LOST_MIN    5       /* in gym mode with the app gone this long: back to sleep */
 #define GYM_IDLE_MIN    45      /* in gym mode with no set this long (finish forgotten): back to sleep */
 #define MOVE_GYRO_DPS   40
@@ -580,9 +578,7 @@ int main(void)
 		}
 	}
 
-	int64_t last_motion = k_uptime_get();
 	int64_t last_app = k_uptime_get();
-	int64_t fast_until = k_uptime_get() + ADV_FAST_S * 1000;
 	bool was_connected = false;
 	uint8_t seen_taps = imu_taps();
 
@@ -625,22 +621,7 @@ int main(void)
 			k_msleep(70);
 			gpio_pin_set_dt(&motor, 0);
 		}
-		if (imu_take_wake() || charging()) {
-			if (now - last_motion > ADV_FAST_S * 1000) {
-				fast_until = now + ADV_FAST_S * 1000;
-			}
-			last_motion = now;
-		}
-
-		STEP(S_ADV);
-		/* advertising: fast just after waking, then once a second, then off when idle */
-		if (now < fast_until) {
-			ble_advertise(ADV_FAST);
-		} else if (now - MAX(last_motion, last_app) < ADV_IDLE_MIN * 60 * 1000LL) {
-			ble_advertise(ADV_SLOW);
-		} else {
-			ble_advertise(ADV_OFF);
-		}
+		(void)imu_take_wake();   /* motion no longer changes anything here (see ble.c, advertising) */
 
 		STEP(S_GYMLOST);
 		/* gym mode with the app gone: back to sleep */
