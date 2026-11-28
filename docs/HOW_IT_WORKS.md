@@ -142,14 +142,15 @@ Next-morning recovery on days with vs without a habit. Needs 5+ days each way. "
   sleep when you finish the workout (or by itself 5 min after the app goes away, or 45 min after the last set).
 - It buzzes once when rest is over and twice when a set starts.
 - The phone only stays connected while the gym part of the app is open or a workout is running (then a few seconds
-  more to copy the recordings): a phone holding the link all day was most of the pod's battery use. Once connected it
-  drops to a slow link unless you're in a set.
+  more to copy the recordings): a phone holding the link all day was most of the pod's battery use.
 - Tap it twice (two quick knocks on the case) to end the set: the sensor's own tap detector, on only in gym mode.
   A short buzz says it took.
 - After a workout the app copies the pod's full-rate recordings (100 Hz) to the phone and then clears the pod.
   Settings, "Export pod recordings", saves them as a zip in the same layout as the laptop dumps.
 - The live stream and the rep counter are the same as on the prototype, so everything learned on it carries over (pod v2 sets just count more, see Rep counter).
-- A 60 s watchdog restarts it if the firmware ever hangs: it's sealed, with no reset button.
+- It's sealed, with no reset button: a crash restarts it at once, and a 15 s watchdog restarts it if the firmware ever
+  hangs. Either way it notes what happened in a corner of memory that survives the restart, and Settings shows it
+  under "Pod" (how long it's been running, why it last started, and what ended the run before).
   First flash and updates: `firmware/pod/BRINGUP.md`.
 
 ## Google Health extras

@@ -127,7 +127,8 @@ through a window in the case.*
 - **Bluetooth:** a custom service (status, commands, live stream, recording download with resume). The phone
   only connects while you're in the gym part of the app, and the link drops from 7.5 ms to a slow interval
   outside sets.
-- **A sealed pod can't be reset by hand,** so a 60 s watchdog restarts it if anything hangs, and the IMU interrupt
+- **A sealed pod can't be reset by hand,** so a crash restarts it at once and a 15 s watchdog restarts it if anything
+  hangs, each leaving a note of where it was for the app; the IMU interrupt
   is re-checked every second in case an edge was ever missed.
 
 ## The app ([`app/android`](app/android))
@@ -161,12 +162,16 @@ through a window in the case.*
 
 5. **25% of the battery gone in two hours.** The phone held the pod on a 7.5 ms link all day, and the nRF52 was still
    in debug-interface mode from programming (it only leaves on a full power-off). Now the app connects only in the
-   gym and the pod asks for a slow link outside sets.
+   gym.
 6. **Moving the counter to the new pod.** The new pod sits differently on the wrist, so I tried retraining the counter
    on pod v2 sets alone. Replayed over the first 21 real sets it missed 103 reps, against 36 with the settings learned
    on the prototype. So the old training stays, and pod v2 sets count 3× as it keeps learning.
 7. **The charger's magnet isn't centred between its pins.** With the pins on the pads, the magnet sits off the steel
    washer, so the pod has to be placed carefully. A rev B would move the steel to where the magnet actually is.
+8. **A restart loop.** After the battery update the sealed pod froze and came back about once a minute, and could only
+   be reached just after each restart. The update that started it also asked the phone for a slower link a few seconds
+   into every connection; that request is gone, every thread got more stack, a crash now restarts it in under a
+   second, and it keeps a note of where any crash or hang happened for the app to show.
 
 Full first-flash and test steps, and the lessons above: [`firmware/pod/BRINGUP.md`](firmware/pod/BRINGUP.md).
 
