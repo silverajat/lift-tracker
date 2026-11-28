@@ -79,7 +79,8 @@ object Foods {
         // label values are per 50 g; you have 25 g (from 28 Nov)
         "clusters" to listOf(Part("g", "Protein clusters", "g", 25.0, per(Macros(207.0, 8.3, 16.2, 10.1, 8.5), 50.0))),
         // Sanitarium label: 2 biscuits (31 g) = 459 kJ (110 kcal), 3.8 g protein, 20.4 g carbs, 0.4 g fat, 4.0 g fibre
-        "weetbix" to listOf(Part("biscuits", "Weet-Bix", "biscuits", 4.0, per(Macros(110.0, 3.8, 20.4, 0.4, 4.0), 2.0))),
+        "weetbix" to listOf(Part("biscuits", "Weet-Bix", "biscuits", 2.0, per(Macros(110.0, 3.8, 20.4, 0.4, 4.0), 2.0))),
+        "weetbix_bowl" to listOf(Part("biscuits", "Weet-Bix", "biscuits", 2.0, per(Macros(110.0, 3.8, 20.4, 0.4, 4.0), 2.0))),
         "yoghurt" to one("g", "Yoghurt", "g", 125.0, Macros(95.0, 5.0, 18.1, 0.2)),
         "blueberries" to one("g", "Blueberries", "g", 125.0, Macros(71.0, 0.9, 18.0, 0.4, 3.0)),
         "psyllium" to one("g", "Psyllium husk", "g", 5.0, Macros(20.0, 0.0, 4.0, 0.0, 4.0)),
@@ -153,7 +154,8 @@ object Foods {
             Macros(700.0, 43.0, 72.0, 25.0, 8.0), "photo + stall portions"),
         Food("mayvers10", "Peanut butter (unsalted), 10 g", Macros(58.5, 2.45, 2.15, 4.2, 0.75), "label"),
         Food("clusters", "Red Tractor protein clusters, 25 g", Macros(103.5, 4.15, 8.1, 5.05, 4.25), "label"),
-        Food("weetbix", "Weet-Bix Original, 4 biscuits", Macros(220.0, 7.6, 40.8, 0.8, 8.0), "label"),
+        Food("weetbix", "Weet-Bix Original, 2 biscuits", Macros(110.0, 3.8, 20.4, 0.4, 4.0), "label"),
+        Food("weetbix_bowl", "Weet-Bix Original crushed in, 2 biscuits", Macros(110.0, 3.8, 20.4, 0.4, 4.0), "label"),
         Food("yoghurt", "Marigold mixed berries non-fat yoghurt, 125 g", Macros(95.0, 5.0, 18.1, 0.2)),
         // fruit: one serving of about 150 g (USDA values per 100 g x 1.5)
         Food("kiwi2", "2 green kiwis (150 g)", Macros(92.0, 1.7, 22.0, 0.8, 4.5)),
@@ -264,7 +266,7 @@ object MealPlan {
             add(PlannedItem(Slot.SNACK, Foods.get("honey10")))
             add(PlannedItem(Slot.SNACK, Foods.get("weetbix")))
             add(PlannedItem(Slot.DINNER, dinner))
-            add(PlannedItem(Slot.YOGHURT, Foods.get("clusters")))
+            add(PlannedItem(Slot.YOGHURT, Foods.get("weetbix_bowl")))
             add(PlannedItem(Slot.YOGHURT, Foods.get("yoghurt")))
             fruits.forEachIndexed { i, f -> add(PlannedItem(Slot.YOGHURT, f, optional = i > 0)) }
             add(PlannedItem(Slot.SUPPLEMENTS, Foods.get("supplements")))
@@ -283,8 +285,8 @@ object MealPlan {
         Post-workout: ${Foods.get("shake").amounts["whey"]?.toInt() ?: 32} g Optimum Nutrition Gold Standard Whey (Mocha Cappuccino) + 3 g creatine in 100 ml Marigold HL Green + 100 ml NutriSoy No Sugar Added (~32 g protein, ~4.8 g fat). Measure everything.
         Mains: (1) Salad bowl: citrus-lime chicken breast, Japanese roasted sesame dressing (ask for less), brown rice + broccoli, chickpeas + edamame + egg (carrot instead of egg on Tue/Thu). (2) Steamed chicken rice set + extra skinless chicken (ask for breast), extra rice, bok choy, half a boiled egg. (3) Mixed rice: rice, 2 portions curry chicken, tofu, egg, cabbage or broccoli.
         Rotation: Mon-Fri salad + chicken rice; Sat and Sun chicken rice + mixed rice. Salad is usually weekday lunch and should be early (shop may close); chicken rice can be lunch or dinner; order flexible.
-        Afternoon snack: 1 slice bread, 10 g unsalted peanut butter, 10 g honey, 4 Weet-Bix Original on their own (added 28 Nov; 220 kcal, 7.6 g protein, 40.8 g carbs, 8 g fibre).
-        9 PM yoghurt bowl: 25 g Red Tractor protein clusters (cut from 50 g on 28 Nov) + 125 g Marigold mixed berries non-fat yoghurt + fruit (Mon 2 kiwis, Tue 125 g blueberries, Wed 1 cup apple/orange/guava, Thu 2 kiwis, Fri 125 g blueberries, Sat 1 cup guava or red dragon fruit, Sun 1 cup mango).
+        Afternoon snack: 1 slice bread, 10 g unsalted peanut butter, 10 g honey, 2 Weet-Bix Original on their own (added 28 Nov; 110 kcal, 3.8 g protein, 20.4 g carbs, 0.4 g fat, 4 g fibre).
+        9 PM yoghurt bowl: 2 Weet-Bix Original crushed in, just before eating (replaced the 50 g Red Tractor protein clusters on 28 Nov, which had 10 g fat) + 125 g Marigold mixed berries non-fat yoghurt + fruit (Mon 2 kiwis, Tue 125 g blueberries, Wed 1 cup apple/orange/guava, Thu 2 kiwis, Fri 125 g blueberries, Sat 1 cup guava or red dragon fruit, Sun 1 cup mango).
         10 PM supplements: NOW L-OptiZinc 30 mg, NOW magnesium glycinate 200 mg, NOW D3/K2 1,000 IU + 45 mcg, NOW Ultra Omega-3 500 mg EPA + 250 mg DHA.
         Psyllium husk 5 g once daily around a low-fibre meal with water. Honey 30 g/day. Peanut butter 20 g/day per plan (the snack lists 10 g). Coconut water 250 ml on waking.
         Going out: Meiji 30 g protein drink, skip afternoon snack, enjoy dessert. Lab days: no unnecessary snacking, konjac jelly if needed, no candy or gum.

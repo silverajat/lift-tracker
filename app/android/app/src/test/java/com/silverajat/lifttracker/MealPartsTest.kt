@@ -29,14 +29,14 @@ class MealPartsTest {
     }
 
     @Test
-    fun weetBixAndTheSmallerBowl() {
+    fun weetBixTwiceADay() {
         val w = Foods.get("weetbix")
-        assertEquals(220.0, w.macros.kcal, 0.5)
-        assertEquals(8.0, w.macros.fibre, 0.05)
-        assertEquals("Weet-Bix Original, 4 biscuits", w.name)
-        assertEquals(110.0, Foods.withAmounts(Foods.base("weetbix")!!, mapOf("biscuits" to 2.0)).macros.kcal, 0.5)
-        val c = Foods.get("clusters")
-        assertEquals(103.5, c.macros.kcal, 0.5)
-        assertEquals("Red Tractor protein clusters, 25 g", c.name)
+        assertEquals(110.0, w.macros.kcal, 0.5)
+        assertEquals(4.0, w.macros.fibre, 0.05)
+        assertEquals("Weet-Bix Original, 2 biscuits", w.name)
+        assertEquals(220.0, Foods.withAmounts(Foods.base("weetbix")!!, mapOf("biscuits" to 4.0)).macros.kcal, 0.5)
+        val day = com.silverajat.lifttracker.meals.MealPlan.day(java.time.LocalDate.of(2026, 11, 30))
+        assertTrue(day.none { it.food.id == "clusters" })
+        assertEquals(2, day.count { it.food.id.startsWith("weetbix") })
     }
 }
