@@ -155,7 +155,18 @@ data class PodStatus(
     val gym: Boolean = false,
     /** v2: double taps on the pod, counting up (wraps at 256); a new one ends the set. Null on older firmware. */
     val taps: Int? = null,
+    /** v2.1: seconds since the pod last started, why it did (0 power-up, 1 pin, 2 watchdog, 3 software, 4 lockup),
+     *  and how many times it has restarted since it was powered up. Null on older firmware. */
+    val uptimeS: Long? = null,
+    val resetWhy: Int? = null,
+    val restarts: Int? = null,
 ) {
+    /** "watchdog" etc., for the restart line in Settings. */
+    val resetLabel: String?
+        get() = when (resetWhy) {
+            null -> null; 0 -> "power-up"; 1 -> "reset pin"; 2 -> "watchdog"; 3 -> "software"; 4 -> "lockup"; else -> "other"
+        }
+
     /** Talks protocol 2: gym mode, buzz, recording download. */
     val v2: Boolean get() = proto >= 2
 
@@ -202,6 +213,9 @@ data class PodStatus(
             val hw = if (bb.hasRemaining()) bb.get().toInt() and 0xff else 0
             val busy = if (bb.hasRemaining()) bb.get().toInt() and 0xff else 0
             val taps = if (bb.hasRemaining()) bb.get().toInt() and 0xff else null
+            val up = if (bb.remaining() >= 6) bb.int.toLong() and 0xffffffffL else null
+            val why = if (up != null) bb.get().toInt() and 0xff else null
+            val restarts = if (up != null) bb.get().toInt() and 0xff else null
             return PodStatus(
                 proto = proto,
                 recording = f and 0x01 != 0,
@@ -220,6 +234,9 @@ data class PodStatus(
                 hardware = hw,
                 busy = proto >= 2 && busy != 0,
                 gym = proto >= 2 && f and 0x80 != 0,
+                uptimeS = up,
+                resetWhy = why,
+                restarts = restarts,
                 taps = taps.takeIf { proto >= 2 },
             )
         }

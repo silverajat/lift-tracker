@@ -412,7 +412,8 @@ static void ble_thread(void)
 			struct pod_status st;
 
 			pod_fill_status(&st);
-			bt_gatt_notify(c, &pod_svc.attrs[4], &st, sizeof(st));
+			/* the diagnostics at the end only fit once the phone has asked for a bigger MTU */
+			bt_gatt_notify(c, &pod_svc.attrs[4], &st, MIN(sizeof(st), bt_gatt_get_mtu(c) - 3));
 			next_status = k_uptime_get() + 1000;
 		}
 		bt_conn_unref(c);

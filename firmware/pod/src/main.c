@@ -32,6 +32,8 @@
 #include "imu.h"
 #include "storage.h"
 #include <zephyr/drivers/watchdog.h>
+#include <zephyr/drivers/hwinfo.h>
+#include <hal/nrf_power.h>
 
 LOG_MODULE_REGISTER(pod, LOG_LEVEL_INF);
 
@@ -260,6 +262,35 @@ static bool charging(void)
 	return gpio_pin_get_dt(&chg) == 1;   /* active low in the devicetree */
 }
 
+/* Why the pod last started, and how many times it has restarted since it was powered up. GPREGRET2 survives
+ * every reset except losing power, so bit 7 marks "has been running" and bits 0-6 count the restarts. */
+static uint8_t reset_why, restarts;
+
+static void note_reset(void)
+{
+	uint32_t cause = 0;
+	uint32_t reg = nrf_power_gpregret_get(NRF_POWER, 1);
+
+	hwinfo_get_reset_cause(&cause);
+	hwinfo_clear_reset_cause();
+	if (cause & RESET_WATCHDOG) {
+		reset_why = RST_WATCHDOG;
+	} else if (cause & RESET_CPU_LOCKUP) {
+		reset_why = RST_LOCKUP;
+	} else if (cause & RESET_SOFTWARE) {
+		reset_why = RST_SOFT;
+	} else if (cause & RESET_PIN) {
+		reset_why = RST_PIN;
+	} else if (!(reg & 0x80)) {
+		reset_why = RST_POWER;
+	} else {
+		reset_why = RST_OTHER;
+	}
+	restarts = (reg & 0x80) ? MIN((reg & 0x7f) + 1, 0x7f) : 0;
+	nrf_power_gpregret_set(NRF_POWER, 1, 0x80 | restarts);
+	LOG_INF("started: reason %u (cause 0x%x), restart %u", reset_why, cause, restarts);
+}
+
 void pod_fill_status(struct pod_status *st)
 {
 	k_mutex_lock(&store_lock, K_FOREVER);
@@ -282,6 +313,9 @@ void pod_fill_status(struct pod_status *st)
 		.hw = POD_HW,
 		.busy = busy,
 		.taps = imu_taps(),
+		.uptime_s = (uint32_t)(k_uptime_get() / 1000),
+		.reset_why = reset_why,
+		.restarts = restarts,
 	};
 }
 
@@ -320,6 +354,17 @@ static void set_gym(bool on)
 	} else {
 		gym = false;                       /* the sampler closes any open recording */
 		k_msleep(50);
+		/* and don't put the flash to sleep under it while it's still closing one (up to 2 s) */
+		for (int i = 0; i < 40; i++) {
+			k_mutex_lock(&store_lock, K_FOREVER);
+			bool open = storage_recording();
+
+			k_mutex_unlock(&store_lock);
+			if (!open) {
+				break;
+			}
+			k_msleep(50);
+		}
 		if (imu_ok) {
 			imu_active(false);
 		}
@@ -399,6 +444,7 @@ static void handle_cmd(const struct app_cmd *c)
 
 int main(void)
 {
+	note_reset();
 	gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
 	gpio_pin_configure_dt(&motor, GPIO_OUTPUT_INACTIVE);
 	gpio_pin_configure_dt(&chg, GPIO_INPUT);
@@ -417,14 +463,20 @@ int main(void)
 	int bt = ble_init();
 
 	/* A fresh update is only kept once it has started cleanly; otherwise MCUboot rolls back. */
+	bool new_image = !boot_is_img_confirmed();
+
 	if (bt == 0 && imu_ok) {
 		boot_write_img_confirmed();
 	}
-	blink(200);
-	/* no hello-buzz on a nearly flat cell: the motor's kick can dip it enough to restart the pod, which buzzes
-	 * again, and so on (a buzz every minute or so as the cell recovers between tries) */
-	if (batt_cache_mv == 0 || batt_cache_mv > 3500) {
-		buzz(1);
+	/* Hello blink and buzz only when you'd expect one: first power-up, or a new firmware. A restart on its own
+	 * (the watchdog, a crash) stays silent, so a fault can never turn into buzzing on your wrist; the reason
+	 * and the count go to the app instead (Settings). And no buzz on a nearly flat cell, which could dip it
+	 * enough to restart again. */
+	if (reset_why == RST_POWER || reset_why == RST_PIN || new_image) {
+		blink(200);
+		if (batt_cache_mv == 0 || batt_cache_mv > 3500) {
+			buzz(1);
+		}
 	}
 
 	int64_t last_motion = k_uptime_get();

@@ -68,7 +68,12 @@ struct __packed pod_status {
 	uint8_t hw;            /* v2: POD_HW (was a 0 reserved byte on the prototype) */
 	uint8_t busy;          /* v2: 1 while erasing or sending a recording */
 	uint8_t taps;          /* v2: double taps in gym mode, counting up (wraps at 256): end the set */
-};                             /* 16 bytes */
+	uint32_t uptime_s;     /* v2.1: seconds since the pod last started */
+	uint8_t reset_why;     /* v2.1: why it last started, enum pod_reset */
+	uint8_t restarts;      /* v2.1: restarts since it was last powered up (saturates at 127) */
+};                             /* 22 bytes */
+
+enum pod_reset { RST_POWER = 0, RST_PIN = 1, RST_WATCHDOG = 2, RST_SOFT = 3, RST_LOCKUP = 4, RST_OTHER = 5 };
 
 struct __packed stream_pkt {
 	uint16_t seq;

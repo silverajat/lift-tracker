@@ -30,6 +30,10 @@ class PodV2Test {
         assertNull(p.taps); assertNull(v2.taps)
         val tapped = PodStatus.parse(status(2, 0x80, 16) + byteArrayOf(5))!!
         assertEquals(5, tapped.taps)
+        assertNull(tapped.uptimeS)
+        // v2.1: uptime, why it last started and the restart count on the end
+        val diag = PodStatus.parse(status(2, 0x80, 16) + byteArrayOf(5) + le(6).apply { putInt(3725); put(2); put(4) }.array())!!
+        assertEquals(3725L, diag.uptimeS); assertEquals("watchdog", diag.resetLabel); assertEquals(4, diag.restarts)
     }
 
     @Test
