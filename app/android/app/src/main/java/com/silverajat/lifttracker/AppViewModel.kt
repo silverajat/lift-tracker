@@ -7,6 +7,7 @@ import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.silverajat.lifttracker.ble.PodClient
+import com.silverajat.lifttracker.ble.PodStatus
 import com.silverajat.lifttracker.ble.PodConn
 import com.silverajat.lifttracker.ble.PodProtocol
 import com.silverajat.lifttracker.data.Day
@@ -68,6 +69,9 @@ data class NextSet(val ex: Exercise, val setNo: Int, val weight: Double, val add
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     val pod = PodClient(app, viewModelScope)
+    private val _podSeen = MutableStateFlow<Pair<PodStatus, Long>?>(null)
+    /** The pod's last status and when it was received. */
+    val podSeen: StateFlow<Pair<PodStatus, Long>?> = _podSeen
     private val store = SessionStore(app)
     private val raw = RawStore(app)
     /** Full-rate recordings downloaded from pod v2 (dump_logs format). */
@@ -199,6 +203,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.Default) { runCatching { autoEndOff = checkAutoEnd(_model.value) } }
         // pod v2 sets now get their own fit: redo the model once with this version
         if (prefs.getInt("model_v", 0) < 2) { prefs.edit().putInt("model_v", 2).apply(); retrain() }
+        viewModelScope.launch {
+            // the pod's last status with when it came, for Settings (the app lets go of the pod outside the gym)
+            pod.status.collect { st -> if (st != null) _podSeen.value = st to System.currentTimeMillis() }
+        }
         viewModelScope.launch {
             // pod v2: tapping it twice ends the set (a reconnect only sets the starting count)
             var last: Int? = null

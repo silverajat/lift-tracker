@@ -120,10 +120,13 @@ fun SettingsScreen(hub: HubViewModel, vm: com.silverajat.lifttracker.AppViewMode
                     Text(if (fresh > 0) "$fresh new since the last export" else "All saved sets as a zip in Downloads",
                         style = MaterialTheme.typography.bodySmall, color = C.Muted)
                 }
-                val st by vm.pod.status.collectAsStateWithLifecycle()
-                st?.uptimeS?.let { up ->
+                val seen by vm.podSeen.collectAsStateWithLifecycle()
+                seen?.let { (st, at) ->
+                    val up = st.uptimeS ?: return@let
                     val ago = if (up < 3600) "${up / 60} min" else "${up / 3600} h ${up % 3600 / 60} min"
-                    Text("Running $ago · last start: ${st?.resetLabel} · restarts since power-up: ${st?.restarts}",
+                    val time = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                        .format(java.time.Instant.ofEpochMilli(at).atZone(java.time.ZoneId.systemDefault()))
+                    Text("At $time: running $ago · last start: ${st.resetLabel} · restarts since power-up: ${st.restarts}",
                         style = MaterialTheme.typography.bodySmall, color = C.Muted, modifier = Modifier.padding(top = 8.dp))
                 }
             }
