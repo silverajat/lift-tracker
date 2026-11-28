@@ -1,7 +1,7 @@
 # Polished public repo: plan
 
-Pod v2 bring-up is done and the README is rewritten (28 Nov). Still to do: the demo clip below, and photos of the
-finished pod (the README has `<!-- PHOTO -->` markers where they go).
+Pod v2 bring-up is done and the README is rewritten (28 Nov). Photos are in (docs/photos).
+Still to do: the demo clip below.
 
 ## The hero demo (top of the README)
 

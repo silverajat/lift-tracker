@@ -15,15 +15,13 @@ Python (NumPy) · OpenSCAD · GitHub Actions
 
 > **Demo coming:** a set of preacher curls filmed next to a screen recording of the app counting the reps live.
 
-<!-- PHOTO: finished pod v2 on the wrist / strap (hero) -->
-
 <p>
-<img src="hardware/pod-v2/release/liftpod_v2_revA/previews/board_top.png" width="390" alt="Pod v2 board, top side: Ebyte E73 nRF52840 module, IMU, flash and charger on a 41 x 18 mm board">
-<img src="hardware/pod-v2/release/liftpod_v2_revA/previews/board_bottom.png" width="390" alt="Pod v2 board, underside: black solder mask with two gold charging contacts">
+<img src="docs/photos/pod_underside.jpg" width="430" alt="The pod on its strap, underside up: black circuit board with two gold charging contacts and the text LIFT POD v2, silverajat 2026">
+<img src="docs/photos/pod_on_wrist.jpg" width="383" alt="The pod on a wrist, under its fabric strap">
 </p>
 
-*Pod v2: my own 4-layer, 0.8 mm board, 41 × 18 mm, assembled by JLCPCB. The underside is the outside of the pod:
-two gold contacts land on the Fitbit Air charger's pins.*
+*Pod v2 on its strap. Left: the underside is the board itself: black solder mask, the two gold contacts for the
+Fitbit Air charger, and the debug pads under Kapton. Right: worn on the wrist.*
 
 ---
 
@@ -103,9 +101,20 @@ flowchart LR
   [`release/liftpod_v2_revA`](hardware/pod-v2/release/liftpod_v2_revA). Design decisions:
   [`SPEC.md`](hardware/pod-v2/SPEC.md).
 
-<!-- PHOTO: pod next to the Fitbit Air (top + side) -->
-<!-- PHOTO: pod on the Fitbit charger, red LED lit -->
-<!-- PHOTO: bare JLC boards, top and underside -->
+<p>
+<img src="docs/photos/pod_vs_fitbit.jpg" width="400" alt="The pod side by side with a Fitbit Air, seen edge-on: the pod is slightly thinner">
+<img src="docs/photos/pod_charging.jpg" width="400" alt="The pod held on the Fitbit Air charger, its red charging LED lit">
+</p>
+
+*Left: the pod (bottom) under a Fitbit Air, edge-on. Right: charging on the Fitbit Air charger; the red LED shows
+through a window in the case.*
+
+<p>
+<img src="docs/images/board_top.png" width="400" alt="Pod v2 board render, top side: Ebyte E73 nRF52840 module, IMU, flash and charger on a 41 x 18 mm board">
+<img src="docs/images/board_bottom.png" width="400" alt="Pod v2 board render, underside: black solder mask with two gold charging contacts">
+</p>
+
+*The board as designed: 41 × 18 mm, 4 layers, 0.8 mm, assembled by JLCPCB.*
 
 ## The firmware ([`firmware/pod`](firmware/pod))
 
@@ -146,6 +155,9 @@ flowchart LR
    and there was no short across the battery or the motor pads. The likely cause: a loose steel washer I'd been
    trying in different spots on the powered board had bridged pins and damaged a part. The spare board, built with a test after every step, worked
    first time.
+
+   <img src="docs/photos/board_first_build.jpg" width="480" alt="The first board: the nRF52840 module, the steel washer on Kapton in the middle, and the battery soldered on">
+
 5. **25% of the battery gone in two hours.** The phone held the pod on a 7.5 ms link all day, and the nRF52 was still
    in debug-interface mode from programming (it only leaves on a full power-off). Now the app connects only in the
    gym and the pod asks for a slow link outside sets.
@@ -174,6 +186,7 @@ Raw recordings stay private; the simulated sets and a day of pod v2 sets (motion
 set end, rep quality, learning, rest timer and history.
 
 **Next:**
+
 - Accuracy table on pod v2 once the counter has learned it (upper-body days first: a wrist pod reads those best)
 - Measure battery life over a week (estimated at 5–6 workouts a charge)
 - The filmed demo
