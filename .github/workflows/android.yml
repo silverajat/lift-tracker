@@ -24,8 +24,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      # Robolectric downloads a ~150 MB Android jar from Maven Central on every run, and Central
+      # rate-limits (HTTP 429): keep it in the cache and retry the tests if the first fetch is refused.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-android-all-15
       - name: Unit tests (rep counter vs the Python reference)
-        run: gradle testDebugUnitTest --no-daemon --stacktrace -i | grep -E "MISMATCH|exact|ROM|FAILED|PASSED|Tests" || true; gradle testDebugUnitTest --no-daemon
+        run: |
+          gradle testDebugUnitTest --no-daemon --stacktrace -i | grep -E "MISMATCH|exact|ROM|FAILED|PASSED|Tests" || true
+          for i in 1 2 3; do gradle testDebugUnitTest --no-daemon && exit 0; echo "retry $i in 60 s"; sleep 60; done
+          exit 1
       - name: Screenshots (sample data)
         if: always()
         uses: actions/upload-artifact@v4
